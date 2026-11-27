@@ -142,7 +142,7 @@ public sealed class NetworkAdapterAdvancedDiagnosticsServiceTests
     }
 
     [Theory]
-    [InlineData("=HYPERLINK(\"https://example.invalid\")", "\"'=HYPERLINK(\"\"https://example.invalid\"")\"")]
+    [InlineData("=HYPERLINK(\"https://example.invalid\")", "\"'=HYPERLINK(\"\"https://example.invalid\"\")\"")]
     [InlineData("Normal text", "\"Normal text\"")]
     public void EscapeCsv_PreventsFormulaInjection(string input, string expected)
     {
