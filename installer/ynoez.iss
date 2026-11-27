@@ -40,6 +40,22 @@ Name: "{app}\Data"; Permissions: users-modify; Flags: uninsneveruninstall
 Name: "{app}\Backups"; Permissions: users-modify; Flags: uninsneveruninstall
 Name: "{app}\Logs"; Permissions: users-modify; Flags: uninsneveruninstall
 Name: "{app}\Downloads"; Permissions: users-modify; Flags: uninsneveruninstall
+Name: "{app}\Toolbox\Debloat"
+Name: "{app}\Toolbox\Internet"
+Name: "{app}\Toolbox\Windows"
+Name: "{app}\Toolbox\Servicos"
+Name: "{app}\Toolbox\Drivers"
+Name: "{app}\Toolbox\GPU"
+Name: "{app}\Toolbox\CPU"
+Name: "{app}\Toolbox\RAM"
+Name: "{app}\Toolbox\Energia"
+Name: "{app}\Toolbox\Jogos"
+Name: "{app}\Toolbox\Brave"
+Name: "{app}\Toolbox\Discord"
+Name: "{app}\Toolbox\Ferramentas"
+Name: "{app}\Toolbox\Diagnostico"
+Name: "{app}\Toolbox\Restauracao"
+Name: "{app}\Toolbox\Placas-mae"
 Name: "{app}\Toolbox\Performance"; Permissions: users-modify
 
 [Files]
