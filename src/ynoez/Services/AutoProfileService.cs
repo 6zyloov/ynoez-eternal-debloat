@@ -29,7 +29,8 @@ public static class AutoProfileService
         string[] GameProcessNames,
         string[] ProtectedProcessNames,
         int IdleThresholdMinutes,
-        int PollIntervalSeconds);
+        int PollIntervalSeconds,
+        bool ProtectionConfigInvalid);
 
     private sealed record UserSettings(int SchemaVersion, string[] ProtectedProcessNames);
 
@@ -93,7 +94,8 @@ public static class AutoProfileService
         TimeSpan idleTime,
         TimeSpan idleThreshold,
         bool gameRunning,
-        bool protectedProcessRunning)
+        bool protectedProcessRunning,
+        bool protectionConfigInvalid = false)
     {
         if (idleThreshold < TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(idleThreshold));
@@ -105,6 +107,8 @@ public static class AutoProfileService
         // a sleep-prevention request, never the aggressive power-saver plan.
         if (gameRunning && idleTime < idleThreshold)
             return PowerProfileMode.Performance;
+        if (protectionConfigInvalid)
+            return PowerProfileMode.ProtectedAfk;
         if (gameRunning || protectedProcessRunning)
             return PowerProfileMode.ProtectedAfk;
 
@@ -138,8 +142,11 @@ public static class AutoProfileService
                 token.ThrowIfCancellationRequested();
                 var idle = GetIdleTime();
                 var game = FindRunningProcess(settings.GameProcessNames);
-                var protectedProcess = FindRunningProcess(settings.ProtectedProcessNames);
-                var desired = DecideMode(idle, idleThreshold, game.Length > 0, protectedProcess.Length > 0);
+                var protectedProcess = settings.ProtectionConfigInvalid
+                    ? "Configuração de proteção inválida — economia agressiva bloqueada"
+                    : FindRunningProcess(settings.ProtectedProcessNames);
+                var desired = DecideMode(idle, idleThreshold, game.Length > 0,
+                    protectedProcess.Length > 0, settings.ProtectionConfigInvalid);
 
                 var resolution = PowerProfileService.ResolveTarget(desired);
                 var active = PowerProfileService.GetActiveSchemeGuid();
@@ -187,6 +194,7 @@ public static class AutoProfileService
         var idleMinutes = 15;
         var pollSeconds = 15;
         var shippedProtected = Array.Empty<string>();
+        var protectionConfigInvalid = false;
 
         try
         {
@@ -226,7 +234,8 @@ public static class AutoProfileService
         }
         catch (Exception ex)
         {
-            AppLog.Write("Configuração de jogos inválida; usando padrões seguros: " + ex.Message);
+            protectionConfigInvalid = true;
+            AppLog.Write("Configuração de jogos inválida; economia agressiva será bloqueada por segurança: " + ex.Message);
         }
 
         var protectedNames = shippedProtected;
@@ -240,12 +249,13 @@ public static class AutoProfileService
         }
         catch (Exception ex)
         {
-            // Do not silently discard a corrupted user configuration. Preserve the file,
-            // log the issue, and use shipped defaults until the user repairs it.
-            AppLog.Write("Lista de processos protegidos inválida; configuração preservada: " + ex.Message);
+            // Do not silently discard a corrupted user configuration. Preserve the file
+            // and prevent the aggressive AFK plan until the user repairs the configuration.
+            protectionConfigInvalid = true;
+            AppLog.Write("Lista de processos protegidos inválida; economia agressiva será bloqueada por segurança: " + ex.Message);
         }
 
-        return new AutoProfileSettings(gameNames, protectedNames, idleMinutes, pollSeconds);
+        return new AutoProfileSettings(gameNames, protectedNames, idleMinutes, pollSeconds, protectionConfigInvalid);
     }
 
     internal static string[] ParseUserSettings(string json)
