@@ -22,13 +22,16 @@ public sealed class NetworkMonitorIpv6Tests
         double ipv6Loss = 0,
         double ipv6TcpFailure = 0,
         double ipv6SecondaryLoss = 0,
-        double ipv6SecondaryTcpFailure = 0)
+        double ipv6SecondaryTcpFailure = 0,
+        double ipv4GatewayLoss = 0,
+        double ipv4IcmpLoss = 0,
+        double ipv4TcpFailure = 0)
     {
         return new NetworkMonitorSample(
             DateTimeOffset.UtcNow,
             "192.168.1.1", "OK", 2,
             "OK", 20, "OK", 25,
-            0, 0, 0, 0, 0, 0,
+            ipv4GatewayLoss, ipv4IcmpLoss, ipv4TcpFailure, 0, 0, 0,
             "OK", 22, "OK", 27,
             "OK", 8.5, 0, 0, 0,
             DnsIpv4AddressCount: 2,
@@ -100,6 +103,60 @@ public sealed class NetworkMonitorIpv6Tests
         Assert.Equal("IPv6 / SEM CONECTIVIDADE", result.Category);
         Assert.Contains("IPv4 continua acessível", result.Assessment);
         Assert.Contains("Nenhum gateway IPv6", result.Assessment);
+    }
+
+    [Fact]
+    public void Analyze_DetectsIpv6AbsenceWhenIpv4IcmpIsFilteredButTcpStillWorks()
+    {
+        var sample = Sample(
+            ipv6GatewayStatus: "NO_IPV6_GATEWAY",
+            ipv6GatewayMs: null,
+            ipv6Status: "TIMEOUT",
+            ipv6Ms: null,
+            ipv6TcpStatus: "TIMEOUT",
+            ipv6TcpMs: null,
+            ipv6SecondaryStatus: "TIMEOUT",
+            ipv6SecondaryMs: null,
+            ipv6SecondaryTcpStatus: "TIMEOUT",
+            ipv6SecondaryTcpMs: null,
+            ipv6Loss: 100,
+            ipv6TcpFailure: 100,
+            ipv6SecondaryLoss: 100,
+            ipv6SecondaryTcpFailure: 100,
+            ipv4IcmpLoss: 100,
+            ipv4TcpFailure: 0);
+
+        var result = NetworkRootCauseService.Analyze(sample);
+
+        Assert.Equal("IPv6 / SEM CONECTIVIDADE", result.Category);
+        Assert.Contains("TCP/443 IPv4 continua acessível", result.Assessment);
+    }
+
+    [Fact]
+    public void Analyze_PrioritizesIpv4GatewayFailureOverExternalIpv6IcmpFiltering()
+    {
+        var sample = Sample(
+            ipv6Loss: 100,
+            ipv6SecondaryLoss: 100,
+            ipv4GatewayLoss: 25);
+
+        var result = NetworkRootCauseService.Analyze(sample);
+
+        Assert.Equal("REDE LOCAL", result.Category);
+        Assert.Contains("gateway IPv4", result.Assessment);
+    }
+
+    [Fact]
+    public void Analyze_CombinesLossWhenBothLocalGatewaysFail()
+    {
+        var sample = Sample(
+            ipv6GatewayLoss: 25,
+            ipv4GatewayLoss: 25);
+
+        var result = NetworkRootCauseService.Analyze(sample);
+
+        Assert.Equal("REDE LOCAL IPv4/IPv6", result.Category);
+        Assert.Contains("ambos os gateways", result.Assessment);
     }
 
     [Fact]
