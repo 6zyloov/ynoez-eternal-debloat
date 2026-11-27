@@ -25,7 +25,7 @@ Copy-Item -Path (Join-Path $PublishDir '*') -Destination $Target -Recurse -Force
 $folders = @('Toolbox','Data','Backups','Logs','Downloads','Toolbox\Debloat','Toolbox\Internet','Toolbox\Windows','Toolbox\Servicos','Toolbox\Drivers','Toolbox\GPU','Toolbox\CPU','Toolbox\RAM','Toolbox\Energia','Toolbox\Jogos','Toolbox\Brave','Toolbox\Discord','Toolbox\Ferramentas','Toolbox\Diagnostico','Toolbox\Restauracao','Toolbox\Placas-mae','Toolbox\Performance')
 foreach ($folder in $folders) { New-Item -ItemType Directory -Path (Join-Path $Target $folder) -Force | Out-Null }
 # Concede escrita apenas nas pastas de dados; executável e arquivos do programa ficam protegidos.
-foreach ($folder in @('Data','Backups','Logs','Downloads')) {
+foreach ($folder in @('Data','Backups','Logs','Downloads','Toolbox\Performance')) {
     $dataPath = Join-Path $Target $folder
     & icacls.exe $dataPath /grant '*S-1-5-32-545:(OI)(CI)M' /T /C | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Não foi possível configurar permissões para $dataPath" }
