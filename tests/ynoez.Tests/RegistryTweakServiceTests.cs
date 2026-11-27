@@ -556,6 +556,23 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void NetworkMonitorCsv_PersistsRootCauseAlongsideProbeMetrics()
+    {
+        var sample = new NetworkMonitorSample(
+            DateTimeOffset.Parse("2026-11-27T20:00:00-03:00"), "192.168.1.1", "TIMEOUT", null,
+            "OK", 18, "OK", 24, 0, 0, 0, null, null, null,
+            "OK", 22, "OK", 26, "OK", 5,
+            GatewayLoss60sPercent: 20);
+        var assessment = NetworkRootCauseService.Analyze(sample);
+
+        var line = NetworkMonitorService.BuildCsvLine(sample, assessment);
+
+        Assert.Contains("REDE LOCAL", line);
+        Assert.Contains("Há perda recorrente", line);
+        Assert.Equal(28, line.Split(',').Length);
+    }
+
+    [Fact]
     public void NetworkRootCause_SeparatesLocalDnsAndUpstreamPatterns()
     {
         var local = MakeNetworkSample(gatewayLoss: 25);

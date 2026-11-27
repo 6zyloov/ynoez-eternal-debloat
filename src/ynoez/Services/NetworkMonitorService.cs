@@ -36,7 +36,7 @@ public static class NetworkMonitorService
             "-" + Guid.NewGuid().ToString("N")[..8] + ".csv");
         await using var stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
-        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external_1,external_1_icmp_status,external_1_icmp_ms,external_1_tcp_status,external_1_tcp_ms,external_2,external_2_icmp_status,external_2_icmp_ms,external_2_tcp_status,external_2_tcp_ms,dns_host,dns_status,dns_ms,gateway_loss_60s_pct,external_1_loss_60s_pct,external_1_tcp_failure_60s_pct,external_2_loss_60s_pct,external_2_tcp_failure_60s_pct,dns_failure_60s_pct,gateway_jitter_60s_ms,external_1_jitter_60s_ms,external_1_tcp_jitter_60s_ms");
+        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external_1,external_1_icmp_status,external_1_icmp_ms,external_1_tcp_status,external_1_tcp_ms,external_2,external_2_icmp_status,external_2_icmp_ms,external_2_tcp_status,external_2_tcp_ms,dns_host,dns_status,dns_ms,gateway_loss_60s_pct,external_1_loss_60s_pct,external_1_tcp_failure_60s_pct,external_2_loss_60s_pct,external_2_tcp_failure_60s_pct,dns_failure_60s_pct,gateway_jitter_60s_ms,external_1_jitter_60s_ms,external_1_tcp_jitter_60s_ms,root_cause_category,root_cause_assessment");
         await writer.FlushAsync();
         AppLog.Write("Monitoramento contínuo de rede iniciado: " + file);
         var window = new Queue<(long Tick, NetworkMonitorSample Sample)>();
@@ -86,29 +86,8 @@ public static class NetworkMonitorService
                     ExternalTcpJitter60sMilliseconds = summary.ExternalTcpJitterMilliseconds
                 };
 
-                await writer.WriteLineAsync(string.Join(",",
-                    sample.Timestamp.ToString("O", CultureInfo.InvariantCulture),
-                    Csv(sample.Gateway), Csv(sample.GatewayStatus),
-                    sample.GatewayMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                    "1.1.1.1", Csv(sample.ExternalStatus),
-                    sample.ExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                    Csv(sample.ExternalTcpStatus),
-                    sample.ExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                    "8.8.8.8", Csv(sample.SecondaryExternalStatus),
-                    sample.SecondaryExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                    Csv(sample.SecondaryExternalTcpStatus),
-                    sample.SecondaryExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                    "cloudflare.com", Csv(sample.DnsStatus),
-                    sample.DnsMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
-                    sample.GatewayLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
-                    sample.ExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
-                    sample.ExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
-                    sample.SecondaryExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
-                    sample.SecondaryExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
-                    sample.DnsFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
-                    sample.GatewayJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
-                    sample.ExternalJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
-                    sample.ExternalTcpJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty));
+                var rootCause = NetworkRootCauseService.Analyze(sample);
+                await writer.WriteLineAsync(BuildCsvLine(sample, rootCause));
                 await writer.FlushAsync();
                 onSample?.Invoke(sample);
 
@@ -123,6 +102,32 @@ public static class NetworkMonitorService
             return file;
         }
     }
+
+    internal static string BuildCsvLine(NetworkMonitorSample sample, NetworkRootCause rootCause) =>
+        string.Join(",",
+            sample.Timestamp.ToString("O", CultureInfo.InvariantCulture),
+            Csv(sample.Gateway), Csv(sample.GatewayStatus),
+            sample.GatewayMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            "1.1.1.1", Csv(sample.ExternalStatus),
+            sample.ExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            Csv(sample.ExternalTcpStatus),
+            sample.ExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            "8.8.8.8", Csv(sample.SecondaryExternalStatus),
+            sample.SecondaryExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            Csv(sample.SecondaryExternalTcpStatus),
+            sample.SecondaryExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            "cloudflare.com", Csv(sample.DnsStatus),
+            sample.DnsMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
+            sample.GatewayLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+            sample.ExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+            sample.ExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+            sample.SecondaryExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+            sample.SecondaryExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+            sample.DnsFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+            sample.GatewayJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
+            sample.ExternalJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
+            sample.ExternalTcpJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
+            Csv(rootCause.Category), Csv(rootCause.Assessment));
 
     public static NetworkWindowSummary SummarizeWindow(IReadOnlyList<NetworkMonitorSample> samples)
     {
