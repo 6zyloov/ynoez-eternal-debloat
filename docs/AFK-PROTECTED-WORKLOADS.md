@@ -16,7 +16,7 @@ O perfil AFK protegido não usa SCHEME_MAX; usa SCHEME_BALANCED e mantém uma so
 
 ## Processos protegidos pelo usuário
 
-A interface Tweaks permite cadastrar até 64 nomes de processos adicionais, separados por ponto e vírgula. O nome é a imagem do processo, não um caminho ou uma linha de comando; o sufixo .exe é opcional. Caminhos, argumentos, curingas e separadores são rejeitados.
+A interface Tweaks permite cadastrar até 64 nomes de processos adicionais, separados por ponto e vírgula. O nome é a imagem do processo, sem espaços, caminho ou linha de comando; o sufixo .exe é opcional. Caminhos, espaços, argumentos, curingas e separadores são rejeitados.
 
 As preferências são gravadas em C:\ynoez\Data\auto-profile-settings.json. A lista é carregada ao iniciar uma nova sessão automática. Jogos incluídos em Optimization/games.json são protegidos independentemente da lista personalizada.
 
