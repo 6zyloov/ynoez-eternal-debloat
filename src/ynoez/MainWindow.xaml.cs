@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Input;
+using System.Windows.Data;
 using Microsoft.Win32;
 using ynoez.Services;
 
@@ -25,6 +26,7 @@ public partial class MainWindow : Window
     private bool _isBusy;
     private CancellationTokenSource? _networkMonitorCts;
     private CancellationTokenSource? _networkDiagnosticCts;
+    private CancellationTokenSource? _appxInventoryCts;
     private CancellationTokenSource? _autoProfileCts;
     private CancellationTokenSource? _metricsCts;
     private CancellationTokenSource? _benchmarkCts;
@@ -63,7 +65,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
+        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -707,6 +709,64 @@ public partial class MainWindow : Window
         adapterCard.Child = adapterPanel;
         root.Children.Add(adapterCard);
 
+        var statsCard = MakeCard();
+        var statsPanel = new StackPanel { Margin = new Thickness(20) };
+        statsPanel.Children.Add(Heading("Contadores dos adaptadores", 15));
+        statsPanel.Children.Add(Body("Leitura local sem UAC dos bytes, pacotes, erros e descartes acumulados por interface. Esses contadores normalmente zeram quando o adaptador é reiniciado ou o Windows reinicia; use duas leituras em momentos diferentes para comparar. Contadores acumulados não identificam sozinhos a causa de uma queda."));
+        var statsStatus = Body("Contadores ainda não consultados.");
+        var statsGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 240,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Interface", Binding = new Binding(nameof(NetworkAdapterStatistics.Name)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Status", Binding = new Binding(nameof(NetworkAdapterStatistics.Status)), Width = new DataGridLength(75) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Link", Binding = new Binding(nameof(NetworkAdapterStatistics.LinkSpeedBitsPerSecond), StringFormat="{}{0:N0} bps"), Width = new DataGridLength(100) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Recebido", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesReceived), StringFormat="{}{0:N0}"), Width = new DataGridLength(105) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Enviado", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesSent), StringFormat="{}{0:N0}"), Width = new DataGridLength(105) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveErrors)), Width = new DataGridLength(75) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendErrors)), Width = new DataGridLength(75) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Descartes RX/TX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveDiscards)), Width = new DataGridLength(100) });
+        var refreshStats = new Button { Content = "Atualizar contadores", Style = (Style)FindResource("AccentButton"), HorizontalAlignment = HorizontalAlignment.Left };
+        refreshStats.Click += async (_, _) =>
+        {
+            refreshStats.IsEnabled = false;
+            statsStatus.Text = "Lendo contadores dos adaptadores…";
+            try
+            {
+                var samples = await Task.Run(NetworkAdapterStatisticsService.Capture);
+                statsGrid.ItemsSource = samples;
+                statsStatus.Text = samples.Count + " interfaces consultadas às " +
+                    (samples.Count > 0 ? samples[0].CapturedAt.ToString("HH:mm:ss") : DateTime.Now.ToString("HH:mm:ss")) +
+                    ". Erros e descartes são contadores cumulativos do Windows.";
+                if (samples.Count == 0)
+                    statsStatus.Text += " Nenhuma interface retornou estatísticas.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Contadores de rede falharam: " + ex);
+                statsStatus.Text = "Falha ao consultar contadores: " + ex.Message;
+            }
+            finally { refreshStats.IsEnabled = true; }
+        };
+        statsPanel.Children.Add(statsStatus);
+        statsPanel.Children.Add(statsGrid);
+        statsPanel.Children.Add(refreshStats);
+        statsCard.Child = statsPanel;
+        root.Children.Add(statsCard);
+
         root.Children.Add(NoteCard("Como interpretar", "Perda também no gateway sugere um problema dentro da rede local (Wi-Fi, cabo, adaptador ou roteador). Perda somente no destino externo pode estar na rota ou no provedor. Um teste curto não prova sozinho a causa de desconexões intermitentes."));
         return root;
     }
@@ -850,6 +910,86 @@ public partial class MainWindow : Window
                     ShowPage("Debloat");
                 }, task.Definition.Risk.ToUpperInvariant()));
         }
+        var appxCard = MakeCard();
+        var appxPanel = new StackPanel { Margin = new Thickness(20) };
+        appxPanel.Children.Add(Heading("Inventário de aplicativos AppX", 15));
+        appxPanel.Children.Add(Body("Lista os pacotes AppX/MSIX instalados somente para o usuário atual, com versão, editor, estado e sinalizadores de pacote. Esta tela é somente leitura: não oferece remoção em massa nem presume que um pacote seja seguro de remover. Store, Calculadora, Bloco de Notas e componentes de shell ficam identificados como protegidos."));
+        var appxStatus = Body("Inventário ainda não consultado.");
+        var appxGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserReorderColumns = true,
+            CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 260,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Pacote", Binding = new Binding(nameof(AppxPackageInfo.Name)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(AppxPackageInfo.Version)), Width = new DataGridLength(95) });
+        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Editor", Binding = new Binding(nameof(AppxPackageInfo.Publisher)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(AppxPackageInfo.Status)), Width = new DataGridLength(85) });
+        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Classificação", Binding = new Binding(nameof(AppxPackageInfo.Classification)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        var appxButtons = new WrapPanel();
+        var loadAppx = new Button { Content = "Consultar aplicativos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var exportAppx = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        IReadOnlyList<AppxPackageInfo> appxPackages = Array.Empty<AppxPackageInfo>();
+        loadAppx.Click += async (_, _) =>
+        {
+            if (_appxInventoryCts is not null) return;
+            _appxInventoryCts = new CancellationTokenSource();
+            var token = _appxInventoryCts.Token;
+            loadAppx.IsEnabled = false;
+            exportAppx.IsEnabled = false;
+            appxStatus.Text = "Consultando pacotes AppX do usuário atual…";
+            try
+            {
+                appxPackages = await AppPackageInventoryService.GetCurrentUserPackagesAsync(token);
+                appxGrid.ItemsSource = appxPackages;
+                var protectedCount = appxPackages.Count(x => x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
+                appxStatus.Text = appxPackages.Count + " pacotes encontrados • " + protectedCount +
+                    " protegidos/classificados como componentes do Windows • consulta somente leitura.";
+                exportAppx.IsEnabled = appxPackages.Count > 0;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                appxStatus.Text = "Consulta cancelada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário AppX falhou: " + ex);
+                appxStatus.Text = "Não foi possível consultar os pacotes: " + ex.Message;
+            }
+            finally
+            {
+                _appxInventoryCts?.Dispose();
+                _appxInventoryCts = null;
+                loadAppx.IsEnabled = true;
+            }
+        };
+        exportAppx.Click += (_, _) =>
+        {
+            if (appxPackages.Count == 0) return;
+            var path = AppPackageInventoryService.ExportCsv(appxPackages);
+            appxStatus.Text = "CSV salvo: " + path;
+        };
+        appxButtons.Children.Add(loadAppx);
+        appxButtons.Children.Add(exportAppx);
+        appxPanel.Children.Add(appxStatus);
+        appxPanel.Children.Add(appxGrid);
+        appxPanel.Children.Add(appxButtons);
+        appxPanel.Children.Add(NoteCard("Por que não há botão de remover?", "Remover pacotes provisionados/AppX pode afetar dependências, atualizações e outros usuários. O ynoez só habilitará remoção quando existir um mecanismo de backup/reinstalação e verificação adequado para cada pacote; este inventário não altera nada."));
+        appxCard.Child = appxPanel;
+        root.Children.Add(appxCard);
+
         root.Children.Add(ProtectedItemsCard());
         return root;
     }

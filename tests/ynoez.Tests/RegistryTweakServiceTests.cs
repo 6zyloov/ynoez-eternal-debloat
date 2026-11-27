@@ -269,6 +269,35 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void AppxInventory_LabelsCoreWindowsPackagesAsProtected()
+    {
+        const string json = "[{\"Name\":\"Microsoft.WindowsStore\",\"PackageFullName\":\"Microsoft.WindowsStore_1.0_x64\",\"Version\":\"1.0.0.0\",\"Publisher\":\"CN=Microsoft\",\"Status\":\"Ok\",\"IsFramework\":false,\"IsResourcePackage\":false,\"NonRemovable\":false},{\"Name\":\"Example.Framework\",\"PackageFullName\":\"Example.Framework_1.0_x64\",\"Version\":\"1.0.0.0\",\"Publisher\":\"CN=Example\",\"Status\":\"Ok\",\"IsFramework\":true,\"IsResourcePackage\":false,\"NonRemovable\":false}]";
+        var packages = AppPackageInventoryService.ParseJson(json);
+
+        Assert.Equal(2, packages.Count);
+        Assert.Contains(packages, x => x.Name == "Microsoft.WindowsStore" && x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
+        Assert.Contains(packages, x => x.Name == "Example.Framework" && x.IsFramework && x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AppxInventory_ParsesSinglePackageObject()
+    {
+        var packages = AppPackageInventoryService.ParseJson("{\"Name\":\"Example.App\",\"PackageFullName\":\"Example.App_1.0_x64\",\"Version\":\"1.0.0.0\"}");
+        var package = Assert.Single(packages);
+        Assert.Equal("Example.App", package.Name);
+        Assert.Equal("Inventário — remoção não avaliada", package.Classification);
+    }
+
+    [Fact]
+    public void NetworkStatistics_CalculateErrorAndDiscardRatesSafely()
+    {
+        Assert.Equal(5.2631579, NetworkAdapterStatisticsService.CalculateProblemPercent(900, 20, 30)!.Value, 5);
+        Assert.Null(NetworkAdapterStatisticsService.CalculateProblemPercent(0, 0, 0));
+        Assert.Equal("1.0 KB", NetworkAdapterStatisticsService.FormatBytes(1024));
+        Assert.Equal("1 Gbps", NetworkAdapterStatisticsService.FormatLinkSpeed(1_000_000_000));
+    }
+
+    [Fact]
     public void ScheduledTaskCatalog_ContainsOnlyExplicitOptionalTasks()
     {
         var catalog = ScheduledTaskTweakService.GetCatalog();
