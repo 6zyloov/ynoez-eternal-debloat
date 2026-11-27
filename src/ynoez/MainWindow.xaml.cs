@@ -324,6 +324,10 @@ public partial class MainWindow : Window
             {
                 benchmarkStatus.Text = "Captura interrompida.";
             }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                benchmarkStatus.Text = "A permissão ETW/UAC foi cancelada. Nenhuma captura foi executada.";
+            }
             catch (Exception ex)
             {
                 AppLog.Write("Benchmark PresentMon falhou: " + ex);

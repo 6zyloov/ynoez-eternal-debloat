@@ -8,7 +8,7 @@
 - Perfis manuais Performance, Equilibrado e AFK, com backup do plano original.
 - Perfil automático por jogo conhecido e inatividade do teclado/mouse: Performance durante jogos com entrada ativa, Equilibrado no uso comum e AFK após 15 minutos sem entrada. Não encerra processos. Exporta o plano original e restaura ao parar; tenta recuperar sessões interrompidas na próxima inicialização. AFK bloqueia suspensão automática enquanto o app está aberto, sem impedir que a tela apague.
 - Monitor ao vivo de CPU/RAM via APIs nativas e GPU 3D via NVIDIA SMI ou WMI GPU Engine. Temperatura/VRAM/potência dependem do suporte NVIDIA; não instala drivers de sensor.
-- Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV, FPS médio, 1% low (inverso do P99 frametime), frametime médio e frames lentos. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
+- Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV + resumo JSON, FPS médio, 1% low (inverso do P99), 0,1% low (inverso do P99,9), frametime médio, p99/p99,9 e frames lentos. Compara com a captura anterior do mesmo processo; isso não controla a cena nem as condições do PC. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
 - Diagnóstico de rede: ICMP, TCP/443, DNS IPv4/IPv6 e tracert.
 - Monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, ICMP/TCP para Cloudflare e Google, resolução DNS, janela móvel real de 60 segundos e hipótese de causa, com exportação CSV.
 - Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
@@ -36,7 +36,7 @@
 - Poppins é incorporada sob SIL Open Font License; o texto integral está em `src/ynoez/Assets/Fonts/OFL.txt`.
 
 ## Próxima linha de engenharia
-1. Comparação automática de benchmarks antes/depois por jogo, 0,1% low e sessões repetidas.
+1. Comparação A/B repetida e controlada de benchmarks por jogo, agregação de várias sessões e controle/registro de cena, temperaturas e processos concorrentes.
 2. Inventário AppX/Win32/provisionados e remoção só quando houver pacote de recuperação confiável.
 3. Diagnóstico de NIC mais completo (driver, EEE, interrupt moderation e propriedades avançadas) com recomendações condicionais.
 4. Migrar code-behind para MVVM/DI e ampliar testes de falhas, concorrência e recuperação após crash.

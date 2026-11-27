@@ -95,16 +95,23 @@ public static class NetworkDiagnosticService
 
     private static async Task<string> TestDnsAsync(string host, CancellationToken token)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(4));
         var sw = Stopwatch.StartNew();
         try
         {
-            var addresses = await Dns.GetHostAddressesAsync(host, token);
+            var addresses = await Dns.GetHostAddressesAsync(host, timeout.Token);
             sw.Stop();
             var ipv4 = addresses.Count(x => x.AddressFamily == AddressFamily.InterNetwork);
             var ipv6 = addresses.Count(x => x.AddressFamily == AddressFamily.InterNetworkV6);
             return host + " • OK • " + sw.Elapsed.TotalMilliseconds.ToString("0.0") + " ms • IPv4 " + ipv4 + " / IPv6 " + ipv6;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException)
+        {
+            sw.Stop();
+            return host + " • falha • timeout (4 s)";
+        }
         catch (Exception ex)
         {
             sw.Stop();

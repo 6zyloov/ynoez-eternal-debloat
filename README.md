@@ -16,8 +16,8 @@ Aplicativo nativo para Windows em C# / WPF (.NET 8). A linguagem visual toma com
 - **Monitor:** CPU/RAM em tempo real; GPU 3D via NVIDIA SMI ou contadores do Windows; temperatura/VRAM/potência quando o driver NVIDIA oferece esses dados.
 - **Benchmark:** PresentMon 2.6.0 oficial, baixado somente quando solicitado e validado por SHA-256. Captura de 30–180 segundos, FPS médio, 1% low calculado pelo inverso do P99 de frametime, frametime médio e contagem de frames lentos. CSV salvo em `Logs\`. A captura pode solicitar UAC.
 - **Tweaks:** perfis Performance/Equilibrado/AFK; fallback explícito para Equilibrado quando um plano opcional não existe; bloqueio da suspensão automática no AFK; sessão automática com backup/restauração e recuperação após encerramento inesperado; 11 ajustes HKCU com detecção, consentimento, verificação e reversão.
-- **Network:** diagnóstico cancelável ICMP, TCP/443, DNS IPv4/IPv6 e tracert; monitoramento contínuo de gateway/1.1.1.1 com janela temporal real de 60 segundos, perda e jitter separados entre ICMP e TCP, CSV; consulta/ajuste reversível de energia em adaptadores compatíveis.
-- **Debloat:** limpeza seletiva de Temp e caches Brave/Discord, preservando perfis e credenciais; gerenciador de inicialização HKCU + arquivos da pasta pessoal com backup e reversão (HKLM e pasta Startup compartilhada somente leitura); whitelist de seis serviços opcionais e seis tarefas agendadas opcionais com backup, verificação e restauração.
+- **Network:** diagnóstico cancelável de gateway, dois destinos públicos, ICMP, TCP/443, DNS IPv4/IPv6 e tracert; monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, Cloudflare e Google, DNS, janela móvel real de 60 segundos, perda/jitter por protocolo e hipótese de causa, com CSV; contadores RX/TX e consulta/ajuste reversível de energia em adaptadores compatíveis.
+- **Debloat:** limpeza seletiva de Temp e caches Brave/Discord, preservando perfis e credenciais; inventário AppX/MSIX somente leitura com exportação CSV; gerenciador de inicialização HKCU + arquivos da pasta pessoal com backup e reversão (HKLM e pasta Startup compartilhada somente leitura); whitelist de seis serviços opcionais e seis tarefas agendadas opcionais com backup, verificação e restauração.
 - **Motherboard:** identificação da placa e revisão, perfil A520M K V2 com fontes oficiais por revisão.
 - **Toolbox:** pesquisa de recursos/configurações Windows e consulta de serviços protegidos.
 - **Backup, Restore e Logs:** central de recuperação para Registro, plano base, sessão AFK interrompida, serviços, adaptadores, tarefas e inicialização; snapshots locais com nomes únicos, manifesto SHA-256 e descarte de snapshots incompletos; ponto de restauração opcional.
@@ -62,7 +62,7 @@ O executável autocontido será gerado em `dist\ynoez.exe`. Para instalar em `C:
 
 ## Próximas etapas
 
-Ainda faltam gerenciamento seguro de AppX e recursos com pacote de recuperação real, comparação automática de benchmarks antes/depois, 0,1% lows, arquitetura MVVM/DI, maior cobertura de falhas/concorrência, atualização assinada Authenticode e validação física de compatibilidade. Remoção AppX não é disponibilizada enquanto não houver rollback confiável. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
+Ainda faltam remoção AppX/provisioned com recuperação confiável, comparação A/B repetida e controlada de benchmarks (mesma cena, duração, temperatura e processos), arquitetura MVVM/DI, maior cobertura de falhas/concorrência, atualizador e assinatura Authenticode, além de validação física de compatibilidade. Remoção AppX não é disponibilizada enquanto não houver rollback confiável. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
 
 ## Licença
 
