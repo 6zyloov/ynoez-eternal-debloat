@@ -5,20 +5,128 @@ using System.Text.Json;
 
 namespace ynoez.Services;
 
-public sealed record AutoProfileStatus(PowerProfileMode Mode, PowerProfileMode AppliedMode, bool UsedFallback, bool GameDetected, TimeSpan IdleTime, string ActiveGame);
+public sealed record AutoProfileStatus(
+    PowerProfileMode Mode,
+    PowerProfileMode AppliedMode,
+    bool UsedFallback,
+    bool GameDetected,
+    TimeSpan IdleTime,
+    string ActiveGame,
+    string ActiveProtectedProcess);
 
 public static class AutoProfileService
 {
     private static readonly string GamesPath = Path.Combine(AppContext.BaseDirectory, "Optimization", "games.json");
+    private static readonly string UserSettingsPath = Path.Combine(AppPaths.Data, "auto-profile-settings.json");
     private static readonly string[] DefaultGames =
     {
         "RobloxPlayerBeta", "VALORANT-Win64-Shipping", "cs2", "FortniteClient-Win64-Shipping",
         "r5apex", "GTA5", "League of Legends", "Overwatch", "Minecraft", "Minecraft.Windows"
     };
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    private sealed record AutoProfileSettings(
+        string[] GameProcessNames,
+        string[] ProtectedProcessNames,
+        int IdleThresholdMinutes,
+        int PollIntervalSeconds);
+
+    private sealed record UserSettings(int SchemaVersion, string[] ProtectedProcessNames);
+
+    public static IReadOnlyList<string> GetProtectedProcessNames() =>
+        LoadSettings().ProtectedProcessNames;
+
+    /// <summary>
+    /// Saves extra process names that must not enter the aggressive AFK power plan.
+    /// Values are process image names, not paths or command lines.
+    /// </summary>
+    public static IReadOnlyList<string> SaveProtectedProcessNames(IEnumerable<string> processNames)
+    {
+        ArgumentNullException.ThrowIfNull(processNames);
+        var normalized = NormalizeProtectedProcessNames(processNames);
+        Directory.CreateDirectory(AppPaths.Data);
+        var path = UserSettingsPath;
+        var tempPath = path + ".tmp";
+        try
+        {
+            var json = JsonSerializer.Serialize(new UserSettings(1, normalized), JsonOptions);
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, path, overwrite: true);
+            AppLog.Write("Lista de processos protegidos do perfil automático salva: " +
+                (normalized.Length == 0 ? "(vazia)" : string.Join(", ", normalized)));
+        }
+        finally
+        {
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+        }
+        return normalized;
+    }
+
+    internal static string[] NormalizeProtectedProcessNames(IEnumerable<string> processNames)
+    {
+        ArgumentNullException.ThrowIfNull(processNames);
+        var result = new List<string>();
+        foreach (var raw in processNames)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            var value = raw.Trim();
+            if (value.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                value = value[..^4].Trim();
+
+            if (value.Length == 0) continue;
+            if (value.Length > 128 ||
+                value.Any(char.IsControl) ||
+                value.IndexOfAny(new[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', ';' }) >= 0)
+                throw new ArgumentException(
+                    "Nome de processo inválido. Informe somente o nome do executável, sem caminho, argumentos ou curingas: " + raw,
+                    nameof(processNames));
+
+            if (!result.Contains(value, StringComparer.OrdinalIgnoreCase))
+                result.Add(value);
+            if (result.Count > 64)
+                throw new ArgumentException("É permitido cadastrar no máximo 64 processos protegidos.", nameof(processNames));
+        }
+        return result.ToArray();
+    }
+
+    internal static PowerProfileMode DecideMode(
+        TimeSpan idleTime,
+        TimeSpan idleThreshold,
+        bool gameRunning,
+        bool protectedProcessRunning)
+    {
+        if (idleThreshold < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(idleThreshold));
+        if (idleTime < TimeSpan.Zero)
+            idleTime = TimeSpan.Zero;
+
+        // A user is allowed to be AFK while a game or an explicitly protected task
+        // is doing useful work. In that case use Balanced + a sleep-prevention request,
+        // never the aggressive power-saver plan.
+        if (gameRunning || protectedProcessRunning)
+        {
+            if (gameRunning && !protectedProcessRunning && idleTime < idleThreshold)
+                return PowerProfileMode.Performance;
+            return PowerProfileMode.ProtectedAfk;
+        }
+
+        return idleTime >= idleThreshold
+            ? PowerProfileMode.Afk
+            : PowerProfileMode.Balanced;
+    }
+
+    public static string GetModeDisplayName(PowerProfileMode mode) => mode switch
+    {
+        PowerProfileMode.Performance => "Performance",
+        PowerProfileMode.Balanced => "Equilibrado",
+        PowerProfileMode.Afk => "AFK / Economia",
+        PowerProfileMode.ProtectedAfk => "AFK protegido (Equilibrado, sem suspensão)",
+        _ => mode.ToString()
+    };
 
     public static async Task RunAsync(Action<AutoProfileStatus>? onStatus, CancellationToken token)
     {
-        var session = PowerProfileService.CaptureAutomaticSession();
+        _ = PowerProfileService.CaptureAutomaticSession();
         try
         {
             var settings = LoadSettings();
@@ -29,21 +137,26 @@ public static class AutoProfileService
             {
                 token.ThrowIfCancellationRequested();
                 var idle = GetIdleTime();
-                var game = FindRunningGame(settings.ProcessNames);
-                var desired = idle >= idleThreshold
-                    ? PowerProfileMode.Afk
-                    : game.Length > 0 ? PowerProfileMode.Performance : PowerProfileMode.Balanced;
+                var game = FindRunningProcess(settings.GameProcessNames);
+                var protectedProcess = FindRunningProcess(settings.ProtectedProcessNames);
+                var desired = DecideMode(idle, idleThreshold, game.Length > 0, protectedProcess.Length > 0);
 
                 var resolution = PowerProfileService.ResolveTarget(desired);
                 var active = PowerProfileService.GetActiveSchemeGuid();
                 if (!string.Equals(active, resolution.Guid, StringComparison.OrdinalIgnoreCase)
                     || lastMode != desired)
-                    PowerProfileService.ApplyForAutomaticSession(desired);
+                    _ = PowerProfileService.ApplyForAutomaticSession(desired);
 
                 if (lastMode != desired)
                 {
-                    onStatus?.Invoke(new AutoProfileStatus(desired, resolution.AppliedMode, resolution.UsedFallback,
-                        game.Length > 0, idle, game));
+                    onStatus?.Invoke(new AutoProfileStatus(
+                        desired,
+                        resolution.AppliedMode,
+                        resolution.UsedFallback,
+                        game.Length > 0,
+                        idle,
+                        game,
+                        protectedProcess));
                     lastMode = desired;
                 }
                 await Task.Delay(pollInterval, token);
@@ -66,30 +179,90 @@ public static class AutoProfileService
 
     private static AutoProfileSettings LoadSettings()
     {
+        var gameNames = DefaultGames;
+        var idleMinutes = 15;
+        var pollSeconds = 15;
+        var shippedProtected = Array.Empty<string>();
+
         try
         {
-            if (!File.Exists(GamesPath))
-                return new AutoProfileSettings(DefaultGames, 15, 15);
-            using var document = JsonDocument.Parse(File.ReadAllText(GamesPath));
-            var root = document.RootElement;
-            var names = root.GetProperty("processNames").EnumerateArray()
-                .Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x!).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var idle = root.TryGetProperty("idleThresholdMinutes", out var idleElement) ? idleElement.GetInt32() : 15;
-            var poll = root.TryGetProperty("pollIntervalSeconds", out var pollElement) ? pollElement.GetInt32() : 15;
-            return new AutoProfileSettings(names.Length > 0 ? names : DefaultGames,
-                Math.Clamp(idle, 1, 120), Math.Clamp(poll, 5, 120));
+            if (File.Exists(GamesPath))
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(GamesPath));
+                var root = document.RootElement;
+                if (root.TryGetProperty("processNames", out var gamesElement) &&
+                    gamesElement.ValueKind == JsonValueKind.Array)
+                {
+                    var names = gamesElement.EnumerateArray()
+                        .Where(x => x.ValueKind == JsonValueKind.String)
+                        .Select(x => x.GetString())
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Select(x => x!)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    if (names.Length > 0) gameNames = names;
+                }
+
+                if (root.TryGetProperty("protectedProcessNames", out var protectedElement) &&
+                    protectedElement.ValueKind == JsonValueKind.Array)
+                {
+                    shippedProtected = NormalizeProtectedProcessNames(
+                        protectedElement.EnumerateArray()
+                            .Where(x => x.ValueKind == JsonValueKind.String)
+                            .Select(x => x.GetString() ?? ""));
+                }
+
+                if (root.TryGetProperty("idleThresholdMinutes", out var idleElement) &&
+                    idleElement.TryGetInt32(out var idle))
+                    idleMinutes = Math.Clamp(idle, 1, 120);
+                if (root.TryGetProperty("pollIntervalSeconds", out var pollElement) &&
+                    pollElement.TryGetInt32(out var poll))
+                    pollSeconds = Math.Clamp(poll, 5, 120);
+            }
         }
         catch (Exception ex)
         {
-            AppLog.Write("Configuração de perfis automáticos inválida; usando padrão: " + ex.Message);
-            return new AutoProfileSettings(DefaultGames, 15, 15);
+            AppLog.Write("Configuração de jogos inválida; usando padrões seguros: " + ex.Message);
         }
+
+        var protectedNames = shippedProtected;
+        try
+        {
+            if (File.Exists(UserSettingsPath))
+            {
+                var userSettings = ParseUserSettings(File.ReadAllText(UserSettingsPath));
+                protectedNames = NormalizeProtectedProcessNames(userSettings);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Do not silently discard a corrupted user configuration. Preserve the file,
+            // log the issue, and use shipped defaults until the user repairs it.
+            AppLog.Write("Lista de processos protegidos inválida; configuração preservada: " + ex.Message);
+        }
+
+        return new AutoProfileSettings(gameNames, protectedNames, idleMinutes, pollSeconds);
     }
 
-    private sealed record AutoProfileSettings(string[] ProcessNames, int IdleThresholdMinutes, int PollIntervalSeconds);
+    internal static string[] ParseUserSettings(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            throw new InvalidDataException("Configuração de processos protegidos vazia.");
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("Configuração de processos protegidos inválida.");
+        if (!root.TryGetProperty("protectedProcessNames", out var processNames) ||
+            processNames.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("A lista protectedProcessNames não existe ou não é um array.");
+        var values = processNames.EnumerateArray()
+            .Select(x => x.ValueKind == JsonValueKind.String
+                ? x.GetString() ?? ""
+                : throw new InvalidDataException("Todos os processos protegidos precisam ser textos."));
+        return NormalizeProtectedProcessNames(values);
+    }
 
-    private static string FindRunningGame(IEnumerable<string> processNames)
+    private static string FindRunningProcess(IEnumerable<string> processNames)
     {
         foreach (var name in processNames)
         {
@@ -99,7 +272,10 @@ public static class AutoProfileService
                 processes = Process.GetProcessesByName(name);
                 if (processes.Length > 0) return name;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLog.Write("Não foi possível consultar o processo " + name + ": " + ex.Message);
+            }
             finally
             {
                 foreach (var process in processes) process.Dispose();
