@@ -13,7 +13,6 @@ catch { throw "Versão do projeto inválida: '$version'." }
 if ($parsedVersion.Build -lt 0 -or $parsedVersion.Revision -ne -1) {
     throw "Versão do projeto fora do formato MAJOR.MINOR.PATCH: '$version'."
 }
-$versionQuad = "$version.0"
 
 $isccCandidates = @(
     (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
@@ -29,14 +28,14 @@ Get-ChildItem -Path $artifactDir -Filter "ynoez-setup-*.exe" -File -ErrorAction 
     Remove-Item -Force
 
 $defineVersion = "/DMyAppVersion='$version'"
-$defineVersionQuad = "/DMyAppVersionQuad='$versionQuad'"
-& $iscc $defineVersion $defineVersionQuad $script
+& $iscc $defineVersion $script
 if ($LASTEXITCODE -ne 0) { throw "ISCC falhou com código $LASTEXITCODE." }
 
 $setup = Join-Path $artifactDir "ynoez-setup-$version.exe"
 if (-not (Test-Path $setup -PathType Leaf)) { throw "O instalador esperado não foi gerado: $setup" }
 
 $fileInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
+$versionQuad = "$version.0"
 if ($fileInfo.FileVersion -ne $versionQuad) {
     throw "Versão PE do instalador ($($fileInfo.FileVersion)) difere do projeto ($versionQuad)."
 }
