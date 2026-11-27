@@ -527,11 +527,11 @@ public partial class MainWindow : Window
     private UIElement BuildNetwork()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Network", "Mede latência, jitter, perda de pacotes no gateway e conectividade externa."));
+        root.Children.Add(PageIntro("Network", "Mede latência, jitter, perda de pacotes, DNS, conectividade TCP e rota."));
         var resultCard = MakeCard();
         var panel = new StackPanel { Margin = new Thickness(20) };
         panel.Children.Add(Heading("Diagnóstico de conexão", 15));
-        panel.Children.Add(Body("O teste envia 8 pacotes ao gateway local e 10 para 1.1.1.1, além de medir uma consulta DNS. Nenhuma configuração de rede será modificada."));
+        panel.Children.Add(Body("O teste mede ICMP no gateway e em 1.1.1.1, testa HTTPS/TCP em dois destinos, resolve DNS IPv4/IPv6 e rastreia a rota com tracert. Nenhuma configuração de rede será modificada."));
         var output = new TextBlock
         {
             Text = "Pronto para testar.", Foreground = SecondaryBrush, FontFamily = new FontFamily("Consolas"),

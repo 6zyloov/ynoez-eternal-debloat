@@ -58,7 +58,11 @@ public static class PresentMonService
         if (durationSeconds is not 30 and not 60 and not 120 and not 180)
             throw new ArgumentOutOfRangeException(nameof(durationSeconds), "Duração permitida: 30, 60, 120 ou 180 segundos.");
 
-        using (Process.GetProcessById(target.ProcessId)) { }
+        using (var targetProcess = Process.GetProcessById(target.ProcessId))
+        {
+            if (!string.Equals(targetProcess.ProcessName, target.ProcessName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("O processo selecionado mudou. Atualize a lista de jogos antes de capturar.");
+        }
         onStatus?.Invoke("Verificando PresentMon " + Version + "…");
         var executable = await EnsurePresentMonAsync(token);
 
@@ -92,6 +96,8 @@ public static class PresentMonService
 
         await process.WaitForExitAsync();
         token.ThrowIfCancellationRequested();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException("PresentMon terminou com código " + process.ExitCode + ". Verifique as permissões ETW e tente executar novamente.");
 
         if (!File.Exists(csv) || new FileInfo(csv).Length < 100)
             throw new InvalidOperationException("PresentMon não gerou dados. Verifique se o processo ainda estava aberto e se a permissão de captura foi concedida.");
