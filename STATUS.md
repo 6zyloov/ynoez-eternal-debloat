@@ -1,6 +1,7 @@
 # Desenvolvimento — ynoez 0.3.0
 
 - Base de build atualizada para .NET 10 LTS (`net10.0-windows`), usando `System.Management 10.0.15`.
+- Central da A520M K V2 separa indício de revisão SMBIOS da revisão física confirmada: links de BIOS por revisão só aparecem após selecionar e confirmar manualmente a serigrafia no PCB. Sem confirmação, permanece disponível apenas a página genérica.
 
 ## Implementado nesta linha
 - Continuidade de operação pela bandeja do sistema: fechar a janela pelo usuário (sem desligar/sair do Windows) enquanto monitoramento de rede, perfil automático, telemetria, benchmark ou reparo Windows está ativo oculta a interface sem encerrar a operação. Duplo clique reabre; menu contextual oferece encerramento explícito.
