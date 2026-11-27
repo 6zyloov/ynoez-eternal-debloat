@@ -534,6 +534,18 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void AdapterPowerBackupFileName_DisambiguatesSanitizedNames()
+    {
+        var first = AdapterPowerManagementService.GetBackupFileName("Ethernet 2");
+        var second = AdapterPowerManagementService.GetBackupFileName("Ethernet_2");
+
+        Assert.NotEqual(first, second);
+        Assert.Equal(first, AdapterPowerManagementService.GetBackupFileName("Ethernet 2"));
+        Assert.EndsWith(".json", first, StringComparison.OrdinalIgnoreCase);
+        Assert.Throws<ArgumentException>(() => AdapterPowerManagementService.GetBackupFileName(""));
+    }
+
+    [Fact]
     public void OptionalServiceCatalog_ContainsNoDuplicateNames()
     {
         var names = ServiceTweakService.GetCatalog().Select(x => x.Name).ToArray();

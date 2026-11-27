@@ -35,10 +35,9 @@ public sealed class AdapterPowerManagementService
             "DeviceSleepOnDisconnect=[string]$p.DeviceSleepOnDisconnect } } catch {} }); " +
             "ConvertTo-Json -InputObject @($items) -Depth 4 | Set-Content -LiteralPath '" + path + "' -Encoding UTF8 " +
             "} catch { exit 2 }; exit 0";
-        RunElevated(script);
-
         try
         {
+            RunPowerShell(script);
             if (!File.Exists(outputPath)) throw new InvalidOperationException("O Windows não retornou os dados de energia dos adaptadores.");
             using var document = JsonDocument.Parse(File.ReadAllText(outputPath));
             var root = document.RootElement;
@@ -177,8 +176,19 @@ public sealed class AdapterPowerManagementService
     private string GetBackupPath(string name)
     {
         ValidateName(name);
+        var canonical = Path.Combine(_backupDirectory, GetBackupFileName(name));
+        // Preserve restore support for backups created by older ynoez versions.
+        var legacy = Path.Combine(_backupDirectory,
+            string.Concat(name.Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' ? c : '_')) + ".json");
+        return !File.Exists(canonical) && File.Exists(legacy) ? legacy : canonical;
+    }
+
+    public static string GetBackupFileName(string name)
+    {
+        ValidateName(name);
         var safe = string.Concat(name.Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' ? c : '_'));
-        return Path.Combine(_backupDirectory, safe + ".json");
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(name))).ToLowerInvariant();
+        return safe + "-" + hash[..12] + ".json";
     }
 
     private static void ValidateName(string name)
@@ -192,6 +202,31 @@ public sealed class AdapterPowerManagementService
             ? value.GetString() ?? "" : "";
 
     private static string EscapePowerShell(string value) => value.Replace("'", "''", StringComparison.Ordinal);
+
+    private static void RunPowerShell(string script)
+    {
+        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo("powershell.exe",
+                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }
+        };
+        process.Start();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+        var output = outputTask.GetAwaiter().GetResult();
+        var error = errorTask.GetAwaiter().GetResult();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException("A consulta de energia dos adaptadores falhou (código " +
+                process.ExitCode + "). " + error + " " + output);
+    }
 
     private static void RunElevated(string script)
     {

@@ -659,7 +659,7 @@ public partial class MainWindow : Window
         var adapterCard = MakeCard();
         var adapterPanel = new StackPanel { Margin = new Thickness(20) };
         adapterPanel.Children.Add(Heading("Energia dos adaptadores físicos", 15));
-        adapterPanel.Children.Add(Body("Consulta opções de economia de energia do driver. Se compatível, permite desativar somente Selective Suspend e Device Sleep on Disconnect, salvando os valores originais. Exige UAC, não reinicia o adaptador automaticamente e pode exigir reconexão/reinício para aplicar. Pode aumentar consumo e não garante corrigir quedas."));
+        adapterPanel.Children.Add(Body("A consulta é somente leitura e não pede UAC. Se compatível, permite desativar somente Selective Suspend e Device Sleep on Disconnect, salvando os valores originais. A alteração e a restauração exigem UAC, não reiniciam o adaptador automaticamente e podem exigir reconexão/reinício para aplicar. Pode aumentar consumo e não garante corrigir quedas."));
         var adapterResults = new StackPanel();
         var adapterService = new AdapterPowerManagementService();
         var scanAdapters = new Button { Content = "Analisar adaptadores", Style = (Style)FindResource("AccentButton"), MinWidth = 155, Margin = new Thickness(0, 10, 0, 10) };
