@@ -600,6 +600,24 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void SystemAppxInventory_ParsesAndClassifiesInstalledAndProvisionedPackages()
+    {
+        const string json = "[{\"Name\":\"Microsoft.WindowsStore\",\"PackageName\":\"Microsoft.WindowsStore_1.0_x64\",\"Version\":\"1.0.0.0\",\"Architecture\":\"X64\",\"Scope\":\"Todos os usuários\"},{\"Name\":\"Example.App\",\"PackageName\":\"Example.App_1.0_x64\",\"Version\":\"1.0.0.0\",\"Architecture\":\"X64\",\"Scope\":\"Provisionado\"}]";
+        var packages = AppxSystemInventoryService.ParseJson(json);
+
+        Assert.Equal(2, packages.Count);
+        Assert.Contains(packages, x => x.Name == "Microsoft.WindowsStore" && x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
+        Assert.Contains(packages, x => x.Name == "Example.App" && x.Scope == "Provisionado");
+    }
+
+    [Fact]
+    public void SystemAppxInventory_CsvNeutralizesSpreadsheetFormulae()
+    {
+        Assert.Equal("\"'=HYPERLINK(1)\"", AppxSystemInventoryService.EscapeCsv("=HYPERLINK(1)"));
+        Assert.Equal("\"normal\"", AppxSystemInventoryService.EscapeCsv("normal"));
+    }
+
+    [Fact]
     public void AppxInventory_LabelsCoreWindowsPackagesAsProtected()
     {
         const string json = "[{\"Name\":\"Microsoft.WindowsStore\",\"PackageFullName\":\"Microsoft.WindowsStore_1.0_x64\",\"Version\":\"1.0.0.0\",\"Publisher\":\"CN=Microsoft\",\"Status\":\"Ok\",\"IsFramework\":false,\"IsResourcePackage\":false,\"NonRemovable\":false},{\"Name\":\"Example.Framework\",\"PackageFullName\":\"Example.Framework_1.0_x64\",\"Version\":\"1.0.0.0\",\"Publisher\":\"CN=Example\",\"Status\":\"Ok\",\"IsFramework\":true,\"IsResourcePackage\":false,\"NonRemovable\":false}]";

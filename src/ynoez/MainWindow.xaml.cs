@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _networkMonitorCts;
     private CancellationTokenSource? _networkDiagnosticCts;
     private CancellationTokenSource? _appxInventoryCts;
+    private CancellationTokenSource? _systemAppxInventoryCts;
     private CancellationTokenSource? _programInventoryCts;
     private CancellationTokenSource? _autoProfileCts;
     private CancellationTokenSource? _metricsCts;
@@ -1200,6 +1201,86 @@ public partial class MainWindow : Window
         appxPanel.Children.Add(NoteCard("Por que não há botão de remover?", "Remover pacotes provisionados/AppX pode afetar dependências, atualizações e outros usuários. O ynoez só habilitará remoção quando existir um mecanismo de backup/reinstalação e verificação adequado para cada pacote; este inventário não altera nada."));
         appxCard.Child = appxPanel;
         root.Children.Add(appxCard);
+
+        var systemAppxCard = MakeCard();
+        var systemAppxPanel = new StackPanel { Margin = new Thickness(20) };
+        systemAppxPanel.Children.Add(Heading("Pacotes AppX de todos os perfis e provisionados", 15));
+        systemAppxPanel.Children.Add(Body("Inventário somente leitura dos pacotes AppX/MSIX instalados para todos os usuários e dos pacotes provisionados para novos perfis do Windows. A consulta exige elevação UAC porque usa os cmdlets administrativos oficiais do Windows. Nenhum pacote é removido, alterado ou provisionado pelo ynoez."));
+        var systemAppxStatus = Body("Inventário do sistema ainda não consultado.");
+        var systemAppxGrid = new DataGrid
+        {
+            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
+            CanUserDeleteRows = false, CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"), AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft, Height = 250, Margin = new Thickness(0, 10, 0, 10)
+        };
+        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Pacote", Binding = new Binding(nameof(AppxSystemPackageInfo.Name)), Width = new DataGridLength(1.6, DataGridLengthUnitType.Star) });
+        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Escopo", Binding = new Binding(nameof(AppxSystemPackageInfo.Scope)), Width = new DataGridLength(140) });
+        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(AppxSystemPackageInfo.Version)), Width = new DataGridLength(90) });
+        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Arquitetura", Binding = new Binding(nameof(AppxSystemPackageInfo.Architecture)), Width = new DataGridLength(90) });
+        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Classificação", Binding = new Binding(nameof(AppxSystemPackageInfo.Classification)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        var systemAppxButtons = new WrapPanel();
+        var loadSystemAppx = new Button { Content = "Consultar inventário do sistema", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelSystemAppx = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportSystemAppx = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        IReadOnlyList<AppxSystemPackageInfo> systemPackages = Array.Empty<AppxSystemPackageInfo>();
+        loadSystemAppx.Click += async (_, _) =>
+        {
+            if (_systemAppxInventoryCts is not null) return;
+            if (MessageBox.Show("Consultar pacotes de todos os usuários e pacotes provisionados? O Windows solicitará UAC. A consulta é somente leitura.",
+                "Permissão administrativa", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            _systemAppxInventoryCts = new CancellationTokenSource();
+            var token = _systemAppxInventoryCts.Token;
+            loadSystemAppx.IsEnabled = false;
+            cancelSystemAppx.IsEnabled = true;
+            exportSystemAppx.IsEnabled = false;
+            systemAppxStatus.Text = "Aguardando UAC e consultando pacotes…";
+            try
+            {
+                systemPackages = await AppxSystemInventoryService.GetAllUsersAndProvisionedAsync(token);
+                systemAppxGrid.ItemsSource = systemPackages;
+                var protectedCount = systemPackages.Count(x => x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
+                var provisionedCount = systemPackages.Count(x => x.Scope == "Provisionado");
+                systemAppxStatus.Text = systemPackages.Count + " registros • " + protectedCount +
+                    " protegidos/componentes • " + provisionedCount + " provisionados • somente leitura.";
+                exportSystemAppx.IsEnabled = systemPackages.Count > 0;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                systemAppxStatus.Text = "Consulta cancelada. Nenhum pacote foi alterado.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário AppX de sistema falhou: " + ex);
+                systemAppxStatus.Text = "Não foi possível consultar os pacotes: " + ex.Message;
+            }
+            finally
+            {
+                _systemAppxInventoryCts?.Dispose();
+                _systemAppxInventoryCts = null;
+                loadSystemAppx.IsEnabled = true;
+                cancelSystemAppx.IsEnabled = false;
+            }
+        };
+        cancelSystemAppx.Click += (_, _) => _systemAppxInventoryCts?.Cancel();
+        exportSystemAppx.Click += (_, _) =>
+        {
+            if (systemPackages.Count == 0) return;
+            var path = AppxSystemInventoryService.ExportCsv(systemPackages);
+            systemAppxStatus.Text = "CSV completo salvo em: " + path;
+        };
+        systemAppxButtons.Children.Add(loadSystemAppx);
+        systemAppxButtons.Children.Add(cancelSystemAppx);
+        systemAppxButtons.Children.Add(exportSystemAppx);
+        systemAppxPanel.Children.Add(systemAppxStatus);
+        systemAppxPanel.Children.Add(systemAppxGrid);
+        systemAppxPanel.Children.Add(systemAppxButtons);
+        systemAppxPanel.Children.Add(NoteCard("Política de remoção", "Pacotes provisionados afetam novos perfis e a recuperação do Windows; pacotes de outros usuários podem pertencer a contas diferentes. Este relatório não oferece remoção automática. Store, Calculator, Notepad, shell, frameworks, recursos, segurança e componentes essenciais continuam protegidos."));
+        systemAppxCard.Child = systemAppxPanel;
+        root.Children.Add(systemAppxCard);
 
         root.Children.Add(ProtectedItemsCard());
         return root;
