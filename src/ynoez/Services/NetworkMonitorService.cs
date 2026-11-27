@@ -269,13 +269,14 @@ public static class NetworkMonitorService
 
     private static async Task<ProbeResult> ProbeTcpAsync(string host, int port, CancellationToken token)
     {
-        using var client = new TcpClient();
+        var address = IPAddress.Parse(host);
+        using var client = new TcpClient(address.AddressFamily);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
         timeout.CancelAfter(TimeSpan.FromSeconds(2));
         var started = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            await client.ConnectAsync(IPAddress.Parse(host), port, timeout.Token);
+            await client.ConnectAsync(address, port, timeout.Token);
             started.Stop();
             return new ProbeResult("OK", started.ElapsedMilliseconds);
         }
