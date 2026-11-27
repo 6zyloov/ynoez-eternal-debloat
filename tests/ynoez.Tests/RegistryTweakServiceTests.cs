@@ -989,8 +989,10 @@ public sealed class RegistryTweakServiceTests
             Assert.False(extra.IsValid);
             Assert.Contains("fora do manifesto", extra.Details, StringComparison.OrdinalIgnoreCase);
 
-            var unsafeManifest = manifest with
+            var unsafeManifest = new BackupResult
             {
+                Folder = manifest.Folder,
+                CreatedAt = manifest.CreatedAt,
                 Files = new[] { new BackupFileInfo("..\\outside.txt", 4, new string('0', 64)) }
             };
             await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"), System.Text.Json.JsonSerializer.Serialize(unsafeManifest));
