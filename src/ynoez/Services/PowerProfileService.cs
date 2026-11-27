@@ -42,7 +42,7 @@ public static class PowerProfileService
         else
         {
             Directory.CreateDirectory(AppPaths.Backups);
-            var exportPath = Path.Combine(AppPaths.Backups, "power-profile-base-" + current + ".pow");
+            var exportPath = Path.Combine(AppPaths.Backups, "power-profile-base-" + current + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".pow");
             var export = RunPowerCfg("/export " + Quote(exportPath) + " " + current);
             if (export.ExitCode != 0 || !File.Exists(exportPath))
                 throw new InvalidOperationException("Não foi possível exportar o plano original antes da alteração. Nenhum perfil foi aplicado. " + export.Error);
