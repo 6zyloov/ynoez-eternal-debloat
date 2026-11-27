@@ -79,6 +79,41 @@ public sealed class RegistryTweakServiceTests
             Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
         });
     }
+ 
+    [Fact]
+    public void StartupEntry_DisableAndRestoreIsReversible()
+    {
+        const string runPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        var valueName = "ynoez-test-" + Guid.NewGuid().ToString("N");
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "ynoez-startup-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDirectory);
+        try
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(runPath))
+                key!.SetValue(valueName, "test-command.exe", RegistryValueKind.String);
+
+            var manager = new StartupManagerService(tempDirectory);
+            var entry = manager.GetActiveEntries().Single(x => x.Name == valueName && x.Scope == "Usuário atual");
+            Assert.True(entry.CanDisable);
+
+            manager.Disable(entry);
+
+            using (var key = Registry.CurrentUser.OpenSubKey(runPath))
+                Assert.DoesNotContain(valueName, key!.GetValueNames());
+            var disabled = Assert.Single(manager.GetDisabledEntries());
+            manager.Restore(disabled);
+
+            using (var key = Registry.CurrentUser.OpenSubKey(runPath))
+                Assert.Equal("test-command.exe", key!.GetValue(valueName));
+            Assert.Empty(manager.GetDisabledEntries());
+        }
+        finally
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(runPath, writable: true);
+            key?.DeleteValue(valueName, throwOnMissingValue: false);
+            if (Directory.Exists(tempDirectory)) Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
 
     private static RegistryTweak MakeTweak(string id, string keyPath, string valueName, int value) =>
         new(id, "Teste", "Teste isolado", "Teste", "Baixo", RegistryHive.CurrentUser,

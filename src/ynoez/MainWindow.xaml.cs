@@ -368,6 +368,50 @@ public partial class MainWindow : Window
             var result = await CleanupService.ClearDiscordCacheAsync();
             MessageBox.Show(result.Summary, "Discord", MessageBoxButton.OK, MessageBoxImage.Information);
         }, "PERFIL PRESERVADO"));
+        root.Children.Add(Heading("Gerenciador de inicialização", 15));
+        root.Children.Add(Body("Mostra entradas de inicialização do usuário e do sistema. Nesta versão, somente entradas HKCU não protegidas podem ser desativadas; entradas de drivers, segurança, NVIDIA, áudio, rede e anti-cheats ficam protegidas."));
+        var startupManager = new StartupManagerService();
+        foreach (var entry in startupManager.GetActiveEntries())
+        {
+            var detail = entry.Command + "\nOrigem: " + entry.Scope;
+            if (entry.CanDisable)
+            {
+                root.Children.Add(ActionCard(entry.Name, detail, "Desativar inicialização", () =>
+                {
+                    if (MessageBox.Show("Desativar a inicialização automática de \"" + entry.Name + "\"? O comando será salvo para restauração.",
+                        "Confirmar", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                        return Task.CompletedTask;
+                    startupManager.Disable(entry);
+                    MessageBox.Show("Entrada removida da inicialização e backup criado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowPage("Debloat");
+                    return Task.CompletedTask;
+                }, "USUÁRIO"));
+            }
+            else
+                root.Children.Add(NoteCard(entry.Name + " — preservado", detail + "\n" + entry.ProtectionReason));
+        }
+
+        var disabledStartup = startupManager.GetDisabledEntries();
+        if (disabledStartup.Count > 0)
+        {
+            root.Children.Add(Heading("Entradas desativadas pelo ynoez", 15));
+            foreach (var entry in disabledStartup)
+            {
+                root.Children.Add(ActionCard(entry.Name, entry.Command, "Restaurar inicialização", () =>
+                {
+                    if (MessageBox.Show("Restaurar \"" + entry.Name + "\" à inicialização?", "Confirmar restauração",
+                        MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                        return Task.CompletedTask;
+                    startupManager.Restore(entry);
+                    MessageBox.Show("Entrada restaurada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowPage("Debloat");
+                    return Task.CompletedTask;
+                }, "REVERSÍVEL"));
+            }
+        }
+        else
+            root.Children.Add(NoteCard("Inicialização", "Nenhuma entrada desativada pelo ynoez."));
+
         root.Children.Add(ProtectedItemsCard());
         return root;
     }

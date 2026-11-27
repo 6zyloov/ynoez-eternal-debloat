@@ -56,6 +56,27 @@ public sealed class RegistryTweakService
         }
     }
 
+    public void RemoveValue(RegistryTweak tweak)
+    {
+        Validate(tweak);
+        lock (Sync)
+        {
+            var backupPath = GetBackupPath(tweak.Id);
+            if (!File.Exists(backupPath))
+                WriteAtomically(backupPath, JsonSerializer.Serialize(Capture(tweak), JsonOptions));
+
+            using var key = Registry.CurrentUser.OpenSubKey(tweak.KeyPath, writable: true);
+            if (key is null)
+                throw new InvalidOperationException("A chave de inicialização não existe mais.");
+            key.DeleteValue(tweak.ValueName, throwOnMissingValue: false);
+            key.Flush();
+
+            if (key.GetValueNames().Contains(tweak.ValueName, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Não foi possível remover a entrada de inicialização.");
+            AppLog.Write("Entrada de inicialização removida: " + tweak.Id);
+        }
+    }
+
     public bool CanRestore(string id) => File.Exists(GetBackupPath(id));
 
     public void Restore(RegistryTweak tweak)
