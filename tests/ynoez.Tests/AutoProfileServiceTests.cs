@@ -35,6 +35,30 @@ public sealed class AutoProfileServiceTests
     }
 
     [Fact]
+    public void DecideMode_CorruptedProtectionConfig_NeverUsesAggressiveSaverWhenUserIsAfk()
+    {
+        var mode = AutoProfileService.DecideMode(
+            TimeSpan.FromHours(3), Threshold,
+            gameRunning: false,
+            protectedProcessRunning: false,
+            protectionConfigInvalid: true);
+
+        Assert.Equal(PowerProfileMode.ProtectedAfk, mode);
+    }
+
+    [Fact]
+    public void DecideMode_CorruptedConfigDoesNotOverrideActiveGamePerformanceWhileUserIsPresent()
+    {
+        var mode = AutoProfileService.DecideMode(
+            TimeSpan.FromMinutes(2), Threshold,
+            gameRunning: true,
+            protectedProcessRunning: false,
+            protectionConfigInvalid: true);
+
+        Assert.Equal(PowerProfileMode.Performance, mode);
+    }
+
+    [Fact]
     public void DecideMode_OrdinaryUse_UsesBalanced()
     {
         var mode = AutoProfileService.DecideMode(
