@@ -128,6 +128,87 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void ApplyAndRestore_PreservesBinaryOriginalValue()
+    {
+        var keyPath = TestKeyPath();
+        var backupDirectory = NewBackupDirectory();
+        var original = new byte[] { 0x00, 0x01, 0x7F, 0x80, 0xFF };
+        try
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(keyPath))
+                key!.SetValue("Binary", original, RegistryValueKind.Binary);
+
+            var service = new RegistryTweakService(backupDirectory);
+            var tweak = MakeTweak("test-binary-" + Guid.NewGuid().ToString("N"), keyPath, "Binary", 0);
+            service.Apply(tweak);
+            service.Restore(tweak);
+
+            using var restored = Registry.CurrentUser.OpenSubKey(keyPath);
+            Assert.Equal(RegistryValueKind.Binary, restored!.GetValueKind("Binary"));
+            Assert.Equal(original, (byte[])restored.GetValue("Binary")!);
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(keyPath, throwOnMissingSubKey: false);
+            if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ApplyAndRestore_PreservesMultiStringOriginalValue()
+    {
+        var keyPath = TestKeyPath();
+        var backupDirectory = NewBackupDirectory();
+        var original = new[] { "first", "second", "with spaces" };
+        try
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(keyPath))
+                key!.SetValue("Multi", original, RegistryValueKind.MultiString);
+
+            var service = new RegistryTweakService(backupDirectory);
+            var tweak = MakeTweak("test-multi-" + Guid.NewGuid().ToString("N"), keyPath, "Multi", 0);
+            service.Apply(tweak);
+            service.Restore(tweak);
+
+            using var restored = Registry.CurrentUser.OpenSubKey(keyPath);
+            Assert.Equal(RegistryValueKind.MultiString, restored!.GetValueKind("Multi"));
+            Assert.Equal(original, (string[])restored.GetValue("Multi")!);
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(keyPath, throwOnMissingSubKey: false);
+            if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ApplyAndRestore_PreservesQwordOriginalValue()
+    {
+        var keyPath = TestKeyPath();
+        var backupDirectory = NewBackupDirectory();
+        const long original = 9_223_372_036_854_000;
+        try
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(keyPath))
+                key!.SetValue("Qword", original, RegistryValueKind.QWord);
+
+            var service = new RegistryTweakService(backupDirectory);
+            var tweak = MakeTweak("test-qword-" + Guid.NewGuid().ToString("N"), keyPath, "Qword", 0);
+            service.Apply(tweak);
+            service.Restore(tweak);
+
+            using var restored = Registry.CurrentUser.OpenSubKey(keyPath);
+            Assert.Equal(RegistryValueKind.QWord, restored!.GetValueKind("Qword"));
+            Assert.Equal(original, (long)restored.GetValue("Qword")!);
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(keyPath, throwOnMissingSubKey: false);
+            if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Restore_LeavesCorruptBackupForManualRecovery()
     {
         var keyPath = TestKeyPath();
