@@ -93,14 +93,21 @@ public static class NetworkMonitorService
     private static async Task<ProbeResult> ProbeTcpAsync(string host, int port, CancellationToken token)
     {
         using var client = new TcpClient();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(2));
         var started = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            await client.ConnectAsync(IPAddress.Parse(host), port, token);
+            await client.ConnectAsync(IPAddress.Parse(host), port, timeout.Token);
             started.Stop();
             return new ProbeResult("OK", started.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException)
+        {
+            started.Stop();
+            return new ProbeResult("TIMEOUT", null);
+        }
         catch (Exception ex)
         {
             started.Stop();

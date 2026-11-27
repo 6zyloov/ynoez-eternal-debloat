@@ -71,14 +71,21 @@ public static class NetworkDiagnosticService
     private static async Task<string> TestTcpAsync(string host, int port, CancellationToken token)
     {
         using var client = new TcpClient();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(4));
         var sw = Stopwatch.StartNew();
         try
         {
-            await client.ConnectAsync(host, port, token);
+            await client.ConnectAsync(host, port, timeout.Token);
             sw.Stop();
             return host + ":" + port + " • TCP OK • " + sw.Elapsed.TotalMilliseconds.ToString("0.0") + " ms";
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException)
+        {
+            sw.Stop();
+            return host + ":" + port + " • TCP falhou • timeout";
+        }
         catch (Exception ex)
         {
             sw.Stop();
