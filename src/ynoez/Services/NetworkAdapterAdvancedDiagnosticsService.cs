@@ -35,6 +35,8 @@ public static class NetworkAdapterAdvancedDiagnosticsService
 
     private sealed class RawSnapshot
     {
+        public RawSnapshot() { }
+
         public DateTimeOffset CapturedAt { get; set; }
         public List<RawProperty>? Properties { get; set; }
         public List<string>? Errors { get; set; }
@@ -42,6 +44,8 @@ public static class NetworkAdapterAdvancedDiagnosticsService
 
     private sealed class RawProperty
     {
+        public RawProperty() { }
+
         public string? AdapterName { get; set; }
         public string? AdapterDescription { get; set; }
         public string? DisplayName { get; set; }
