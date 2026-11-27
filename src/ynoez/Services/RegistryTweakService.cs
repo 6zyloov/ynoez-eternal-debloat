@@ -173,9 +173,11 @@ public sealed class RegistryTweakService
             throw new InvalidOperationException("Este ajuste exige Windows build " + tweak.MinimumBuild + " ou superior.");
         var path = tweak.KeyPath.Replace('/', '\\').Trim('\\');
         var allowed = new[] { "Software\\Microsoft\\Windows\\CurrentVersion\\", "Software\\Microsoft\\GameBar\\" };
+        if (!string.Equals(path, tweak.KeyPath, StringComparison.Ordinal) || path.Contains(@"\\", StringComparison.Ordinal))
+            throw new InvalidOperationException("O caminho de registro precisa estar em formato canônico, sem separadores duplicados.");
         if (!allowed.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Caminho de registro fora da lista permitida.");
-        if (path.Contains("..", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(tweak.ValueName))
+        if (path.Split('\\').Any(segment => segment is "." or "..") || string.IsNullOrWhiteSpace(tweak.ValueName) || tweak.ValueName.Contains('\\') || tweak.ValueName.Contains('/'))
             throw new InvalidOperationException("Caminho ou nome de valor inválido.");
         if (tweak.Kind is not RegistryValueKind.DWord and not RegistryValueKind.String)
             throw new InvalidOperationException("Tipo de registro não suportado.");

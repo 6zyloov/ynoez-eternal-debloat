@@ -18,3 +18,8 @@ O painel Tweaks lê `Optimization/catalog.json`, detecta estado, exige confirma�
 - O catálogo inicial é intencionalmente pequeno. Cada novo ajuste deve incluir justificativa, risco, builds suportadas, pré-condições, detecção, aplicação, verificação e reversão.
 - Backup corrompido ou incompatível interrompe a restauração sem apagar o arquivo de backup.
 - Ainda são necessários testes adicionais de falha abrupta, permissões, concorrência e alteração externa simultânea.
+
+
+## Validação do caminho do catálogo
+
+Os caminhos HKCU são validados em formato canônico: separadores duplicados, barras alternativas, segmentos `.`/`..` e nomes de valor com separadores são rejeitados antes de qualquer leitura ou gravação. O teste de catálogo verifica que todos os caminhos distribuídos usam exatamente um separador entre segmentos.

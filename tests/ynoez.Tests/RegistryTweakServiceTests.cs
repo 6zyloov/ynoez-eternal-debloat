@@ -77,6 +77,8 @@ public sealed class RegistryTweakServiceTests
         {
             Assert.Equal(RegistryHive.CurrentUser, tweak.Hive);
             Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
+            Assert.DoesNotContain(@"\\", tweak.KeyPath);
+            Assert.StartsWith(@"Software\\Microsoft\\Windows\\CurrentVersion\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
         });
     }
  
