@@ -17,6 +17,7 @@
   "policy": {
     "neverTerminateProcesses": true,
     "neverChangeAntiCheatSecuritySettings": true,
-    "afkMayUsePowerSaverWhileGamesRemainOpen": true
-  }
+    "afkMayUsePowerSaverWhileGamesRemainOpen": false
+  },
+  "protectedProcessNames": []
 }
