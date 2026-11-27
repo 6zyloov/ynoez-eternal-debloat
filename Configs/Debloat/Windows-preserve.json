@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "configId": "windows-preserve-core",
+  "displayName": "Windows — Preserve Core Components",
+  "purpose": "Do not remove or disable the following features in generic debloat operations.",
+  "applyAutomatically": false,
+  "preserveApps": [
+    "Microsoft.WindowsStore",
+    "Microsoft.WindowsCalculator",
+    "Microsoft.WindowsNotepad",
+    "Microsoft Store Purchase App",
+    "Windows clipboard components",
+    "Windows Search and Start menu search"
+  ],
+  "preserveServices": [
+    "wuauserv",
+    "UsoSvc",
+    "BITS",
+    "DoSvc",
+    "WSearch",
+    "Spooler",
+    "ClipSVC",
+    "InstallService",
+    "AppXSvc",
+    "StateRepository",
+    "WinDefend",
+    "SecurityHealthService",
+    "mpssvc",
+    "BFE"
+  ],
+  "preserveSecurityFeatures": [
+    "TPM",
+    "Secure Boot",
+    "Virtualization-based Security",
+    "HVCI / Memory Integrity",
+    "IOMMU",
+    "DMA remapping",
+    "User Account Control",
+    "Microsoft Defender",
+    "Microsoft Firewall",
+    "SmartScreen"
+  ],
+  "preserveCaptureAndAntiCheat": [
+    "NVIDIA Instant Replay",
+    "NVIDIA Alt+Z overlay",
+    "NVIDIA display/container services",
+    "VALORANT Vanguard",
+    "FACEIT Anti-Cheat"
+  ],
+  "exceptions": {
+    "printer": "Never remove print services, print spooler or printer drivers by default.",
+    "search": "Never disable Windows Search when user relies on Start menu search.",
+    "instantReplay": "Do not disable NVIDIA overlay, NVIDIA App background components or capture features."
+  }
+}
