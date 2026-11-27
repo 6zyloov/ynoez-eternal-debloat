@@ -1139,6 +1139,79 @@ public partial class MainWindow : Window
         inventoryCard.Child = inventoryPanel;
         root.Children.Add(inventoryCard);
 
+        var advancedCard = MakeCard();
+        var advancedPanel = new StackPanel { Margin = new Thickness(20) };
+        advancedPanel.Children.Add(Heading("Propriedades avançadas do driver (somente leitura)", 15));
+        advancedPanel.Children.Add(Body("Consulta os parâmetros que o driver realmente expõe para adaptadores físicos, como EEE, Interrupt Moderation, RSS, LSO, Checksum Offload, Flow Control, Speed & Duplex e buffers. Não altera valores, não reinicia a placa e não solicita UAC."));
+        var advancedStatus = Body("Propriedades avançadas ainda não consultadas.");
+        var advancedGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 330,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.AdapterName)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Propriedade", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.DisplayName)), Width = new DataGridLength(1.25, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Valor atual", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.DisplayValue)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Categoria", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Category)), Width = new DataGridLength(0.9, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Avaliação", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Assessment)), Width = new DataGridLength(1.25, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Orientação", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Guidance)), Width = new DataGridLength(2.4, DataGridLengthUnitType.Star) });
+        var advancedButtons = new WrapPanel();
+        var refreshAdvanced = new Button { Content = "Analisar propriedades", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var exportAdvanced = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        NetworkAdapterAdvancedDiagnosticsSnapshot? advancedSnapshot = null;
+        refreshAdvanced.Click += async (_, _) =>
+        {
+            refreshAdvanced.IsEnabled = false;
+            exportAdvanced.IsEnabled = false;
+            advancedStatus.Text = "Lendo propriedades publicadas pelos drivers…";
+            try
+            {
+                advancedSnapshot = await NetworkAdapterAdvancedDiagnosticsService.CaptureAsync();
+                advancedGrid.ItemsSource = advancedSnapshot.Properties;
+                advancedStatus.Text = advancedSnapshot.Properties.Count + " propriedades lidas às " +
+                    advancedSnapshot.CapturedAt.ToLocalTime().ToString("HH:mm:ss") +
+                    " • consulta somente leitura.";
+                if (advancedSnapshot.Errors.Count > 0)
+                    advancedStatus.Text += " • " + advancedSnapshot.Errors.Count + " aviso(s): " +
+                        string.Join(" | ", advancedSnapshot.Errors.Take(2));
+                exportAdvanced.IsEnabled = advancedSnapshot.Properties.Count > 0;
+                if (advancedSnapshot.Properties.Count == 0 && advancedSnapshot.Errors.Count == 0)
+                    advancedStatus.Text += " O driver não publicou propriedades avançadas para os adaptadores físicos detectados.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Auditoria de propriedades avançadas de rede falhou: " + ex);
+                advancedStatus.Text = "Não foi possível consultar os drivers: " + ex.Message;
+            }
+            finally { refreshAdvanced.IsEnabled = true; }
+        };
+        exportAdvanced.Click += (_, _) =>
+        {
+            if (advancedSnapshot is null || advancedSnapshot.Properties.Count == 0) return;
+            var path = NetworkAdapterAdvancedDiagnosticsService.ExportCsv(advancedSnapshot);
+            advancedStatus.Text = "Relatório CSV salvo em: " + path;
+        };
+        advancedButtons.Children.Add(refreshAdvanced);
+        advancedButtons.Children.Add(exportAdvanced);
+        advancedPanel.Children.Add(advancedStatus);
+        advancedPanel.Children.Add(advancedGrid);
+        advancedPanel.Children.Add(advancedButtons);
+        advancedPanel.Children.Add(NoteCard("Não existe tweak universal de rede", "EEE e Interrupt Moderation podem mudar consumo, CPU e latência; RSS e offloads normalmente devem seguir o suporte do driver; Speed & Duplex costuma ficar em negociação automática. Essas são orientações condicionais, não comandos de otimização. O ynoez não muda nenhum desses valores e não promete corrigir quedas causadas pelo roteador ou provedor."));
+        advancedCard.Child = advancedPanel;
+        root.Children.Add(advancedCard);
+
         var statsCard = MakeCard();
         var statsPanel = new StackPanel { Margin = new Thickness(20) };
         statsPanel.Children.Add(Heading("Contadores dos adaptadores", 15));
