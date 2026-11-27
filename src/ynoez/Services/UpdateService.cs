@@ -16,7 +16,6 @@ public static class UpdateService
 {
     private const string Repository = "6zyloov/ynoez-eternal-debloat";
     private const string LatestReleaseApi = "https://api.github.com/repos/" + Repository + "/releases/latest";
-    private const string ReleaseUrlPrefix = "https://github.com/" + Repository + "/releases/tag/";
     private static readonly HttpClient Http = CreateClient();
 
     private static HttpClient CreateClient()
@@ -78,8 +77,7 @@ public static class UpdateService
             published = publishedAt;
 
         var notes = GetOptionalString(root, "body") ?? string.Empty;
-        if (notes.Length > 12000) notes = notes[..12000] + "
-[Notas truncadas]";
+        if (notes.Length > 12000) notes = notes[..12000] + "\n[Notas truncadas]";
         return new UpdateCheckResult(FormatVersion(current), FormatVersion(latest), tag,
             releaseUri.AbsoluteUri, published, notes, latest > current);
     }
