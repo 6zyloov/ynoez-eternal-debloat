@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 
 namespace ynoez.Services;
 
@@ -35,19 +36,28 @@ public static class NetworkDiagnosticService
         lines.Add("CONECTIVIDADE EXTERNA (Cloudflare DNS)");
         lines.Add(internet.ToDisplay());
 
+        progress?.Report("Testando conectividade TCP…");
+        lines.Add("");
+        lines.Add("CONECTIVIDADE TCP (HTTPS/443)");
+        lines.Add(await TestTcpAsync("1.1.1.1", 443, cancellationToken));
+        lines.Add(await TestTcpAsync("8.8.8.8", 443, cancellationToken));
+
         progress?.Report("Verificando resolução DNS…");
-        var sw = Stopwatch.StartNew();
+        lines.Add("");
+        lines.Add("RESOLUÇÃO DNS");
+        lines.Add(await TestDnsAsync("cloudflare.com", cancellationToken));
+        lines.Add(await TestDnsAsync("google.com", cancellationToken));
+
+        progress?.Report("Rastreando rota até a internet…");
+        lines.Add("");
+        lines.Add("ROTA ATÉ 1.1.1.1");
         try
         {
-            var addresses = await Dns.GetHostAddressesAsync("cloudflare.com", cancellationToken);
-            sw.Stop();
-            lines.Add($"DNS: OK • {sw.Elapsed.TotalMilliseconds:0.0} ms • {addresses.Length} endereço(s) retornado(s)");
+            var route = await RunTraceRouteAsync(cancellationToken);
+            lines.Add(string.IsNullOrWhiteSpace(route) ? "tracert não retornou dados." : route);
         }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            lines.Add("DNS: falha • " + ex.Message);
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) { lines.Add("Não foi possível rastrear a rota: " + ex.Message); }
 
         lines.Add("");
         lines.Add("LEITURA");
@@ -56,6 +66,83 @@ public static class NetworkDiagnosticService
         AppLog.Write("Diagnóstico de rede concluído.");
         progress?.Report("Diagnóstico concluído.");
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static async Task<string> TestTcpAsync(string host, int port, CancellationToken token)
+    {
+        using var client = new TcpClient();
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            await client.ConnectAsync(host, port, token);
+            sw.Stop();
+            return host + ":" + port + " • TCP OK • " + sw.Elapsed.TotalMilliseconds.ToString("0.0") + " ms";
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return host + ":" + port + " • TCP falhou • " + ex.GetType().Name;
+        }
+    }
+
+    private static async Task<string> TestDnsAsync(string host, CancellationToken token)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var addresses = await Dns.GetHostAddressesAsync(host, token);
+            sw.Stop();
+            var ipv4 = addresses.Count(x => x.AddressFamily == AddressFamily.InterNetwork);
+            var ipv6 = addresses.Count(x => x.AddressFamily == AddressFamily.InterNetworkV6);
+            return host + " • OK • " + sw.Elapsed.TotalMilliseconds.ToString("0.0") + " ms • IPv4 " + ipv4 + " / IPv6 " + ipv6;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return host + " • falha • " + ex.GetType().Name;
+        }
+    }
+
+    private static async Task<string> RunTraceRouteAsync(CancellationToken token)
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo("tracert.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            }
+        };
+        foreach (var arg in new[] { "-d", "-h", "8", "-w", "400", "1.1.1.1" })
+            process.StartInfo.ArgumentList.Add(arg);
+
+        process.Start();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            return "Rota excedeu o limite de 15 segundos.";
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            throw;
+        }
+
+        var output = await outputTask;
+        var error = await errorTask;
+        return process.ExitCode == 0 ? output.Trim() : (output + Environment.NewLine + error).Trim();
     }
 
     private static async Task<PingSummary> TestHostAsync(string host, int count, IProgress<string>? progress, CancellationToken token)
