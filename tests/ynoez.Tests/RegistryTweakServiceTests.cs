@@ -816,6 +816,11 @@ public sealed class RegistryTweakServiceTests
         Assert.Throws<InvalidDataException>(() => UpdateService.ParseLatestRelease(
             "{\"tag_name\":\"v0.4.0-beta\",\"html_url\":\"https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0-beta\",\"draft\":false,\"prerelease\":false}", "0.3.0"));
         Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com.evil.invalid/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com@evil.invalid/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com:444/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0?download=1"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0/extra"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0/"));
     }
 
     [Fact]

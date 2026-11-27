@@ -21,7 +21,7 @@ public static class UpdateService
 
     private static HttpClient CreateClient()
     {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
+        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("ynoez-Windows-utility/0.3");
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         return client;
@@ -29,11 +29,13 @@ public static class UpdateService
 
     public static async Task<UpdateCheckResult?> CheckLatestAsync(CancellationToken token = default)
     {
-        using var response = await Http.GetAsync(LatestReleaseApi, HttpCompletionOption.ResponseHeadersRead, token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        using var response = await Http.GetAsync(LatestReleaseApi, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync(token);
+        var json = await response.Content.ReadAsStringAsync(timeout.Token);
         return ParseLatestRelease(json, GetCurrentVersion());
     }
 
@@ -67,14 +69,7 @@ public static class UpdateService
             throw new InvalidDataException("A tag da release não contém uma versão estável MAJOR.MINOR.PATCH reconhecida.");
 
         var urlText = GetRequiredString(root, "html_url");
-        var expectedReleaseSuffix = "/" + Repository + "/releases/tag/" + Uri.EscapeDataString(tag);
-        if (!Uri.TryCreate(urlText, UriKind.Absolute, out var releaseUri) ||
-            releaseUri.Scheme != Uri.UriSchemeHttps || !releaseUri.IsDefaultPort ||
-            !string.IsNullOrEmpty(releaseUri.UserInfo) || !string.IsNullOrEmpty(releaseUri.Query) ||
-            !string.IsNullOrEmpty(releaseUri.Fragment) ||
-            !string.Equals(releaseUri.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
-            !releaseUri.AbsolutePath.EndsWith(expectedReleaseSuffix, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("A URL da release não corresponde à tag do repositório oficial do ynoez.");
+        var releaseUri = ParseReleaseUrl(urlText, tag);
 
         DateTimeOffset? published = null;
         var publishedText = GetOptionalString(root, "published_at");
@@ -94,13 +89,30 @@ public static class UpdateService
         Process.Start(new ProcessStartInfo(validated.AbsoluteUri) { UseShellExecute = true });
     }
 
-    internal static Uri ParseReleaseUrl(string url)
+    internal static Uri ParseReleaseUrl(string url) => ParseReleaseUrl(url, expectedTag: null);
+
+    private static Uri ParseReleaseUrl(string url, string? expectedTag)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-            uri.Scheme != Uri.UriSchemeHttps ||
+            uri.Scheme != Uri.UriSchemeHttps || !uri.IsDefaultPort ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment) ||
             !string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
-            !uri.AbsolutePath.StartsWith("/" + Repository + "/releases/tag/", StringComparison.OrdinalIgnoreCase))
+            uri.AbsolutePath.EndsWith("/", StringComparison.Ordinal))
             throw new InvalidDataException("A URL de atualização não é a página oficial de release do ynoez.");
+
+        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length != 5 ||
+            !string.Equals(segments[0], "6zyloov", StringComparison.Ordinal) ||
+            !string.Equals(segments[1], "ynoez-eternal-debloat", StringComparison.Ordinal) ||
+            !string.Equals(segments[2], "releases", StringComparison.Ordinal) ||
+            !string.Equals(segments[3], "tag", StringComparison.Ordinal))
+            throw new InvalidDataException("A URL não aponta para uma tag de release do repositório oficial.");
+
+        var tag = Uri.UnescapeDataString(segments[4]);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(tag, @"^v?[0-9]+\\.[0-9]+\\.[0-9]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant) ||
+            (expectedTag is not null && !string.Equals(tag, expectedTag, StringComparison.Ordinal)))
+            throw new InvalidDataException("A URL não corresponde a uma tag estável e exata do ynoez.");
         return uri;
     }
 
