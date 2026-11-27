@@ -57,11 +57,13 @@ public sealed class ScheduledTaskTweakService
 
     public IReadOnlyList<ScheduledTaskStatus> GetStatuses()
     {
+        var states = QueryCatalogStates();
         var result = new List<ScheduledTaskStatus>();
         foreach (var item in Catalog)
         {
-            var state = QueryState(item);
-            result.Add(new ScheduledTaskStatus(item, state != "NOTFOUND",
+            var state = states.TryGetValue(Key(item.TaskPath, item.TaskName), out var value) ? value : "Indisponível";
+            var available = state != "NOTFOUND" && state != "Indisponível";
+            result.Add(new ScheduledTaskStatus(item, available,
                 state == "NOTFOUND" ? "Não encontrada" : state, File.Exists(GetBackupPath(item))));
         }
         return result;
@@ -139,6 +141,33 @@ public sealed class ScheduledTaskTweakService
             throw new InvalidOperationException("Esta tarefa não pertence à lista de tarefas opcionais permitidas.");
         if (!Catalog.Any(x => string.Equals(Key(x.TaskPath, x.TaskName), Key(definition.TaskPath, definition.TaskName), StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Definição de tarefa inválida.");
+    }
+
+    private static Dictionary<string, string> QueryCatalogStates()
+    {
+        var definitions = string.Join(",", Catalog.Select(item =>
+            "[pscustomobject]@{Path='" + Escape(item.TaskPath) + "';Name='" + Escape(item.TaskName) + "'}"));
+        var script = "$ErrorActionPreference='Stop'; Import-Module ScheduledTasks -ErrorAction Stop; " +
+            "$defs=@(" + definitions + "); $rows=foreach($d in $defs) { " +
+            "$t=Get-ScheduledTask -TaskPath $d.Path -TaskName $d.Name -ErrorAction SilentlyContinue; " +
+            "$state=if($null -eq $t){'NOTFOUND'}else{[string]$t.State}; " +
+            "[pscustomobject]@{Key=($d.Path.TrimEnd('\\')+'\\'+$d.Name);State=$state} }; " +
+            "ConvertTo-Json -InputObject @($rows) -Compress";
+        try
+        {
+            var result = RunPowerShell(script, elevated: false);
+            if (result.ExitCode != 0) throw new InvalidOperationException(result.Error);
+            using var document = JsonDocument.Parse(result.Output);
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in document.RootElement.EnumerateArray())
+                values[item.GetProperty("Key").GetString() ?? ""] = item.GetProperty("State").GetString() ?? "Indisponível";
+            return values;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Consulta em lote das tarefas opcionais falhou: " + ex.Message);
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     private static string QueryState(ScheduledTaskDefinition definition)

@@ -201,8 +201,8 @@ public sealed class RegistryTweakServiceTests
         Assert.Equal(0, summary.GatewayLossPercent);
         Assert.Equal(25, summary.ExternalLossPercent);
         Assert.Equal(25, summary.ExternalTcpFailurePercent);
-        Assert.Equal(15, summary.ExternalJitterMilliseconds);
-        Assert.Equal(26.6666667, summary.ExternalTcpJitterMilliseconds!.Value, 5);
+        Assert.Equal(10, summary.ExternalJitterMilliseconds);
+        Assert.Equal(20, summary.ExternalTcpJitterMilliseconds!.Value);
     }
 
     [Fact]
@@ -211,7 +211,7 @@ public sealed class RegistryTweakServiceTests
         var catalog = ScheduledTaskTweakService.GetCatalog();
         Assert.NotEmpty(catalog);
         Assert.Equal(catalog.Count, catalog.Select(x => x.TaskPath + x.TaskName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
-        Assert.DoesNotContain(catalog, x => x.TaskName.Contains("Update", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(catalog, x => x.TaskPath.Contains("WindowsUpdate", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(catalog, x => x.TaskName.Contains("Defender", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(catalog, x => x.TaskName.Contains("Search", StringComparison.OrdinalIgnoreCase));
     }

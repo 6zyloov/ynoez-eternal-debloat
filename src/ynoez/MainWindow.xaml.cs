@@ -783,7 +783,8 @@ public partial class MainWindow : Window
             var details = task.Definition.Description + "\nEstado: " + task.State +
                 (task.DisabledByYnoez ? "\nBackup do estado original disponível." : "");
             if (!task.Available)
-                root.Children.Add(NoteCard(task.Definition.DisplayName + " — não encontrada", details));
+                root.Children.Add(NoteCard(task.Definition.DisplayName + " — " +
+                    (task.State == "Não encontrada" ? "não encontrada" : "consulta indisponível"), details));
             else if (task.DisabledByYnoez)
                 root.Children.Add(ActionCard(task.Definition.DisplayName, details, "Restaurar tarefa", async () =>
                 {
