@@ -1159,12 +1159,67 @@ public partial class MainWindow : Window
         root.Children.Add(PageIntro("Restore", "Central de recuperação do ynoez. Cada backup permanece separado e só é consumido depois da verificação da restauração."));
 
         root.Children.Add(ActionCard("Restauração do Sistema", "Abre o utilitário nativo do Windows para escolher um ponto de restauração disponível.", "Abrir Restauração", () => OpenTargetAsync("rstrui.exe"), "WINDOWS"));
-        root.Children.Add(ActionCard("Restaurar plano de energia", "Reaplica o plano salvo antes da última alteração manual de energia feita pelo ynoez.", "Restaurar plano", () =>
+        root.Children.Add(Heading("Planos de energia", 15));
+        if (PowerProfileService.CanRestoreOriginal())
         {
-            var message = BackupService.RestorePreviousPowerScheme();
-            MessageBox.Show(message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-            return Task.CompletedTask;
-        }, "REVERSÍVEL"));
+            root.Children.Add(ActionCard("Restaurar plano base do ynoez",
+                "Recupera o plano exportado antes do primeiro perfil manual, com verificação e reimportação do arquivo .pow quando necessário.",
+                "Restaurar plano original", () =>
+                {
+                    if (_autoProfileCts is not null)
+                    {
+                        MessageBox.Show("Pare os perfis automáticos antes de restaurar o plano original.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return Task.CompletedTask;
+                    }
+                    var message = PowerProfileService.RestoreOriginal();
+                    MessageBox.Show(message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowPage("Restore");
+                    return Task.CompletedTask;
+                }, "BACKUP"));
+        }
+        else
+            root.Children.Add(NoteCard("Plano base", "Nenhum backup persistente de plano de energia está aguardando restauração."));
+
+        if (PowerProfileService.HasInterruptedAutomaticSession)
+        {
+            root.Children.Add(ActionCard("Recuperar sessão automática interrompida",
+                "O ynoez encontrou metadados de uma sessão automática pendente. A recuperação tenta reativar o plano original e só remove o backup depois de verificar o resultado.",
+                "Recuperar sessão", () =>
+                {
+                    try
+                    {
+                        PowerProfileService.RecoverInterruptedAutomaticSession();
+                        MessageBox.Show("Sessão automática recuperada e plano anterior verificado.", "ynoez",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLog.Write("Recuperação manual da sessão automática falhou: " + ex);
+                        MessageBox.Show(ex.Message + "\n\nO backup foi preservado.", "ynoez",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    ShowPage("Restore");
+                    return Task.CompletedTask;
+                }, "RECUPERAÇÃO"));
+        }
+
+        if (BackupService.HasPreviousPowerSchemeBackup)
+        {
+            root.Children.Add(ActionCard("Restaurar plano de energia legado",
+                "Recupera um backup de plano criado por versões antigas do ynoez. O arquivo só será removido após confirmação do plano ativo pelo Windows.",
+                "Restaurar backup antigo", () =>
+                {
+                    if (_autoProfileCts is not null)
+                    {
+                        MessageBox.Show("Pare os perfis automáticos antes de restaurar energia.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return Task.CompletedTask;
+                    }
+                    var message = BackupService.RestorePreviousPowerScheme();
+                    MessageBox.Show(message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowPage("Restore");
+                    return Task.CompletedTask;
+                }, "LEGADO"));
+        }
 
         root.Children.Add(Heading("Backups de Registro", 15));
         try

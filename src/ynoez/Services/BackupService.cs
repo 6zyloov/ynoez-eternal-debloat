@@ -231,18 +231,35 @@ public static class BackupService
         File.WriteAllText(file, JsonSerializer.Serialize(new { SavedAt = DateTime.Now, Guid = guid }, JsonOptions));
     }
 
+    private static string LegacyPowerPlanBackupPath =>
+        Path.Combine(AppPaths.Data, "previous-power-plan.json");
+
+    public static bool HasPreviousPowerSchemeBackup => File.Exists(LegacyPowerPlanBackupPath);
+
     public static string RestorePreviousPowerScheme()
     {
-        var file = Path.Combine(AppPaths.Data, "previous-power-plan.json");
-        if (!File.Exists(file)) return "Não existe um plano de energia anterior salvo pelo ynoez.";
+        var file = LegacyPowerPlanBackupPath;
+        if (!File.Exists(file))
+            return "Não existe um backup de plano de energia da versão antiga do ynoez.";
+
         using var json = JsonDocument.Parse(File.ReadAllText(file));
-        var guid = json.RootElement.GetProperty("Guid").GetString();
-        if (string.IsNullOrWhiteSpace(guid)) return "O backup do plano de energia está inválido.";
-        var result = RunCommand("powercfg.exe", $"/setactive {guid}");
-        AppLog.Write($"Plano de energia restaurado: {guid}");
-        if (result.ExitCode != 0) return "Falha ao restaurar o plano: " + result.Error;
-        try { File.Delete(file); } catch { }
-        return "Plano de energia anterior restaurado. O registro antigo foi consumido; uma próxima alteração salvará o novo plano base.";
+        var guidText = json.RootElement.TryGetProperty("Guid", out var guidElement)
+            ? guidElement.GetString() : null;
+        if (!Guid.TryParse(guidText, out var parsed))
+            throw new InvalidDataException("O GUID do backup antigo de energia é inválido; o arquivo foi preservado.");
+
+        var guid = parsed.ToString();
+        var result = RunCommand("powercfg.exe", "/setactive " + guid);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException("Falha ao solicitar a restauração do plano antigo: " + result.Error);
+
+        var active = GetCurrentPowerSchemeGuid();
+        if (!string.Equals(active, guid, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("O Windows não confirmou o plano antigo. O backup foi mantido.");
+
+        File.Delete(file);
+        AppLog.Write("Plano de energia legado restaurado e verificado: " + guid);
+        return "Plano de energia legado restaurado e verificado.";
     }
 
     public static string SetHighPerformancePlan()

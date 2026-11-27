@@ -458,6 +458,13 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void OptionalServiceCatalog_ContainsNoDuplicateNames()
+    {
+        var names = ServiceTweakService.GetCatalog().Select(x => x.Name).ToArray();
+        Assert.Equal(names.Length, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
+    [Fact]
     public void OptionalServiceRestoreInventory_ExposesOnlyWhitelistedBackups()
     {
         var directory = Path.Combine(Path.GetTempPath(), "ynoez-service-restore-" + Guid.NewGuid().ToString("N"));

@@ -31,6 +31,7 @@ public static class PowerProfileService
     private static extern uint SetThreadExecutionState(uint esFlags);
 
     public static bool HasInterruptedAutomaticSession => File.Exists(SessionPath);
+    public static bool CanRestoreOriginal() => File.Exists(BaseBackupPath);
 
     public static string GetActiveSchemeGuid()
     {
