@@ -157,12 +157,24 @@ public static class WindowsRepairService
 
         return "$ErrorActionPreference='Stop'; " +
             "$exe=Join-Path $env:windir 'System32\\" + executable + "'; " +
-            "$ynoezArgs=@(" + args + "); " +
-            "$lines=& $exe @ynoezArgs 2>&1; $code=$LASTEXITCODE; " +
-            "$text=@($lines | ForEach-Object { [string]$_ }) -join [Environment]::NewLine; " +
-            "[IO.File]::WriteAllText('" + log + "', $text, [Text.UTF8Encoding]::new($true)); " +
+            "$ynoezArgs=@(" + args + "); $code=1; " +
+            "[IO.File]::WriteAllText('" + log + "', 'ynoez Windows repair log' + [Environment]::NewLine, [Text.UTF8Encoding]::new($true)); " +
+            "try { " +
+            "if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Ferramenta do Windows não encontrada.' }; " +
+            "& $exe @ynoezArgs 2>&1 | Tee-Object -FilePath '" + log + "' -Append | Out-Null; " +
+            "$code=$LASTEXITCODE; if ($null -eq $code) { $code=1 }; " +
+            "} catch { " +
+            "($_ | Out-String) | Add-Content -LiteralPath '" + log + "' -Encoding UTF8; $code=1; " +
+            "}; " +
             "[IO.File]::WriteAllText('" + exit + "', ([int]$code).ToString([Globalization.CultureInfo]::InvariantCulture)); " +
             "exit [int]$code";
+    }
+
+    internal static string BuildPowerShellScriptForTest(WindowsRepairAction action, string logPath, string exitPath)
+    {
+        if (!Catalog.TryGetValue(action, out var entry))
+            throw new ArgumentOutOfRangeException(nameof(action));
+        return BuildPowerShellScript(entry.Plan, logPath, exitPath);
     }
 
     internal static bool IsSafeActionCatalog() =>

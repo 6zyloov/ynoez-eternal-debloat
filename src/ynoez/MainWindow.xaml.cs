@@ -1729,7 +1729,8 @@ public partial class MainWindow : Window
                 var progress = new Progress<string>(message => repairStatus.Text = message);
                 try
                 {
-                    var result = await WindowsRepairService.RunAsync(actionInfo.Action, progress, token);
+                    var result = await Task.Run(
+                        () => WindowsRepairService.RunAsync(actionInfo.Action, progress, token), token);
                     repairStatus.Text = (result.Succeeded ? "Concluído" : "Finalizado com erro") +
                         " • código " + result.ExitCode + "\nInício: " + result.StartedAt.ToLocalTime().ToString("HH:mm:ss") +
                         " • Fim: " + result.FinishedAt.ToLocalTime().ToString("HH:mm:ss") +

@@ -19,6 +19,30 @@ public sealed class WindowsRepairServiceTests
     }
 
     [Fact]
+    public void Script_StreamsOutputToPersistentLogAndUsesOnlyFixedCommands()
+    {
+        var logPath = Path.Combine(Path.GetTempPath(), "ynoez-repair-'log.log");
+        var exitPath = logPath + ".exit";
+        var script = WindowsRepairService.BuildPowerShellScriptForTest(
+            WindowsRepairAction.RepairComponentStore, logPath, exitPath);
+
+        Assert.Contains("Tee-Object -FilePath", script);
+        Assert.Contains("-Append", script);
+        Assert.Contains("$ynoezArgs", script);
+        Assert.DoesNotContain("$args=@", script);
+        Assert.Contains("dism.exe", script);
+        Assert.Contains("/RestoreHealth", script);
+        Assert.Contains("ynoez-''log.log", script);
+    }
+
+    [Fact]
+    public void ScriptBuilder_RejectsUnknownAction()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            WindowsRepairService.BuildPowerShellScriptForTest((WindowsRepairAction)999, "C:\\temp\\x.log", "C:\\temp\\x.exit"));
+    }
+
+    [Fact]
     public void Catalog_NeverIncludesBootSecurityOrAntiCheatChanges()
     {
         var descriptions = string.Join(" ", WindowsRepairService.GetActions().Select(x => x.Description));
