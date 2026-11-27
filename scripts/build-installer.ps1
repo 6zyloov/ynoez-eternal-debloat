@@ -28,6 +28,35 @@ Get-ChildItem -Path $artifactDir -Filter "ynoez-setup-*.exe" -File -ErrorAction 
     Remove-Item -Force
 
 $defineVersion = "/DMyAppVersion='$version'"
+$preprocessed = & $iscc -e $defineVersion $script
+if ($LASTEXITCODE -ne 0) { throw "ISPP falhou ao expandir o script (código $LASTEXITCODE)." }
+$preprocessedText = $preprocessed -join [Environment]::NewLine
+$versionDirective = [regex]::Match($preprocessedText, '(?m)^\s*VersionInfoVersion\s*=\s*([^\r\n]+)\s*
+
+$setup = Join-Path $artifactDir "ynoez-setup-$version.exe"
+if (-not (Test-Path $setup -PathType Leaf)) { throw "O instalador esperado não foi gerado: $setup" }
+
+$fileInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
+$versionQuad = "$version.0"
+if ($fileInfo.FileVersion -ne $versionQuad) {
+    throw "Versão PE do instalador ($($fileInfo.FileVersion)) difere do projeto ($versionQuad)."
+}
+if ($fileInfo.ProductName -ne "ynoez") {
+    throw "Metadado ProductName do instalador não é ynoez."
+}
+
+Write-Host "Instalador $version gerado e metadados PE verificados: $setup"
+)
+if (-not $versionDirective.Success) {
+    throw "ISPP não gerou a diretiva VersionInfoVersion. Revise o script pré-processado."
+}
+$versionQuad = "$version.0"
+$resolvedVersion = $versionDirective.Groups[1].Value.Trim()
+Write-Host "VersionInfoVersion pré-processado: [$resolvedVersion]; esperado: [$versionQuad]"
+if ($resolvedVersion -ne $versionQuad) {
+    throw "VersionInfoVersion pré-processado ('$resolvedVersion') difere do projeto ('$versionQuad')."
+}
+
 & $iscc $defineVersion $script
 if ($LASTEXITCODE -ne 0) { throw "ISCC falhou com código $LASTEXITCODE." }
 
