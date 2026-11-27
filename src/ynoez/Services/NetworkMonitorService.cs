@@ -267,10 +267,16 @@ public static class NetworkMonitorService
         return differences.Count == 0 ? null : differences.Average();
     }
 
+    internal static TcpClient CreateTcpClientForAddress(IPAddress address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        return new TcpClient(address.AddressFamily);
+    }
+
     private static async Task<ProbeResult> ProbeTcpAsync(string host, int port, CancellationToken token)
     {
         var address = IPAddress.Parse(host);
-        using var client = new TcpClient(address.AddressFamily);
+        using var client = CreateTcpClientForAddress(address);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
         timeout.CancelAfter(TimeSpan.FromSeconds(2));
         var started = System.Diagnostics.Stopwatch.StartNew();
