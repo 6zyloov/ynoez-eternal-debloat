@@ -22,7 +22,7 @@ if (-not (Test-Path (Join-Path $PublishDir 'ynoez.exe'))) {
 
 New-Item -ItemType Directory -Path $Target -Force | Out-Null
 Copy-Item -Path (Join-Path $PublishDir '*') -Destination $Target -Recurse -Force
-$folders = @('Toolbox','Data','Backups','Logs','Downloads','Toolbox\Debloat','Toolbox\Internet','Toolbox\Windows','Toolbox\Servicos','Toolbox\Drivers','Toolbox\GPU','Toolbox\CPU','Toolbox\RAM','Toolbox\Energia','Toolbox\Jogos','Toolbox\Brave','Toolbox\Discord','Toolbox\Ferramentas','Toolbox\Diagnostico','Toolbox\Restauracao','Toolbox\Placas-mae')
+$folders = @('Toolbox','Data','Backups','Logs','Downloads','Toolbox\Debloat','Toolbox\Internet','Toolbox\Windows','Toolbox\Servicos','Toolbox\Drivers','Toolbox\GPU','Toolbox\CPU','Toolbox\RAM','Toolbox\Energia','Toolbox\Jogos','Toolbox\Brave','Toolbox\Discord','Toolbox\Ferramentas','Toolbox\Diagnostico','Toolbox\Restauracao','Toolbox\Placas-mae','Toolbox\Performance')
 foreach ($folder in $folders) { New-Item -ItemType Directory -Path (Join-Path $Target $folder) -Force | Out-Null }
 # Concede escrita apenas nas pastas de dados; executável e arquivos do programa ficam protegidos.
 foreach ($folder in @('Data','Backups','Logs','Downloads')) {
