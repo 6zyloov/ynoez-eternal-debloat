@@ -773,6 +773,13 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void UpdateService_RejectsOfficialButMismatchedReleaseTagUrl()
+    {
+        const string json = "{\"tag_name\":\"v0.4.0\",\"html_url\":\"https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.3.0\",\"draft\":false,\"prerelease\":false}";
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseLatestRelease(json, "0.3.0"));
+    }
+
+    [Fact]
     public void UpdateService_ReportsCurrentVersionAndRejectsUntrustedReleaseUrls()
     {
         const string json = "{\"tag_name\":\"v0.3.0\",\"html_url\":\"https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.3.0\",\"draft\":false,\"prerelease\":false}";
@@ -928,6 +935,90 @@ public sealed class RegistryTweakServiceTests
         Assert.Equal(20, comparison.OnePercentLowChangePercent, 3);
         Assert.Equal(20, comparison.OneTenthPercentLowChangePercent, 3);
         Assert.Equal(-10, comparison.AverageFrameTimeChangePercent, 3);
+    }
+
+    [Fact]
+    public async Task SnapshotVerification_AcceptsMatchingManifestAndRejectsTampering()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-snapshot-test-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(root, "snapshot-valid");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var payloadPath = Path.Combine(folder, "hardware.json");
+            await File.WriteAllTextAsync(payloadPath, "{\"cpu\":\"Test CPU\"}");
+            var files = await BackupService.BuildSnapshotManifestAsync(folder);
+            var manifest = new BackupResult
+            {
+                Folder = folder,
+                CreatedAt = DateTime.UtcNow,
+                Files = files
+            };
+            await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"), System.Text.Json.JsonSerializer.Serialize(manifest));
+
+            var valid = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.True(valid.IsValid, valid.Details);
+            Assert.Equal(1, valid.VerifiedFiles);
+
+            await File.AppendAllTextAsync(payloadPath, "tampered");
+            var tampered = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.False(tampered.IsValid);
+            Assert.Contains("tamanho diferente", tampered.Details, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SnapshotVerification_RejectsUnmanifestedFilesAndUnsafePaths()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-snapshot-unsafe-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(root, "snapshot");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var payload = Path.Combine(folder, "hardware.json");
+            await File.WriteAllTextAsync(payload, "safe");
+            var files = await BackupService.BuildSnapshotManifestAsync(folder);
+            var manifest = new BackupResult { Folder = folder, CreatedAt = DateTime.UtcNow, Files = files };
+            await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"), System.Text.Json.JsonSerializer.Serialize(manifest));
+            await File.WriteAllTextAsync(Path.Combine(folder, "unexpected.txt"), "not in manifest");
+            var extra = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.False(extra.IsValid);
+            Assert.Contains("fora do manifesto", extra.Details, StringComparison.OrdinalIgnoreCase);
+
+            var unsafeManifest = manifest with
+            {
+                Files = new[] { new BackupFileInfo("..\\outside.txt", 4, new string('0', 64)) }
+            };
+            await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"), System.Text.Json.JsonSerializer.Serialize(unsafeManifest));
+            var unsafeResult = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.False(unsafeResult.IsValid);
+            Assert.Contains("Nome de arquivo inválido", unsafeResult.Details, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SnapshotVerification_RequiresSnapshotDirectlyInsideBackupRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-snapshot-parent-" + Guid.NewGuid().ToString("N"));
+        var nested = Path.Combine(root, "nested", "snapshot");
+        Directory.CreateDirectory(nested);
+        try
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(
+                () => BackupService.VerifyLocalSnapshotAsync(nested, root));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

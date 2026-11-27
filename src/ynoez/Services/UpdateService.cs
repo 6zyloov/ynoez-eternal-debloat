@@ -62,15 +62,19 @@ public static class UpdateService
             throw new InvalidDataException("O endpoint de atualização retornou um rascunho ou uma versão de pré-lançamento.");
 
         var versionText = tag.StartsWith('v') || tag.StartsWith('V') ? tag[1..] : tag;
-        if (!Version.TryParse(versionText, out var latest))
-            throw new InvalidDataException("A tag da release não contém uma versão estável reconhecida.");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(versionText, @"^[0-9]+\\.[0-9]+\\.[0-9]+$") ||
+            !Version.TryParse(versionText, out var latest) || latest.Build < 0)
+            throw new InvalidDataException("A tag da release não contém uma versão estável MAJOR.MINOR.PATCH reconhecida.");
 
         var urlText = GetRequiredString(root, "html_url");
+        var expectedReleaseSuffix = "/" + Repository + "/releases/tag/" + Uri.EscapeDataString(tag);
         if (!Uri.TryCreate(urlText, UriKind.Absolute, out var releaseUri) ||
-            releaseUri.Scheme != Uri.UriSchemeHttps ||
+            releaseUri.Scheme != Uri.UriSchemeHttps || !releaseUri.IsDefaultPort ||
+            !string.IsNullOrEmpty(releaseUri.UserInfo) || !string.IsNullOrEmpty(releaseUri.Query) ||
+            !string.IsNullOrEmpty(releaseUri.Fragment) ||
             !string.Equals(releaseUri.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
-            !releaseUri.AbsolutePath.StartsWith("/" + Repository + "/releases/tag/", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("A URL da release não pertence ao repositório oficial do ynoez.");
+            !releaseUri.AbsolutePath.EndsWith(expectedReleaseSuffix, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("A URL da release não corresponde à tag do repositório oficial do ynoez.");
 
         DateTimeOffset? published = null;
         var publishedText = GetOptionalString(root, "published_at");

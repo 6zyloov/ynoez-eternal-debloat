@@ -59,9 +59,13 @@ $hashLines = @(
 Set-Content -Path $checksums -Value $hashLines -Encoding ascii
 
 $manifestLines = @(Get-Content $checksums)
-if ($manifestLines.Count -ne 2 -or
-    -not [System.Linq.Enumerable]::SequenceEqual([string[]]$manifestLines, [string[]]$hashLines)) {
-    throw 'O manifesto SHA256SUMS não corresponde aos dois arquivos que serão publicados.'
+if ($manifestLines.Count -ne $hashLines.Count) {
+    throw 'O manifesto SHA256SUMS não corresponde à quantidade de arquivos publicados.'
+}
+for ($index = 0; $index -lt $hashLines.Count; $index++) {
+    if ($manifestLines[$index] -cne $hashLines[$index]) {
+        throw 'O manifesto SHA256SUMS não corresponde aos hashes calculados.'
+    }
 }
 
 if ($DryRun) {
