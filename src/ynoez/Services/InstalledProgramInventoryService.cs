@@ -12,15 +12,6 @@ public sealed record InstalledProgramInfo(
 public static class InstalledProgramInventoryService
 {
     private const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
-    private static readonly string[] ProtectedNameFragments =
-    {
-        "microsoft visual c++", "visual c++ redistributable", ".net runtime",
-        ".net desktop runtime", "windows desktop runtime", "webview2 runtime",
-        "nvidia", "amd chipset", "advanced micro devices", "realtek", "intel chipset",
-        "riot vanguard", "faceit anti-cheat", "easy anti-cheat", "battleye",
-        "windows driver package", "microsoft .net"
-    };
-
     public static IReadOnlyList<InstalledProgramInfo> GetInstalledPrograms(CancellationToken token)
     {
         var result = new List<InstalledProgramInfo>();
@@ -114,13 +105,9 @@ public static class InstalledProgramInventoryService
         if (ContainsAny(releaseType, "update", "hotfix", "security", "service pack", "rollup", "patch"))
             return "Protegido — atualização/correção";
 
-        if (ContainsAny(name,
-                "update for", "security update", "hotfix for", "service pack for",
-                "windows driver package", "microsoft visual c++", "visual c++ redistributable",
-                ".net runtime", ".net desktop runtime", "windows desktop runtime", "webview2 runtime",
-                "nvidia", "amd chipset", "realtek", "intel chipset", "riot vanguard",
-                "faceit anti-cheat", "easy anti-cheat", "battleye", "microsoft .net")
-            || ContainsAny(publisher, "nvidia", "advanced micro devices", "realtek semiconductor", "intel corporation"))
+        if (ContainsAny(name, ProtectedNameFragments) ||
+            ContainsAny(name, "update for", "security update", "hotfix for", "service pack for") ||
+            ContainsAny(publisher, "nvidia", "advanced micro devices", "realtek semiconductor", "intel corporation"))
             return "Protegido — driver/runtime/anti-cheat";
 
         return "Aplicativo desktop — revisar antes de desinstalar";

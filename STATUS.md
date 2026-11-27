@@ -3,6 +3,8 @@
 ## Implementado nesta linha
 - Motor transacional de Registro HKCU com whitelist, backup atômico, detecção, verificação e reversão.
 - Catálogo integrado com 11 ajustes opcionais de privacidade, interface e captura Game DVR, incluindo build mínimo do Windows.
+- Inventário Win32: leitura de entradas HKLM/HKCU em registros 32/64 bits, filtro por nome/editor/classificação, exportação CSV com neutralização de fórmula; não executa UninstallString nem remove aplicativos.
+- Inventário AppX/MSIX atual por usuário com exportação CSV e classificação de pacotes centrais protegidos.
 - Gerenciador de inicialização: inventário HKCU/HKLM 32/64 bits e pastas Startup pessoal/compartilhada; entradas HKCU não protegidas e arquivos pessoais podem ser desativados com backup/reversão; HKLM e Startup compartilhada somente leitura.
 - Catálogo de seis serviços opcionais: DiagTrack, dmwappushservice, MapsBroker, Fax, RetailDemo e WMPNetworkSvc. Backup do modo de inicialização, tratamento de delayed-auto, confirmação, UAC, tentativa de parada sem forçar dependências e restauração verificada.
 - Perfis manuais Performance, Equilibrado e AFK, com backup do plano original.
