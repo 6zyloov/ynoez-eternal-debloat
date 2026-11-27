@@ -2091,7 +2091,6 @@ public partial class MainWindow : Window
         root.Children.Add(NoteCard("Ações de serviço e tarefas", "A Toolbox é somente leitura. A página Debloat contém listas curtas de seis serviços e seis tarefas opcionais, com backup, confirmação, verificação e restauração; não há desligamento em massa. Windows Search, impressão, Store, Defender, Firewall, Windows Update, manutenção, rede, áudio e anti-cheats permanecem protegidos."));
         RenderResults();
         return root;
-        return root;
     }
 
     private UIElement BuildRestore()
