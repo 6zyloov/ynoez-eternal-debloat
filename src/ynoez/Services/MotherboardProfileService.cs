@@ -71,12 +71,32 @@ public static class MotherboardProfileService
         return match.Success ? match.Value : "";
     }
 
-    public static MotherboardRevisionLink? GetRevision(MotherboardProfile profile, string firmwareValue)
+    /// <summary>
+    /// Returns a firmware-reported revision hint. This value must never be used
+    /// to select a BIOS download without the user confirming the physical PCB.
+    /// </summary>
+    public static MotherboardRevisionLink? GetFirmwareRevisionHint(MotherboardProfile profile, string firmwareValue)
     {
+        ArgumentNullException.ThrowIfNull(profile);
         var revision = DetectRevision(firmwareValue);
         return string.IsNullOrWhiteSpace(revision)
             ? null
             : profile.RevisionLinks.FirstOrDefault(x => string.Equals(x.Revision, revision, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Resolves only a physical PCB revision explicitly supplied by the user.
+    /// Does not accept arbitrary text, BIOS versions, or inferred SMBIOS values.
+    /// </summary>
+    public static MotherboardRevisionLink? GetConfirmedPhysicalRevision(MotherboardProfile profile, string? pcbRevision)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        var value = (pcbRevision ?? string.Empty).Trim();
+        if (!Regex.IsMatch(value, @"^1\.[012]$", RegexOptions.CultureInvariant))
+            return null;
+
+        return profile.RevisionLinks.FirstOrDefault(x =>
+            string.Equals(x.Revision, value, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string Normalize(string value) => Regex.Replace((value ?? "").ToUpperInvariant(), "[^A-Z0-9]", "");
