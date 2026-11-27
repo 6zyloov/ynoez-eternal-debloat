@@ -16,8 +16,13 @@ public sealed record CaptureTarget(int ProcessId, string ProcessName)
 
 public sealed record FrameBenchmarkSummary(
     string ProcessName, int ProcessId, string CsvPath, int FrameCount,
-    double AverageFps, double OnePercentLowFps, double AverageFrameTimeMs,
-    double P99FrameTimeMs, int FramesOver33Ms, int FramesOver50Ms);
+    double AverageFps, double OnePercentLowFps, double OneTenthPercentLowFps,
+    double AverageFrameTimeMs, double P99FrameTimeMs, double P99_9FrameTimeMs,
+    int FramesOver33Ms, int FramesOver50Ms, DateTimeOffset CapturedAt);
+
+public sealed record BenchmarkComparison(
+    double AverageFpsChangePercent, double OnePercentLowChangePercent,
+    double OneTenthPercentLowChangePercent, double AverageFrameTimeChangePercent);
 
 public static class PresentMonService
 {
@@ -69,7 +74,7 @@ public static class PresentMonService
         Directory.CreateDirectory(AppPaths.Logs);
         var safeName = string.Concat(target.ProcessName.Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-'));
         var csv = Path.Combine(AppPaths.Logs, "benchmark-" + safeName + "-" +
-            DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".csv");
+            DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N")[..8] + ".csv");
         var session = "ynoez-" + target.ProcessId + "-" + Guid.NewGuid().ToString("N")[..8];
         var args = "--process_id " + target.ProcessId.ToString(CultureInfo.InvariantCulture) +
             " --output_file " + Quote(csv) +
@@ -102,11 +107,22 @@ public static class PresentMonService
         if (!File.Exists(csv) || new FileInfo(csv).Length < 100)
             throw new InvalidOperationException("PresentMon não gerou dados. Verifique se o processo ainda estava aberto e se a permissão de captura foi concedida.");
 
-        onStatus?.Invoke("Calculando FPS médio e 1% low…");
+        onStatus?.Invoke("Calculando FPS médio, 1% low e 0,1% low…");
         var summary = ParseCsv(csv, target);
+        try
+        {
+            var metadataPath = Path.ChangeExtension(csv, ".json");
+            await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(summary,
+                new JsonSerializerOptions { WriteIndented = true }), token);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Não foi possível salvar o resumo do benchmark; o CSV foi preservado: " + ex.Message);
+        }
         AppLog.Write("Benchmark concluído: " + summary.ProcessName + " avg " +
             summary.AverageFps.ToString("0.0", CultureInfo.InvariantCulture) + " FPS, 1% low " +
-            summary.OnePercentLowFps.ToString("0.0", CultureInfo.InvariantCulture) + " FPS");
+            summary.OnePercentLowFps.ToString("0.0", CultureInfo.InvariantCulture) + " FPS, 0,1% low " +
+            summary.OneTenthPercentLowFps.ToString("0.0", CultureInfo.InvariantCulture) + " FPS");
         return summary;
     }
 
@@ -158,6 +174,9 @@ public static class PresentMonService
             frameIndex = columns.FindIndex(x => x.Equals("MsBetweenDisplayChange", StringComparison.OrdinalIgnoreCase));
         if (frameIndex < 0)
             throw new InvalidDataException("A versão do PresentMon não retornou a coluna de tempo entre frames esperada.");
+        var processIndex = columns.FindIndex(x =>
+            x.Equals("ProcessID", StringComparison.OrdinalIgnoreCase) ||
+            x.Equals("ProcessId", StringComparison.OrdinalIgnoreCase));
 
         var frameTimes = new List<double>();
         string? line;
@@ -165,23 +184,62 @@ public static class PresentMonService
         {
             var fields = SplitCsv(line);
             if (frameIndex >= fields.Count) continue;
+            if (processIndex >= 0 &&
+                (processIndex >= fields.Count ||
+                 !int.TryParse(fields[processIndex], NumberStyles.Integer, CultureInfo.InvariantCulture, out var processId) ||
+                 processId != target.ProcessId))
+                continue;
+
             if (double.TryParse(fields[frameIndex], NumberStyles.Float, CultureInfo.InvariantCulture, out var ms)
                 && ms > 0 && ms < 1000)
                 frameTimes.Add(ms);
         }
 
         if (frameTimes.Count < 30)
-            throw new InvalidDataException("A captura teve menos de 30 frames válidos. Deixe o jogo renderizar por mais tempo e tente novamente.");
+            throw new InvalidDataException("A captura teve menos de 30 frames válidos do processo selecionado. Deixe o jogo renderizar por mais tempo e tente novamente.");
 
         frameTimes.Sort();
         var averageFrameTime = frameTimes.Average();
         var p99Index = Math.Clamp((int)Math.Ceiling(frameTimes.Count * 0.99) - 1, 0, frameTimes.Count - 1);
+        var p999Index = Math.Clamp((int)Math.Ceiling(frameTimes.Count * 0.999) - 1, 0, frameTimes.Count - 1);
         var p99 = frameTimes[p99Index];
+        var p999 = frameTimes[p999Index];
         return new FrameBenchmarkSummary(
             target.ProcessName, target.ProcessId, path, frameTimes.Count,
-            1000d / averageFrameTime, 1000d / p99, averageFrameTime, p99,
-            frameTimes.Count(x => x > 33.333), frameTimes.Count(x => x > 50));
+            1000d / averageFrameTime, 1000d / p99, 1000d / p999,
+            averageFrameTime, p99, p999,
+            frameTimes.Count(x => x > 33.333), frameTimes.Count(x => x > 50), DateTimeOffset.UtcNow);
     }
+
+    public static FrameBenchmarkSummary? GetPreviousBenchmark(string processName, string currentCsvPath)
+    {
+        if (!Directory.Exists(AppPaths.Logs)) return null;
+        var candidates = new List<FrameBenchmarkSummary>();
+        foreach (var path in Directory.EnumerateFiles(AppPaths.Logs, "benchmark-*.json", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                var summary = JsonSerializer.Deserialize<FrameBenchmarkSummary>(File.ReadAllText(path));
+                if (summary is null ||
+                    !string.Equals(summary.ProcessName, processName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Path.GetFullPath(summary.CsvPath), Path.GetFullPath(currentCsvPath), StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (File.Exists(summary.CsvPath)) candidates.Add(summary);
+            }
+            catch (Exception ex) { AppLog.Write("Resumo de benchmark ignorado (" + Path.GetFileName(path) + "): " + ex.Message); }
+        }
+        return candidates.OrderByDescending(x => x.CapturedAt).FirstOrDefault();
+    }
+
+    public static BenchmarkComparison Compare(FrameBenchmarkSummary current, FrameBenchmarkSummary previous) =>
+        new(
+            PercentChange(current.AverageFps, previous.AverageFps),
+            PercentChange(current.OnePercentLowFps, previous.OnePercentLowFps),
+            PercentChange(current.OneTenthPercentLowFps, previous.OneTenthPercentLowFps),
+            PercentChange(current.AverageFrameTimeMs, previous.AverageFrameTimeMs));
+
+    private static double PercentChange(double current, double previous) =>
+        previous <= 0 ? 0 : (current - previous) / previous * 100d;
 
     private static List<string> SplitCsv(string line)
     {

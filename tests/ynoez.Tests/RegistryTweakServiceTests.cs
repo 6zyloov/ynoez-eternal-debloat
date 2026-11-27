@@ -277,6 +277,7 @@ public sealed class RegistryTweakServiceTests
             var lines = new List<string> { "Application,ProcessID,MsBetweenPresents" };
             for (var i = 0; i < 90; i++) lines.Add("\"Game, Window\",123,10");
             for (var i = 0; i < 10; i++) lines.Add("\"Game, Window\",123,50");
+            lines.Add("\"Unrelated Process\",999,900");
             File.WriteAllLines(path, lines);
 
             var summary = PresentMonService.ParseCsv(path, new CaptureTarget(123, "Game"));
@@ -284,12 +285,30 @@ public sealed class RegistryTweakServiceTests
             Assert.Equal(100, summary.FrameCount);
             Assert.Equal(1000d / 14d, summary.AverageFps, 3);
             Assert.Equal(20d, summary.OnePercentLowFps, 3);
+            Assert.Equal(20d, summary.OneTenthPercentLowFps, 3);
+            Assert.Equal(50d, summary.P99_9FrameTimeMs, 3);
             Assert.Equal(10, summary.FramesOver33Ms);
         }
         finally
         {
             if (File.Exists(path)) File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void PresentMonComparison_ComputesRelativeChanges()
+    {
+        var previous = new FrameBenchmarkSummary("Game", 1, "old.csv", 100,
+            100, 50, 25, 10, 20, 40, 0, 0, DateTimeOffset.UtcNow.AddMinutes(-5));
+        var current = new FrameBenchmarkSummary("Game", 2, "new.csv", 100,
+            110, 60, 30, 9, 16.67, 33.33, 0, 0, DateTimeOffset.UtcNow);
+
+        var comparison = PresentMonService.Compare(current, previous);
+
+        Assert.Equal(10, comparison.AverageFpsChangePercent, 3);
+        Assert.Equal(20, comparison.OnePercentLowChangePercent, 3);
+        Assert.Equal(20, comparison.OneTenthPercentLowChangePercent, 3);
+        Assert.Equal(-10, comparison.AverageFrameTimeChangePercent, 3);
     }
 
     [Fact]

@@ -298,11 +298,25 @@ public partial class MainWindow : Window
                     "Jogo: " + result.ProcessName + " | Frames: " + result.FrameCount +
                     "\nFPS médio: " + result.AverageFps.ToString("0.0") +
                     " | 1% low: " + result.OnePercentLowFps.ToString("0.0") +
+                    " | 0,1% low: " + result.OneTenthPercentLowFps.ToString("0.0") +
                     "\nFrametime médio: " + result.AverageFrameTimeMs.ToString("0.00") + " ms" +
                     " | P99: " + result.P99FrameTimeMs.ToString("0.00") + " ms" +
+                    " | P99,9: " + result.P99_9FrameTimeMs.ToString("0.00") + " ms" +
                     "\nFrames acima de 33,3 ms: " + result.FramesOver33Ms +
-                    " | acima de 50 ms: " + result.FramesOver50Ms +
-                    "\nCSV: " + result.CsvPath;
+                    " | acima de 50 ms: " + result.FramesOver50Ms;
+                var previousBenchmark = PresentMonService.GetPreviousBenchmark(result.ProcessName, result.CsvPath);
+                if (previousBenchmark is not null)
+                {
+                    var comparison = PresentMonService.Compare(result, previousBenchmark);
+                    benchmarkStatus.Text +=
+                        "\nComparação com a captura anterior (" + previousBenchmark.CapturedAt.ToLocalTime().ToString("dd/MM HH:mm") + "):" +
+                        " FPS médio " + comparison.AverageFpsChangePercent.ToString("+0.0;-0.0;0.0") + "%" +
+                        " | 1% low " + comparison.OnePercentLowChangePercent.ToString("+0.0;-0.0;0.0") + "%" +
+                        " | 0,1% low " + comparison.OneTenthPercentLowChangePercent.ToString("+0.0;-0.0;0.0") + "%" +
+                        " | frametime " + comparison.AverageFrameTimeChangePercent.ToString("+0.0;-0.0;0.0") + "%";
+                }
+                benchmarkStatus.Text += "\nCSV: " + result.CsvPath +
+                    "\nCompare a mesma cena, duração e configurações. Variações também refletem mapa, jogadores, temperatura e processos em segundo plano.";
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
