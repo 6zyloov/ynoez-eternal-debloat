@@ -17,6 +17,45 @@ public static class NetworkRootCauseService
         var firstTcpFailure = sample.ExternalTcpFailure60sPercent;
         var secondTcpFailure = sample.SecondaryExternalTcpFailure60sPercent;
         var dnsFailure = sample.DnsFailure60sPercent;
+        var ipv6GatewayTested = !string.Equals(sample.Ipv6GatewayStatus, "NOT_TESTED", StringComparison.OrdinalIgnoreCase);
+        var ipv6GatewayAvailable = ipv6GatewayTested &&
+            !string.Equals(sample.Ipv6GatewayStatus, "NO_IPV6_GATEWAY", StringComparison.OrdinalIgnoreCase);
+        var ipv6GatewayLoss = sample.Ipv6GatewayLoss60sPercent;
+        var ipv6FirstIcmpLoss = sample.Ipv6ExternalLoss60sPercent;
+        var ipv6SecondIcmpLoss = sample.Ipv6SecondaryExternalLoss60sPercent;
+        var ipv6FirstTcpFailure = sample.Ipv6ExternalTcpFailure60sPercent;
+        var ipv6SecondTcpFailure = sample.Ipv6SecondaryExternalTcpFailure60sPercent;
+        var ipv6Tested = !string.Equals(sample.Ipv6ExternalStatus, "NOT_TESTED", StringComparison.OrdinalIgnoreCase);
+        var ipv6GatewayHasLoss = ipv6GatewayAvailable && ipv6GatewayLoss >= LossThresholdPercent;
+        var ipv4Healthy = firstLoss < LossThresholdPercent && secondLoss < LossThresholdPercent &&
+            firstTcpFailure < LossThresholdPercent && secondTcpFailure < LossThresholdPercent;
+
+        if (ipv6GatewayHasLoss)
+            return new NetworkRootCause("REDE LOCAL IPv6",
+                "Há perda recorrente até o gateway IPv6. Verifique RA/SLAAC, Wi-Fi/Ethernet, roteador e conectividade IPv6 local; os testes IPv4 são avaliados separadamente.");
+
+        if (ipv6Tested && ipv4Healthy &&
+            ipv6FirstIcmpLoss >= LossThresholdPercent && ipv6SecondIcmpLoss >= LossThresholdPercent &&
+            ipv6FirstTcpFailure >= LossThresholdPercent && ipv6SecondTcpFailure >= LossThresholdPercent)
+        {
+            var noGatewayMessage = ipv6GatewayTested && !ipv6GatewayAvailable
+                ? " Nenhum gateway IPv6 foi reportado pelo Windows nesta amostra."
+                : "";
+            return new NetworkRootCause("IPv6 / SEM CONECTIVIDADE",
+                "IPv4 continua acessível, mas dois destinos IPv6 falham por ICMP e TCP. Isso sugere ausência de rota IPv6, IPv6 desativado/sem delegação ou filtragem no roteador/provedor; não indica queda geral da Internet." + noGatewayMessage);
+        }
+
+        if (ipv6Tested &&
+            (ipv6FirstIcmpLoss >= LossThresholdPercent || ipv6SecondIcmpLoss >= LossThresholdPercent) &&
+            ipv6FirstTcpFailure < LossThresholdPercent && ipv6SecondTcpFailure < LossThresholdPercent)
+            return new NetworkRootCause("IPv6 ICMP / FILTRAGEM",
+                "Os probes ICMP IPv6 falham, mas TCP/443 IPv6 continua respondendo. Isso pode indicar filtragem de ICMP, não necessariamente perda real nos aplicativos.");
+
+        if (ipv6Tested &&
+            (ipv6FirstTcpFailure >= LossThresholdPercent || ipv6SecondTcpFailure >= LossThresholdPercent) &&
+            ipv6FirstIcmpLoss < LossThresholdPercent && ipv6SecondIcmpLoss < LossThresholdPercent)
+            return new NetworkRootCause("IPv6 TCP / SERVIÇO",
+                "ICMP IPv6 responde, mas TCP/443 falha em pelo menos um destino. Verifique filtragem TCP/443, firewall, proxy ou rota específica do destino.");
 
         if (hasGateway && gatewayLoss >= LossThresholdPercent)
             return new NetworkRootCause("REDE LOCAL",
