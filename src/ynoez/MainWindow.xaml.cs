@@ -1166,7 +1166,16 @@ public partial class MainWindow : Window
         advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Valor atual", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.DisplayValue)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
         advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Categoria", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Category)), Width = new DataGridLength(0.9, DataGridLengthUnitType.Star) });
         advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Avaliação", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Assessment)), Width = new DataGridLength(1.25, DataGridLengthUnitType.Star) });
-        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Orientação", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Guidance)), Width = new DataGridLength(2.4, DataGridLengthUnitType.Star) });
+        var guidanceStyle = new Style(typeof(TextBlock));
+        guidanceStyle.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap));
+        guidanceStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+        advancedGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Orientação",
+            Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Guidance)),
+            ElementStyle = guidanceStyle,
+            Width = new DataGridLength(2.4, DataGridLengthUnitType.Star)
+        });
         var advancedButtons = new WrapPanel();
         var refreshAdvanced = new Button { Content = "Analisar propriedades", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
         var exportAdvanced = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
