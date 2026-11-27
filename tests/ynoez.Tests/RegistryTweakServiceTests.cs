@@ -80,6 +80,60 @@ public sealed class RegistryTweakServiceTests
         });
     }
  
+
+    [Fact]
+    public void ApplyAndRestore_PreservesExpandStringTypeAndLiteral()
+    {
+        var keyPath = TestKeyPath();
+        var id = "test-expand-" + Guid.NewGuid().ToString("N");
+        var backupDirectory = NewBackupDirectory();
+        const string original = "%TEMP%\\ynoez-test";
+        try
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(keyPath))
+                key!.SetValue("Expandable", original, RegistryValueKind.ExpandString);
+
+            var service = new RegistryTweakService(backupDirectory);
+            var tweak = MakeTweak(id, keyPath, "Expandable", 0);
+            service.Apply(tweak);
+            service.Restore(tweak);
+
+            using var restored = Registry.CurrentUser.OpenSubKey(keyPath);
+            Assert.Equal(RegistryValueKind.ExpandString, restored!.GetValueKind("Expandable"));
+            Assert.Equal(original, restored.GetValue("Expandable", null, RegistryValueOptions.DoNotExpandEnvironmentNames));
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(keyPath, throwOnMissingSubKey: false);
+            if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Restore_LeavesCorruptBackupForManualRecovery()
+    {
+        var keyPath = TestKeyPath();
+        var id = "test-corrupt-" + Guid.NewGuid().ToString("N");
+        var backupDirectory = NewBackupDirectory();
+        try
+        {
+            var service = new RegistryTweakService(backupDirectory);
+            var tweak = MakeTweak(id, keyPath, "Sample", 0);
+            service.Apply(tweak);
+            var backupPath = Path.Combine(backupDirectory, id + ".json");
+            File.WriteAllText(backupPath, "{corrupt");
+
+            Assert.ThrowsAny<Exception>(() => service.Restore(tweak));
+            Assert.True(File.Exists(backupPath));
+            Assert.Equal(TweakState.Enabled, service.Inspect(tweak));
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(keyPath, throwOnMissingSubKey: false);
+            if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, recursive: true);
+        }
+    }
+
     [Fact]
     public void StartupEntry_DisableAndRestoreIsReversible()
     {
