@@ -832,26 +832,34 @@ public partial class MainWindow : Window
                 root.Children.Add(NoteCard(entry.Name + " — preservado", detail + "\n" + entry.ProtectionReason));
         }
 
-        var disabledStartup = startupManager.GetDisabledEntries();
-        if (disabledStartup.Count > 0)
+        try
         {
-            root.Children.Add(Heading("Entradas desativadas pelo ynoez", 15));
-            foreach (var entry in disabledStartup)
+            var disabledStartup = startupManager.GetDisabledEntries();
+            if (disabledStartup.Count > 0)
             {
-                root.Children.Add(ActionCard(entry.Name, entry.Command, "Restaurar inicialização", () =>
+                root.Children.Add(Heading("Entradas desativadas pelo ynoez", 15));
+                foreach (var entry in disabledStartup)
                 {
-                    if (MessageBox.Show("Restaurar \"" + entry.Name + "\" à inicialização?", "Confirmar restauração",
-                        MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    root.Children.Add(ActionCard(entry.Name, entry.IsFile ? entry.OriginalFilePath ?? entry.Command : entry.Command, "Restaurar inicialização", () =>
+                    {
+                        if (MessageBox.Show("Restaurar \\"" + entry.Name + "\\" à inicialização? O destino será verificado antes da recuperação.", "Confirmar restauração",
+                            MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                            return Task.CompletedTask;
+                        startupManager.Restore(entry);
+                        MessageBox.Show("Entrada restaurada e verificada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Debloat");
                         return Task.CompletedTask;
-                    startupManager.Restore(entry);
-                    MessageBox.Show("Entrada restaurada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                    ShowPage("Debloat");
-                    return Task.CompletedTask;
-                }, "REVERSÍVEL"));
+                    }, "REVERSÍVEL"));
+                }
             }
+            else
+                root.Children.Add(NoteCard("Inicialização", "Nenhuma entrada desativada pelo ynoez."));
         }
-        else
-            root.Children.Add(NoteCard("Inicialização", "Nenhuma entrada desativada pelo ynoez."));
+        catch (InvalidDataException ex)
+        {
+            AppLog.Write("Manifesto de inicialização requer recuperação: " + ex);
+            root.Children.Add(NoteCard("Manifesto de inicialização requer atenção", ex.Message));
+        }
 
         root.Children.Add(Heading("Serviços opcionais do Windows", 15));
         root.Children.Add(Body("Somente serviços previamente avaliados como opcionais aparecem aqui. Desativar exige UAC, salva o tipo de inicialização e tenta parar o serviço sem forçar o encerramento de dependências. Windows Search, impressão, Store, Defender, Windows Update, rede, áudio, NVIDIA, Vanguard e FACEIT não fazem parte do catálogo."));

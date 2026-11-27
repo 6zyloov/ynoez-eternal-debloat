@@ -455,6 +455,80 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void StartupManifestCorrupt_DisableKeepsFileAndRegistryEntryUntouched()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-startup-corrupt-" + Guid.NewGuid().ToString("N"));
+        var startup = Path.Combine(root, "Startup");
+        var state = Path.Combine(root, "State");
+        Directory.CreateDirectory(startup);
+        var startupFile = Path.Combine(startup, "ordinary.cmd");
+        File.WriteAllText(startupFile, "@echo off");
+        const string runPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        var valueName = "ynoez-corrupt-" + Guid.NewGuid().ToString("N");
+        var manifest = Path.Combine(state, "disabled-startup.json");
+        try
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(runPath))
+                key!.SetValue(valueName, "ordinary.exe", RegistryValueKind.String);
+            Directory.CreateDirectory(state);
+            File.WriteAllText(manifest, "{corrupt");
+
+            var manager = new StartupManagerService(state, startup);
+            var fileEntry = Assert.Single(manager.GetActiveEntries().Where(x => x.FilePath == startupFile));
+            var registryEntry = Assert.Single(manager.GetActiveEntries().Where(x => x.Name == valueName && x.Scope == "Usuário atual"));
+
+            Assert.Throws<InvalidDataException>(() => manager.GetDisabledEntries());
+            Assert.Throws<InvalidDataException>(() => manager.Disable(fileEntry));
+            Assert.Throws<InvalidDataException>(() => manager.Disable(registryEntry));
+
+            Assert.True(File.Exists(startupFile));
+            using var keyAfter = Registry.CurrentUser.OpenSubKey(runPath);
+            Assert.Equal("ordinary.exe", keyAfter!.GetValue(valueName));
+            Assert.Equal("{corrupt", File.ReadAllText(manifest));
+        }
+        finally
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(runPath, writable: true);
+            key?.DeleteValue(valueName, throwOnMissingValue: false);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void StartupManifestCorrupt_RestoreKeepsFileInBackup()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-startup-corrupt-restore-" + Guid.NewGuid().ToString("N"));
+        var startup = Path.Combine(root, "Startup");
+        var state = Path.Combine(root, "State");
+        Directory.CreateDirectory(startup);
+        var startupFile = Path.Combine(startup, "ordinary.cmd");
+        const string original = "@echo off\\r\\necho preserved";
+        File.WriteAllText(startupFile, original);
+        var manifest = Path.Combine(state, "disabled-startup.json");
+        try
+        {
+            var manager = new StartupManagerService(state, startup);
+            var entry = Assert.Single(manager.GetActiveEntries().Where(x => x.FilePath == startupFile));
+            manager.Disable(entry);
+            var disabled = Assert.Single(manager.GetDisabledEntries());
+            Assert.False(File.Exists(startupFile));
+            var backupPath = disabled.BackupFilePath!;
+            Assert.True(File.Exists(backupPath));
+
+            File.WriteAllText(manifest, "{corrupt");
+            Assert.Throws<InvalidDataException>(() => manager.Restore(disabled));
+
+            Assert.False(File.Exists(startupFile));
+            Assert.True(File.Exists(backupPath));
+            Assert.Equal("{corrupt", File.ReadAllText(manifest));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void StartupEntry_DisableAndRestoreIsReversible()
     {
         const string runPath = @"Software\Microsoft\Windows\CurrentVersion\Run";

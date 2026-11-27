@@ -81,14 +81,30 @@ public sealed class StartupManagerService
         if (!File.Exists(_manifestPath)) return Array.Empty<DisabledStartupEntry>();
         try
         {
-            return JsonSerializer.Deserialize<List<DisabledStartupEntry>>(File.ReadAllText(_manifestPath), JsonOptions)
-                ?? new List<DisabledStartupEntry>();
+            var entries = JsonSerializer.Deserialize<List<DisabledStartupEntry>>(File.ReadAllText(_manifestPath), JsonOptions)
+                ?? throw new InvalidDataException("O manifesto de inicialização está vazio ou contém null.");
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entry in entries)
+            {
+                if (entry is null || string.IsNullOrWhiteSpace(entry.BackupId)
+                    || string.IsNullOrWhiteSpace(entry.Name) || string.IsNullOrWhiteSpace(entry.KeyPath)
+                    || !ids.Add(entry.BackupId))
+                    throw new InvalidDataException("O manifesto contém uma entrada incompleta ou IDs de backup duplicados.");
+            }
+            return entries;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not InvalidDataException)
         {
             AppLog.Write("Manifesto de inicialização desativada inválido: " + ex.Message);
-            return Array.Empty<DisabledStartupEntry>();
+            throw new InvalidDataException("O manifesto de inicialização está corrompido. Nenhuma entrada foi descartada; corrija ou recupere o arquivo em " + _manifestPath + ".", ex);
         }
+    }
+
+    private static void EnsureManifestEntry(IReadOnlyList<DisabledStartupEntry> entries, DisabledStartupEntry requested)
+    {
+        if (requested is null || !entries.Any(saved =>
+            string.Equals(saved.BackupId, requested.BackupId, StringComparison.Ordinal) && saved == requested))
+            throw new InvalidDataException("A entrada solicitada não corresponde exatamente a um backup registrado pelo ynoez.");
     }
 
     public void Disable(StartupEntry entry)
@@ -111,12 +127,14 @@ public sealed class StartupManagerService
                 throw new InvalidOperationException("A entrada mudou desde a leitura. Atualize a página antes de tentar desativá-la.");
         }
 
+        // Read and validate the manifest before mutating the registry. A corrupt manifest must never strand an item.
+        var entries = GetDisabledEntries().ToList();
+        if (entries.Any(x => string.Equals(x.BackupId, entry.Id, StringComparison.Ordinal)))
+            throw new InvalidOperationException("Esta entrada já possui um backup. Atualize a página ou restaure-a antes de continuar.");
+
         var tweak = MakeTweak(entry.Name, entry.Command, entry.Id);
         _registry.RemoveValue(tweak);
-
-        var entries = GetDisabledEntries().ToList();
-        if (!entries.Any(x => x.BackupId == entry.Id))
-            entries.Add(new DisabledStartupEntry(entry.Name, entry.Command, entry.KeyPath, entry.Name, entry.Id, DateTimeOffset.UtcNow));
+        entries.Add(new DisabledStartupEntry(entry.Name, entry.Command, entry.KeyPath, entry.Name, entry.Id, DateTimeOffset.UtcNow));
         try
         {
             WriteManifest(entries);
@@ -144,17 +162,28 @@ public sealed class StartupManagerService
         var backupPath = Path.Combine(_disabledFilesDirectory, id + Path.GetExtension(originalPath));
         if (File.Exists(backupPath))
             throw new InvalidOperationException("Já existe um backup para este arquivo de inicialização.");
-        Directory.CreateDirectory(_disabledFilesDirectory);
-        File.Move(originalPath, backupPath);
-
         var entries = GetDisabledEntries().ToList();
-        entries.Add(new DisabledStartupEntry(entry.Name, originalPath, _userStartupDirectory, entry.Name, id,
-            DateTimeOffset.UtcNow, true, originalPath, backupPath));
-        try { WriteManifest(entries); }
+        if (entries.Any(x => string.Equals(x.BackupId, id, StringComparison.Ordinal)))
+            throw new InvalidOperationException("Este arquivo já possui um backup registrado.");
+        Directory.CreateDirectory(_disabledFilesDirectory);
+        try
+        {
+            File.Move(originalPath, backupPath);
+            entries.Add(new DisabledStartupEntry(entry.Name, originalPath, _userStartupDirectory, entry.Name, id,
+                DateTimeOffset.UtcNow, true, originalPath, backupPath));
+            WriteManifest(entries);
+        }
         catch
         {
-            try { File.Move(backupPath, originalPath); }
-            catch (Exception rollbackError) { AppLog.Write("Falha ao devolver arquivo de inicialização após erro no manifesto: " + rollbackError); }
+            try
+            {
+                if (File.Exists(backupPath) && !File.Exists(originalPath))
+                    File.Move(backupPath, originalPath);
+            }
+            catch (Exception rollbackError)
+            {
+                AppLog.Write("Falha ao devolver arquivo de inicialização após erro no manifesto: " + rollbackError);
+            }
             throw;
         }
         AppLog.Write("Arquivo da pasta de inicialização movido para backup reversível: " + entry.Name);
@@ -170,11 +199,13 @@ public sealed class StartupManagerService
 
         if (entry.KeyPath != UserRunPath || string.IsNullOrWhiteSpace(entry.ValueName))
             throw new InvalidOperationException("Manifesto de inicialização inválido.");
+        var entries = GetDisabledEntries().ToList();
+        EnsureManifestEntry(entries, entry);
         var tweak = MakeTweak(entry.ValueName, entry.Command, entry.BackupId);
         _registry.Restore(tweak);
         try
         {
-            WriteManifest(GetDisabledEntries().Where(x => x.BackupId != entry.BackupId).ToList());
+            WriteManifest(entries.Where(x => x.BackupId != entry.BackupId).ToList());
         }
         catch
         {
@@ -204,8 +235,11 @@ public sealed class StartupManagerService
         if (File.Exists(originalPath))
             throw new IOException("Já existe um arquivo com esse nome na pasta de inicialização. O backup foi mantido para evitar sobrescrita.");
 
+        // Validate the manifest and the exact backup identity before moving a single byte.
+        var entries = GetDisabledEntries().ToList();
+        EnsureManifestEntry(entries, entry);
         File.Move(backupPath, originalPath);
-        try { WriteManifest(GetDisabledEntries().Where(x => x.BackupId != entry.BackupId).ToList()); }
+        try { WriteManifest(entries.Where(x => x.BackupId != entry.BackupId).ToList()); }
         catch
         {
             try { File.Move(originalPath, backupPath); }
@@ -298,8 +332,15 @@ public sealed class StartupManagerService
 
     private void WriteManifest(List<DisabledStartupEntry> entries)
     {
-        var temp = _manifestPath + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(entries, JsonOptions));
-        File.Move(temp, _manifestPath, overwrite: true);
+        var temp = _manifestPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, JsonSerializer.Serialize(entries, JsonOptions));
+            File.Move(temp, _manifestPath, overwrite: true);
+        }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+        }
     }
 }
