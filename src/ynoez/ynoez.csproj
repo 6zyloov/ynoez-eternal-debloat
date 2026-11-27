@@ -8,7 +8,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>ynoez</AssemblyName>
     <RootNamespace>ynoez</RootNamespace>
-    <Version>0.2.2</Version>
+    <Version>0.3.0</Version>
     <Product>ynoez</Product>
     <Company>ynoez</Company>
     <Description>Windows tuning, diagnostics and hardware toolbox.</Description>
@@ -21,5 +21,8 @@
     <PackageReference Include="System.Management" Version="9.0.2" />
     <None Update="Toolbox\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Optimization\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="Assets\Fonts\*.ttf" />
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <Content Include="Assets\Fonts\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -13,6 +13,6 @@ if (-not (Test-Path (Join-Path $dist "ynoez.exe"))) { throw "dist\ynoez.exe não
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 & $iscc $script
 if ($LASTEXITCODE -ne 0) { throw "ISCC falhou com código $LASTEXITCODE." }
-$setup = Join-Path $artifactDir "ynoez-setup-0.2.2.exe"
+$setup = Join-Path $artifactDir "ynoez-setup-0.3.0.exe"
 if (-not (Test-Path $setup)) { throw "O instalador não foi gerado." }
 Write-Host "Instalador gerado: $setup"

@@ -1,9 +1,9 @@
 <Window x:Class="ynoez.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="ynoez 0.2.2" Width="1141" Height="768" MinWidth="1060" MinHeight="680"
+        Title="ynoez 0.3.0" Width="1141" Height="768" MinWidth="1060" MinHeight="680"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResizeWithGrip" Background="#121212" Foreground="#FFFFFF"
-        FontFamily="Poppins" Loaded="Window_Loaded">
+        FontFamily="{StaticResource AppFont}" Loaded="Window_Loaded">
     <Grid Background="#121212">
         <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Grid Grid.Row="0" Background="#121212" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
@@ -43,7 +43,7 @@
                     <StackPanel Grid.Row="2" Margin="20,4,12,10" VerticalAlignment="Bottom">
                         <Border Height="1" Background="#292929" Margin="0,0,0,10" />
                         <TextBlock Text="LOCAL MODE  •  NO TELEMETRY" FontSize="8" Foreground="#787878" />
-                        <TextBlock Text="ynoez 0.2.2" FontSize="9" Foreground="#FF80FF" Margin="0,4,0,0" />
+                        <TextBlock Text="ynoez 0.3.0" FontSize="9" Foreground="#FF80FF" Margin="0,4,0,0" />
                     </StackPanel>
                 </Grid>
             </Border>
