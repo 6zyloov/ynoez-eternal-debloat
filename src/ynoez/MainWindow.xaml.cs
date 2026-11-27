@@ -576,7 +576,10 @@ public partial class MainWindow : Window
                 {
                     monitorStatus.Text = sample.Timestamp.ToString("HH:mm:ss") +
                         " | Gateway: " + sample.GatewayStatus + (sample.GatewayMilliseconds.HasValue ? " " + sample.GatewayMilliseconds + " ms" : "") +
-                        " | Internet: " + sample.ExternalStatus + (sample.ExternalMilliseconds.HasValue ? " " + sample.ExternalMilliseconds + " ms" : "");
+                        " | Internet ICMP: " + sample.ExternalStatus + (sample.ExternalMilliseconds.HasValue ? " " + sample.ExternalMilliseconds + " ms" : "") +
+                        " | TCP 443: " + sample.ExternalTcpStatus +
+                        " | Perda 60s: " + sample.ExternalLoss60sPercent.ToString("0") + "%" +
+                        " | Jitter 60s: " + (sample.ExternalJitter60sMilliseconds.HasValue ? sample.ExternalJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—");
                 }, token);
                 monitorStatus.Text = "Monitor encerrado. CSV salvo em: " + logFile;
             }

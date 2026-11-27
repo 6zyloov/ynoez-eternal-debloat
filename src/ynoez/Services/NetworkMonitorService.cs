@@ -9,7 +9,8 @@ namespace ynoez.Services;
 
 public sealed record NetworkMonitorSample(
     DateTimeOffset Timestamp, string Gateway, string GatewayStatus, long? GatewayMilliseconds,
-    string ExternalStatus, long? ExternalMilliseconds);
+    string ExternalStatus, long? ExternalMilliseconds, string ExternalTcpStatus, long? ExternalTcpMilliseconds,
+    double GatewayLoss60sPercent, double ExternalLoss60sPercent, double? ExternalJitter60sMilliseconds);
 
 public static class NetworkMonitorService
 {
@@ -24,9 +25,10 @@ public static class NetworkMonitorService
 
         await using var stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
-        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external,external_status,external_ms");
+        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external,external_status,external_ms,external_tcp_status,external_tcp_ms,gateway_loss_60s_pct,external_loss_60s_pct,external_jitter_60s_ms");
         await writer.FlushAsync();
         AppLog.Write("Monitoramento contínuo de rede iniciado: " + file);
+        var window = new Queue<NetworkMonitorSample>();
 
         try
         {
@@ -38,18 +40,41 @@ public static class NetworkMonitorService
                     ? Task.FromResult(new ProbeResult("NO_GATEWAY", null))
                     : ProbeAsync(gatewayAddress, cancellationToken);
                 var externalTask = ProbeAsync("1.1.1.1", cancellationToken);
-                await Task.WhenAll(gatewayTask, externalTask);
+                var tcpTask = ProbeTcpAsync("1.1.1.1", 443, cancellationToken);
+                await Task.WhenAll(gatewayTask, externalTask, tcpTask);
 
-                var sample = new NetworkMonitorSample(DateTimeOffset.Now, gatewayAddress,
+                var raw = new NetworkMonitorSample(DateTimeOffset.Now, gatewayAddress,
                     gatewayTask.Result.Status, gatewayTask.Result.Milliseconds,
-                    externalTask.Result.Status, externalTask.Result.Milliseconds);
+                    externalTask.Result.Status, externalTask.Result.Milliseconds,
+                    tcpTask.Result.Status, tcpTask.Result.Milliseconds, 0, 0, null);
+                window.Enqueue(raw);
+                while (window.Count > 12) window.Dequeue();
+                var samples = window.ToArray();
+                var gatewayLoss = 100d * samples.Count(x => x.GatewayMilliseconds is null) / samples.Length;
+                var externalLoss = 100d * samples.Count(x => x.ExternalMilliseconds is null) / samples.Length;
+                var jitterValues = samples.Zip(samples.Skip(1), (a, b) =>
+                    a.ExternalMilliseconds.HasValue && b.ExternalMilliseconds.HasValue
+                        ? Math.Abs((double)b.ExternalMilliseconds.Value - a.ExternalMilliseconds.Value)
+                        : (double?)null).Where(x => x.HasValue).Select(x => x!.Value).ToArray();
+                var jitter = jitterValues.Length > 0 ? jitterValues.Average() : (double?)null;
+                var sample = raw with
+                {
+                    GatewayLoss60sPercent = gatewayLoss,
+                    ExternalLoss60sPercent = externalLoss,
+                    ExternalJitter60sMilliseconds = jitter
+                };
 
                 await writer.WriteLineAsync(string.Join(",",
                     sample.Timestamp.ToString("O", CultureInfo.InvariantCulture),
                     Csv(sample.Gateway), Csv(sample.GatewayStatus),
                     sample.GatewayMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                     "1.1.1.1", Csv(sample.ExternalStatus),
-                    sample.ExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty));
+                    sample.ExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    Csv(sample.ExternalTcpStatus),
+                    sample.ExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    sample.GatewayLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+                    sample.ExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+                    sample.ExternalJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty));
                 await writer.FlushAsync();
                 onSample?.Invoke(sample);
 
@@ -62,6 +87,24 @@ public static class NetworkMonitorService
         {
             AppLog.Write("Monitoramento de rede interrompido: " + file);
             return file;
+        }
+    }
+
+    private static async Task<ProbeResult> ProbeTcpAsync(string host, int port, CancellationToken token)
+    {
+        using var client = new TcpClient();
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            await client.ConnectAsync(IPAddress.Parse(host), port, token);
+            started.Stop();
+            return new ProbeResult("OK", started.ElapsedMilliseconds);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            started.Stop();
+            return new ProbeResult(ex.GetType().Name, null);
         }
     }
 
