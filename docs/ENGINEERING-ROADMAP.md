@@ -43,7 +43,7 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Perfis de GPU por vendor, sem prometer ganhos universais e sem forçar prioridade/afinidade sem evidência.
 
 ## Fase 5 — Rede e energia
-- [x] Monitoramento persistente ICMP gateway/1.1.1.1, TCP 443 e timestamps; monitor DNS e IPv6 persistente ainda pendentes.
+- [x] Monitoramento persistente com gateways IPv4/IPv6, dois destinos por família, ICMP/TCP/443, DNS e contagens A/AAAA, janela móvel de 60s, jitter/perda separados e classificação de IPv6 indisponível/filtrado.
 - [x] Diagnóstico pontual ICMP/TCP/DNS IPv4/IPv6/tracert e monitor com perda/jitter/CSV; correlação automática de incidentes ainda pendente.
 - [x] Jitter/perda em janela móvel de 60s e tracert sob demanda; percentis e janela configurável ainda pendentes.
 - [x] Consulta inicial de Selective Suspend/Device Sleep com alteração reversível quando suportada; driver, EEE, interrupt moderation e advanced properties ainda pendentes.

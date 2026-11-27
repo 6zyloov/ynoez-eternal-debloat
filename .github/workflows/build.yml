@@ -2,6 +2,18 @@ name: build-windows
 
 on:
   push:
+    branches: [ main, 'feat/**' ]
+    paths:
+      - 'src/**'
+      - 'global.json'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'README.md'
+      - 'STATUS.md'
+      - 'docs/**'
+      - 'installer/**'
+      - '.github/workflows/build.yml'
+  pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
