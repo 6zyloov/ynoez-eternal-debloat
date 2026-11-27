@@ -108,22 +108,7 @@ public static class WindowsScheduledTaskInventoryService
     {
         Directory.CreateDirectory(AppPaths.Data);
         var outputPath = Path.Combine(AppPaths.Data, "scheduled-task-inventory-" + Guid.NewGuid().ToString("N") + ".json");
-        var safePath = outputPath.Replace("'", "''", StringComparison.Ordinal);
-        var script =
-            "$ErrorActionPreference='Stop'; Import-Module ScheduledTasks -ErrorAction Stop; " +
-            "$rows=@(Get-ScheduledTask -ErrorAction Stop | ForEach-Object { " +
-                "$t=$_; $i=$null; try { $i=Get-ScheduledTaskInfo -InputObject $t -ErrorAction Stop } catch {}; " +
-                "$last=''; $next=''; $result=''; " +
-                "if ($null -ne $i) { " +
-                    "if ($i.LastRunTime -gt [datetime]::MinValue) { $last=$i.LastRunTime.ToString('o') }; " +
-                    "if ($i.NextRunTime -gt [datetime]::MinValue) { $next=$i.NextRunTime.ToString('o') }; " +
-                    "$result=[string]$i.LastTaskResult " +
-                "}; " +
-                "[pscustomobject]@{TaskPath=[string]$t.TaskPath;TaskName=[string]$t.TaskName;" +
-                    "State=[string]$t.State;Author=[string]$t.Author;Description=[string]$t.Description;" +
-                    "LastRunTime=$last;NextRunTime=$next;LastTaskResult=$result} " +
-            "}); " +
-            "ConvertTo-Json -InputObject $rows -Depth 3 -Compress | Set-Content -LiteralPath '" + safePath + "' -Encoding UTF8";
+        var script = BuildReadOnlyScript(outputPath);
 
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         using var process = new Process
@@ -186,6 +171,29 @@ public static class WindowsScheduledTaskInventoryService
         {
             try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
         }
+    }
+
+    internal static string BuildReadOnlyScript(string outputPath)
+    {
+        if (string.IsNullOrWhiteSpace(outputPath))
+            throw new ArgumentException("Caminho do relatório vazio.", nameof(outputPath));
+
+        var safePath = outputPath.Replace("'", "''", StringComparison.Ordinal);
+        return
+            "$ErrorActionPreference='Stop'; Import-Module ScheduledTasks -ErrorAction Stop; " +
+            "$rows=@(Get-ScheduledTask -ErrorAction Stop | ForEach-Object { " +
+                "$t=$_; $i=$null; try { $i=Get-ScheduledTaskInfo -InputObject $t -ErrorAction Stop } catch {}; " +
+                "$last=''; $next=''; $result=''; " +
+                "if ($null -ne $i) { " +
+                    "if ($i.LastRunTime -gt [datetime]::MinValue) { $last=$i.LastRunTime.ToString('o') }; " +
+                    "if ($i.NextRunTime -gt [datetime]::MinValue) { $next=$i.NextRunTime.ToString('o') }; " +
+                    "$result=[string]$i.LastTaskResult " +
+                "}; " +
+                "[pscustomobject]@{TaskPath=[string]$t.TaskPath;TaskName=[string]$t.TaskName;" +
+                    "State=[string]$t.State;Author=[string]$t.Author;Description=[string]$t.Description;" +
+                    "LastRunTime=$last;NextRunTime=$next;LastTaskResult=$result} " +
+            "}); " +
+            "ConvertTo-Json -InputObject $rows -Depth 3 -Compress | Set-Content -LiteralPath '" + safePath + "' -Encoding UTF8";
     }
 
     internal static IReadOnlyList<WindowsScheduledTaskInfo> ParseJson(string json)
