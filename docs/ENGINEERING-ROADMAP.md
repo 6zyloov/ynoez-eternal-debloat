@@ -21,7 +21,7 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Adicionar verificação de integridade/assinatura de artefatos e SBOM.
 
 ## Fase 2 — Observabilidade e inventário
-- [ ] Inventário detalhado CPU, GPU, RAM/slots/SPD quando permitido, placa/revisão, BIOS, PCIe, monitores, discos, drivers, áudio e NIC.
+- [~] CPU/GPU/RAM total, módulos RAM por WMI/SMBIOS, placa/BIOS e inventário PnP de rede/áudio/sistema com hardware IDs e drivers assinados. Leitura SPD direta, topologia de canais, monitores, discos e inventário completo de drivers ainda pendentes.
 - [x] Monitoramento inicial CPU/RAM via APIs Windows e GPU 3D via NVIDIA SMI/WMI com indicação de fonte; sensores de temperatura por fabricante ainda pendentes.
 - [ ] Health check com problemas reais priorizados (ex.: memória em single channel, XMP/DOCP, refresh rate, driver ausente, plano de energia, temperaturas).
 - [ ] Exportar relatório local para suporte e baseline.
