@@ -1,0 +1,24 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('win-x64')]
+    [string]$Runtime = 'win-x64'
+)
+
+$ErrorActionPreference = 'Stop'
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$Project = Join-Path $ProjectRoot 'src\ynoez\ynoez.csproj'
+$Output = Join-Path $ProjectRoot 'dist'
+
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+    throw 'O .NET 8 SDK não foi encontrado. Instale o SDK 8.0 e execute novamente.'
+}
+
+if (Test-Path $Output) { Remove-Item $Output -Recurse -Force }
+New-Item -ItemType Directory -Path $Output -Force | Out-Null
+
+dotnet publish $Project -c Release -r $Runtime --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o $Output
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish falhou com código $LASTEXITCODE" }
+
+$Exe = Join-Path $Output 'ynoez.exe'
+if (-not (Test-Path $Exe)) { throw 'O processo de publicação terminou sem produzir ynoez.exe.' }
+Write-Host "Publicado: $Exe" -ForegroundColor Green
