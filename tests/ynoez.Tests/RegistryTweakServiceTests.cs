@@ -374,6 +374,31 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void NvidiaSmi_OnlyResolvesFromTrustedDriverDirectories()
+    {
+        var path = AppPaths.NvidiaSmiExecutable;
+        if (path is null) return;
+
+        var full = Path.GetFullPath(path);
+        var systemRoot = Path.GetFullPath(AppPaths.SystemDirectory) + Path.DirectorySeparatorChar;
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var nvidiaRoot = Path.Combine(programFiles, "NVIDIA Corporation", "NVSMI") + Path.DirectorySeparatorChar;
+
+        Assert.True(full.StartsWith(systemRoot, StringComparison.OrdinalIgnoreCase) ||
+            full.StartsWith(nvidiaRoot, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("nvidia-smi.exe", Path.GetFileName(full));
+        Assert.True(File.Exists(full));
+    }
+
+    [Fact]
+    public void PowerProfileBackupExportPath_IsValidatedBeforeRestoreMutation()
+    {
+        var outside = Path.Combine(AppPaths.Data, "not-a-power-scheme.json");
+        Assert.Throws<InvalidDataException>(() =>
+            PowerProfileService.ValidatePowerSchemeExportPath(outside, AppPaths.Backups));
+    }
+
+    [Fact]
     public void PowerProfileExport_RejectsMissingEmptyDirectoriesAndReparsePoints()
     {
         var root = Path.Combine(Path.GetTempPath(), "ynoez-power-export-valid-" + Guid.NewGuid().ToString("N"));

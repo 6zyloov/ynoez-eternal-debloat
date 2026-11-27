@@ -106,7 +106,7 @@ ConvertTo-Json -InputObject $result -Depth 6 -Compress
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(Script));
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
             {
                 UseShellExecute = false,

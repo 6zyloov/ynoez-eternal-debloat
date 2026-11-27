@@ -80,11 +80,15 @@ public sealed class PerformanceMonitorService
 
     private static NvidiaTelemetry QueryNvidiaTelemetry()
     {
+        var executable = AppPaths.NvidiaSmiExecutable;
+        if (string.IsNullOrWhiteSpace(executable))
+            return NvidiaTelemetry.Empty;
+
         try
         {
             using var process = new Process
             {
-                StartInfo = new ProcessStartInfo("nvidia-smi.exe",
+                StartInfo = new ProcessStartInfo(executable,
                     "--query-gpu=temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw --format=csv,noheader,nounits")
                 {
                     UseShellExecute = false, CreateNoWindow = true,

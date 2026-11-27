@@ -10,6 +10,20 @@ public static class AppPaths
     public static string IpConfigExecutable => Path.Combine(SystemDirectory, "ipconfig.exe");
     public static string TraceRouteExecutable => Path.Combine(SystemDirectory, "tracert.exe");
     public static string ScExecutable => Path.Combine(SystemDirectory, "sc.exe");
+    public static string? NvidiaSmiExecutable
+    {
+        get
+        {
+            var candidates = new List<string>
+            {
+                Path.Combine(SystemDirectory, "nvidia-smi.exe")
+            };
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            if (!string.IsNullOrWhiteSpace(programFiles))
+                candidates.Add(Path.Combine(programFiles, "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe"));
+            return candidates.FirstOrDefault(File.Exists);
+        }
+    }
     public static string Toolbox => Path.Combine(Root, "Toolbox");
     public static string Data => Path.Combine(Root, "Data");
     public static string Backups => Path.Combine(Root, "Backups");

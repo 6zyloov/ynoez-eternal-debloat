@@ -35,7 +35,7 @@ public static class AppPackageInventoryService
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
             {
                 UseShellExecute = false,

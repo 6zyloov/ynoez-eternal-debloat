@@ -346,6 +346,9 @@ public static class PowerProfileService
             ?? throw new InvalidDataException("Backup do plano de energia inválido.");
         if (!GuidPattern.IsMatch(backup.OriginalGuid))
             throw new InvalidDataException("GUID do plano original inválido.");
+        var exportPath = string.IsNullOrWhiteSpace(backup.ExportPath)
+            ? null
+            : ValidatePowerSchemeExportPath(backup.ExportPath, AppPaths.Backups);
 
         var result = RunPowerCfg("/setactive " + backup.OriginalGuid);
         var active = "";
@@ -355,17 +358,13 @@ public static class PowerProfileService
         }
 
         if (!string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(backup.ExportPath))
+            && exportPath is not null && IsUsablePowerSchemeExportFile(exportPath))
         {
-            var exportPath = ValidatePowerSchemeExportPath(backup.ExportPath, AppPaths.Backups);
-            if (IsUsablePowerSchemeExportFile(exportPath))
-            {
-                var import = RunPowerCfg("/import " + Quote(exportPath) + " " + backup.OriginalGuid);
-                if (import.ExitCode != 0)
-                    throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
-                result = RunPowerCfg("/setactive " + backup.OriginalGuid);
-                if (result.ExitCode == 0) active = GetActiveSchemeGuid();
-            }
+            var import = RunPowerCfg("/import " + Quote(exportPath) + " " + backup.OriginalGuid);
+            if (import.ExitCode != 0)
+                throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
+            result = RunPowerCfg("/setactive " + backup.OriginalGuid);
+            if (result.ExitCode == 0) active = GetActiveSchemeGuid();
         }
 
         if (result.ExitCode != 0 || !string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase))
@@ -373,14 +372,9 @@ public static class PowerProfileService
 
         TryClearExecutionRequirement();
         File.Delete(BaseBackupPath);
-        if (!string.IsNullOrWhiteSpace(backup.ExportPath))
+        if (exportPath is not null && File.Exists(exportPath))
         {
-            try
-            {
-                var export = Path.GetFullPath(backup.ExportPath);
-                var root = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
-                if (export.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(export)) File.Delete(export);
-            }
+            try { File.Delete(exportPath); }
             catch (Exception ex) { AppLog.Write("Não foi possível remover o arquivo .pow após restauração: " + ex.Message); }
         }
         if (File.Exists(StatePath)) File.Delete(StatePath);
