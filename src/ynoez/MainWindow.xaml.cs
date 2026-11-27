@@ -800,6 +800,7 @@ public partial class MainWindow : Window
             BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 4, 0, 8)
         };
+        var autoStatus = new TextBlock { Text = "Automação desligada.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var saveProtected = new Button
         {
             Content = "Salvar processos protegidos",
@@ -825,7 +826,7 @@ public partial class MainWindow : Window
         };
         autoPanel.Children.Add(protectedInput);
         autoPanel.Children.Add(saveProtected);
-        var autoStatus = new TextBlock { Text = "Automação desligada.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
+        autoPanel.Children.Add(autoStatus);
         var autoButtons = new WrapPanel();
         var startAuto = new Button { Content = "Ativar automático", Style = (Style)FindResource("AccentButton"), MinWidth = 140, Margin = new Thickness(0, 0, 8, 0) };
         var stopAuto = new Button { Content = "Parar", Style = (Style)FindResource("QuietButton"), MinWidth = 90, IsEnabled = false };
