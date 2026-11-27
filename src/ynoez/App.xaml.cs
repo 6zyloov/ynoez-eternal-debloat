@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
 using ynoez.Services;
 
 namespace ynoez;
@@ -8,9 +9,14 @@ public partial class App : Application
 {
     private Mutex? _singleInstanceMutex;
     private bool _ownsMutex;
+    private int _crashShutdownStarted;
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        DispatcherUnhandledException += App_DispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += AppDomain_UnhandledException;
+        TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
         base.OnStartup(e);
         _singleInstanceMutex = new Mutex(initiallyOwned: true, name: @"Local\ynoez-single-instance", createdNew: out _ownsMutex);
         if (!_ownsMutex)
@@ -21,8 +27,21 @@ public partial class App : Application
             return;
         }
 
-        AppPaths.EnsureStructure();
-        AppLog.Write("Aplicativo iniciado.");
+        try
+        {
+            AppPaths.EnsureStructure();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                "O ynoez não conseguiu preparar C:\\ynoez. Verifique as permissões da pasta e tente executar o instalador oficial novamente.\\n\\n" +
+                ex.Message,
+                "ynoez — inicialização", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(-1);
+            return;
+        }
+
+        AppLog.Write("Aplicativo iniciado. Versão: " + UpdateService.GetCurrentVersion());
         try
         {
             PowerProfileService.RecoverInterruptedAutomaticSession();
@@ -31,10 +50,41 @@ public partial class App : Application
         {
             AppLog.Write("A recuperação de uma sessão automática anterior falhou: " + ex);
             MessageBox.Show(
-                "O ynoez encontrou uma sessão automática anterior que não pôde ser restaurada. O backup foi preservado.\n\n" +
-                ex.Message + "\n\nNão inicie uma nova automação até resolver a restauração.",
+                "O ynoez encontrou uma sessão automática anterior que não pôde ser restaurada. O backup foi preservado.\\n\\n" +
+                ex.Message + "\\n\\nNão inicie uma nova automação até resolver a restauração.",
                 "ynoez — recuperação de energia", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        AppLog.Write("Exceção não tratada na interface WPF: " + e.Exception);
+        if (Interlocked.Exchange(ref _crashShutdownStarted, 1) != 0) return;
+
+        e.Handled = true;
+        try
+        {
+            MessageBox.Show(
+                "O ynoez encontrou um erro inesperado e será fechado para evitar continuar com estado interno inconsistente.\\n\\n" +
+                "O diagnóstico foi salvo em C:\\ynoez\\Logs.\\n\\n" + e.Exception.Message,
+                "ynoez — erro inesperado", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        catch { }
+        Shutdown(-1);
+    }
+
+    private static void AppDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex)
+            AppLog.Write("Exceção fatal fora da interface: " + ex);
+        else
+            AppLog.Write("Exceção fatal não gerenciada. IsTerminating=" + e.IsTerminating);
+    }
+
+    private static void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        AppLog.Write("Exceção de Task não observada: " + e.Exception);
+        e.SetObserved();
     }
 
     protected override void OnExit(ExitEventArgs e)

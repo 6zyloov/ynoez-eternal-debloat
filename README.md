@@ -12,7 +12,7 @@ Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual tom
 
 ## Estado do aplicativo — 0.3.0 (em desenvolvimento)
 
-- **Home:** inventário de CPU, GPU, RAM, Windows, placa-mãe e BIOS; verificação manual de atualização estável via GitHub, sem download nem instalação automática.
+- **Home:** inventário de CPU, GPU, RAM, Windows, placa-mãe e BIOS; auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers do Windows Search, impressão, Store, Windows Update, Vanguard e FACEIT; verificação manual de atualização estável via GitHub, sem download nem instalação automática.
 - **Monitor:** CPU/RAM em tempo real; GPU 3D via NVIDIA SMI ou contadores do Windows; temperatura/VRAM/potência quando o driver NVIDIA oferece esses dados.
 - **Benchmark:** PresentMon 2.6.0 oficial, baixado somente quando solicitado e validado por SHA-256. Captura de 30–180 segundos, FPS médio, 1% low calculado pelo inverso do P99 de frametime, frametime médio e contagem de frames lentos. CSV salvo em `Logs\`. A captura pode solicitar UAC.
 - **Tweaks:** perfis Performance/Equilibrado/AFK; fallback explícito para Equilibrado quando um plano opcional não existe; bloqueio da suspensão automática no AFK; sessão automática com backup/restauração e recuperação após encerramento inesperado; 11 ajustes HKCU com detecção, consentimento, verificação e reversão.

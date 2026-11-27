@@ -19,6 +19,8 @@
 - Inventário de adaptadores físicos e virtuais com endereços, DNS, gateways, MTU e versão de driver quando o WMI informa; exportação CSV, somente leitura. Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
 - Central Restore consolida recuperação de Registro, plano base/AFK interrompido, serviços opcionais, adaptadores de rede, tarefas, inicialização e snapshots. Backups órfãos ou corrompidos permanecem preservados.
 - Testes Windows de transações de Registro, tipos originais, backups corrompidos, inicialização HKCU e pasta Startup temporária, fallback de energia, manifesto SHA-256 de snapshots, métricas da janela de rede, parser PresentMon e whitelists de serviços/tarefas.
+- Auditoria de integridade somente leitura para Defender/Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update e estados conhecidos de serviços/drivers Vanguard/FACEIT; não declara compatibilidade por conta própria.
+- Tratamento global de exceções não tratadas: registra stack trace em Logs, fecha a aplicação de forma controlada e tenta restaurar sessão de energia pendente.
 - CI Windows executa testes antes de publicar o executável autocontido.
 - Auditoria somente leitura de Defender/Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers relacionados a Search, impressão, Store, Windows Update, Vanguard e FACEIT; valores não fornecidos pelo Windows aparecem como indisponíveis.
 - Verificador manual de atualização consulta somente quando solicitado a release estável do repositório GitHub, valida tag/URL e abre a página oficial; não baixa nem instala silenciosamente.
