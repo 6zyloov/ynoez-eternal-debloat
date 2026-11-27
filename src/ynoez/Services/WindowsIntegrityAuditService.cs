@@ -71,11 +71,12 @@ try {
 
 $names = @('WinDefend','wuauserv','WSearch','Spooler','ClipSVC','InstallService','vgc','vgk','FACEITService','FaceitService','faceit')
 $services = @(foreach ($name in $names) {
-    $s = Get-CimInstance -ClassName Win32_Service -Filter ("Name='" + $name + "'") -ErrorAction SilentlyContinue
+    $filter = 'Name=' + [char]39 + $name + [char]39
+    $s = Get-CimInstance -ClassName Win32_Service -Filter $filter -ErrorAction SilentlyContinue
     if ($null -ne $s) {
         [pscustomobject]@{ Name=$name; Installed=$true; State=[string]$s.State; StartMode=[string]$s.StartMode; KernelDriver=$false }
     } else {
-        $driver = Get-CimInstance -ClassName Win32_SystemDriver -Filter ("Name='" + $name + "'") -ErrorAction SilentlyContinue
+        $driver = Get-CimInstance -ClassName Win32_SystemDriver -Filter $filter -ErrorAction SilentlyContinue
         if ($null -ne $driver) {
             [pscustomobject]@{ Name=$name; Installed=$true; State=[string]$driver.State; StartMode=[string]$driver.StartMode; KernelDriver=$true }
         } else {
