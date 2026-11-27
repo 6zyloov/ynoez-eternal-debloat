@@ -8,7 +8,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>ynoez</AssemblyName>
     <RootNamespace>ynoez</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Product>ynoez</Product>
     <Company>ynoez</Company>
     <Description>Windows tuning, diagnostics and hardware toolbox.</Description>

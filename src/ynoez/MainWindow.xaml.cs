@@ -212,8 +212,8 @@ public partial class MainWindow : Window
                         : "Não disponível";
                     gpuPower.Value.Text = sample.GpuPowerWatts.HasValue ? sample.GpuPowerWatts.Value.ToString("0.0") + " W" : "Não disponível";
                     source.Text = "Fonte GPU: " + sample.GpuTelemetrySource + " • " + sample.Timestamp.ToString("HH:mm:ss");
-                    status.Text = "Monitoramento ativo • atualização aproximada de 1 segundo";
-                    await Task.Delay(1000, token);
+                    status.Text = "Monitoramento ativo • atualização aproximada de 2 segundos";
+                    await Task.Delay(2000, token);
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)

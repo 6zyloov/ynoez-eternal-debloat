@@ -10,11 +10,12 @@ Aplicativo nativo para Windows em C# / WPF (.NET 8). A linguagem visual toma com
 - Publicação automática: `.github/workflows/build.yml` (artefato win-x64)
 - Instalação proposta: `C:\ynoez\`, com `Toolbox\`, `Data\`, `Backups\`, `Logs\` e `Downloads\` na mesma raiz.
 
-## Estado do aplicativo — 0.2.0 (em desenvolvimento)
+## Estado do aplicativo — 0.2.1 (em desenvolvimento)
 
 - Home: inventário de CPU, GPU, RAM, Windows, placa-mãe, BIOS e adaptadores ativos.
 - Backup: snapshot local de hardware, plano de energia e configuração de rede; ponto de restauração opcional.
-- Tweaks: plano Alto desempenho com backup/restauração e catálogo integrado de ajustes HKCU, com estado detectado, confirmação, backup por valor, verificação e reversão.
+- Tweaks: perfis Performance/Equilibrado/AFK, detecção automática de jogo e inatividade, backup/restauração do plano original e catálogo de 11 ajustes HKCU com detecção, confirmação, verificação e reversão.
+- Monitor: CPU/RAM em tempo real, GPU 3D via NVIDIA SMI ou contadores do Windows, além de temperatura/memória/potência quando o driver NVIDIA oferece esses dados.
 - Network: diagnóstico ICMP/DNS, cancelamento correto e monitoramento contínuo de gateway/1.1.1.1 com histórico CSV.
 - Debloat: limpeza seletiva de Temp e caches do Brave/Discord, preservando perfis e credenciais; gerenciador de inicialização com desativação reversível de entradas HKCU e proteção de itens sensíveis.
 - Motherboard: identificação da placa e revisão, perfil A520M K V2 com a BIOS mais recente listada para cada revisão e links oficiais (consulta em 27/11/2026).
@@ -25,7 +26,7 @@ Aplicativo nativo para Windows em C# / WPF (.NET 8). A linguagem visual toma com
 
 O GitHub Actions compila em Windows x64, executa testes de integração de Registro em HKCU isolado e publica o executável autocontido como artefato. Consulte a aba Actions para a execução associada ao commit mais recente.
 
-A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, hardware físico e compatibilidade com Vanguard/FACEIT numa máquina real.
+Os testes de integração cobrem transações de Registro e inicialização em HKCU isolado. A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, hardware físico e compatibilidade com Vanguard/FACEIT numa máquina real.
 
 ## Regras de segurança
 
@@ -56,7 +57,7 @@ O executável autocontido será gerado em `dist\ynoez.exe`. Para instalar em `C:
 
 ## Próximas etapas
 
-Ainda faltam modos Performance/Equilibrado/AFK com allowlist, monitoramento de sensores CPU/GPU, medição de FPS/frametime, inventário e gerenciamento seguro de AppX/recursos/tarefas/serviços, cobertura maior de testes, instalador/atualizador e validação física de compatibilidade. O monitor de rede registra ICMP, mas não identifica sozinho a causa de cada queda.
+Ainda faltam medição PresentMon de FPS/frametime, inventário e gerenciamento seguro de AppX/recursos/tarefas/serviços, expansão dos testes, instalador/atualizador e validação física de compatibilidade. O monitor de sensores não instala drivers de terceiros; sensores indisponíveis são apresentados como indisponíveis. O monitor de rede registra ICMP, mas não identifica sozinho a causa de cada queda.
 
 ## Licença
 
