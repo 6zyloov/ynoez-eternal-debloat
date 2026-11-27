@@ -1,3 +1,4 @@
+using System.IO;
 namespace ynoez.Services;
 
 public sealed record CleanupResult(int DeletedFiles, long FreedBytes, int SkippedFiles)
