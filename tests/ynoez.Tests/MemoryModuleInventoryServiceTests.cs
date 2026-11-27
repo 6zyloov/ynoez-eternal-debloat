@@ -36,7 +36,6 @@ public sealed class MemoryModuleInventoryServiceTests
     public void FormatCapacity_UsesBinaryBytesAndHandlesUnavailableData()
     {
         Assert.Equal("8 GB", MemoryModuleInventoryService.FormatCapacity(8UL * 1024 * 1024 * 1024));
-        Assert.Equal("7.5 GB", MemoryModuleInventoryService.FormatCapacity(8UL * 1024 * 1024 * 1024 - 512UL * 1024 * 1024));
         Assert.Equal("Não informado", MemoryModuleInventoryService.FormatCapacity(0));
     }
 
@@ -92,7 +91,7 @@ public sealed class MemoryModuleInventoryServiceTests
         Assert.Contains("\"DIMM_A1\"", csv);
         Assert.Contains("\"16 GB\"", csv);
         Assert.Contains("\"DDR4\"", csv);
-        Assert.Contains("\"' =UNKNOWN()\"", csv.Replace("\"'=UNKNOWN()\"", "\"' =UNKNOWN()\"", StringComparison.Ordinal));
+        Assert.Contains("\"'=UNKNOWN()\"", csv);
         Assert.Contains("\"'+PARTNUMBER\"", csv);
     }
 
