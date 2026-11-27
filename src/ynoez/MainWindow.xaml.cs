@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _integrityAuditCts;
     private CancellationTokenSource? _windowsRepairCts;
     private CancellationTokenSource? _serviceInventoryCts;
+    private CancellationTokenSource? _scheduledTaskInventoryCts;
     private bool _allowClose;
     private bool _sessionEnding;
     private bool _trayIconVisible;
@@ -140,6 +141,7 @@ public partial class MainWindow : Window
             _integrityAuditCts?.Cancel();
             _windowsRepairCts?.Cancel();
             _serviceInventoryCts?.Cancel();
+            _scheduledTaskInventoryCts?.Cancel();
         };
     }
 
@@ -1923,7 +1925,170 @@ public partial class MainWindow : Window
         serviceCard.Child = servicePanel;
         root.Children.Add(serviceCard);
 
-        root.Children.Add(NoteCard("Ações de serviço", "A Toolbox não oferece desligamento em massa. A lista Debloat contém somente seis serviços opcionais, com backup, confirmação, verificação e restauração. Windows Search, impressão, Store, Defender, Firewall, Windows Update, rede, áudio e anti-cheats permanecem protegidos."));
+        var taskCard = MakeCard();
+        var taskPanel = new StackPanel { Margin = new Thickness(20) };
+        taskPanel.Children.Add(Heading("Inventário ao vivo de tarefas agendadas", 15));
+        taskPanel.Children.Add(Body("Consulta as tarefas registradas no Agendador do Windows: nome, caminho, estado, autor, descrição, última execução, próxima execução e último resultado. A classificação separa tarefas protegidas, seis tarefas opcionais avaliadas pelo Debloat e todo o restante como somente leitura. Esta tela não habilita, desabilita, inicia ou encerra tarefas."));
+        var taskSearch = new TextBox
+        {
+            Height = 38,
+            FontSize = 12,
+            Padding = new Thickness(11, 8, 11, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            CaretBrush = AccentBrush,
+            ToolTip = "Pesquisar nome, caminho, estado, autor, descrição ou classificação"
+        };
+        var taskStatus = Body("A consulta ainda não foi executada.");
+        var taskDetails = Body("Selecione uma tarefa para ver sua classificação e descrição.");
+        taskDetails.TextWrapping = TextWrapping.Wrap;
+        var taskGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            SelectionMode = DataGridSelectionMode.Single,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 330,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Tarefa", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskName)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Caminho", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskPath)), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsScheduledTaskInfo.StateDisplay)), Width = new DataGridLength(105) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Política", Binding = new Binding(nameof(WindowsScheduledTaskInfo.SafetyDisplay)), Width = new DataGridLength(150) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Última execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.LastRunDisplay)), Width = new DataGridLength(135) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Próxima execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.NextRunDisplay)), Width = new DataGridLength(135) });
+        IReadOnlyList<WindowsScheduledTaskInfo> allTasks = Array.Empty<WindowsScheduledTaskInfo>();
+        void RenderTasks()
+        {
+            var query = taskSearch.Text.Trim();
+            var filtered = string.IsNullOrWhiteSpace(query)
+                ? allTasks
+                : allTasks.Where(x =>
+                    x.TaskName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.TaskPath.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.StateDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Author.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Explanation.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+            taskGrid.ItemsSource = filtered;
+            taskStatus.Text = allTasks.Count == 0
+                ? "Nenhum inventário carregado."
+                : filtered.Count + " de " + allTasks.Count + " tarefas • " +
+                  allTasks.Count(x => x.Safety.IsProtected) + " protegidas • " +
+                  allTasks.Count(x => x.Safety.IsOptional) + " opcionais avaliadas • somente leitura";
+        }
+        taskSearch.TextChanged += (_, _) => RenderTasks();
+        taskGrid.SelectionChanged += (_, _) =>
+        {
+            if (taskGrid.SelectedItem is not WindowsScheduledTaskInfo selected)
+            {
+                taskDetails.Text = "Selecione uma tarefa para ver sua classificação e descrição.";
+                return;
+            }
+            taskDetails.Text = selected.FullName +
+                "\nEstado: " + selected.StateDisplay +
+                " • Autor: " + (string.IsNullOrWhiteSpace(selected.Author) ? "Não informado" : selected.Author) +
+                " • Último resultado: " + selected.LastResultDisplay +
+                "\nÚltima execução: " + selected.LastRunDisplay +
+                " • Próxima execução: " + selected.NextRunDisplay +
+                "\nPolítica: " + selected.Safety.Explanation +
+                (string.IsNullOrWhiteSpace(selected.Description) ? "" : "\nDescrição: " + selected.Description);
+        };
+        var taskButtons = new WrapPanel();
+        var refreshTasks = new Button { Content = "Consultar tarefas", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelTasks = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportTasks = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var openTaskScheduler = new Button { Content = "Abrir taskschd.msc", Style = (Style)FindResource("QuietButton") };
+        refreshTasks.Click += async (_, _) =>
+        {
+            if (_scheduledTaskInventoryCts is not null) return;
+            var cts = new CancellationTokenSource();
+            _scheduledTaskInventoryCts = cts;
+            refreshTasks.IsEnabled = false;
+            cancelTasks.IsEnabled = true;
+            exportTasks.IsEnabled = false;
+            taskStatus.Text = "Consultando o Agendador de Tarefas. A primeira leitura pode levar alguns segundos…";
+            try
+            {
+                var captured = await WindowsScheduledTaskInventoryService.CaptureAsync(cts.Token);
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    allTasks = captured;
+                    RenderTasks();
+                    exportTasks.IsEnabled = allTasks.Count > 0;
+                    taskStatus.Text = allTasks.Count + " tarefas inventariadas • consulta somente leitura; nenhuma tarefa foi alterada.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Consulta cancelada. Nenhuma tarefa foi alterada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário de tarefas agendadas falhou: " + ex);
+                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Falha na consulta: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_scheduledTaskInventoryCts, cts)) _scheduledTaskInventoryCts = null;
+                cts.Dispose();
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    refreshTasks.IsEnabled = true;
+                    cancelTasks.IsEnabled = false;
+                }
+            }
+        };
+        cancelTasks.Click += (_, _) => _scheduledTaskInventoryCts?.Cancel();
+        exportTasks.Click += (_, _) =>
+        {
+            if (allTasks.Count == 0) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar inventário de tarefas agendadas",
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = "ynoez-tarefas-agendadas.csv",
+                AddExtension = true,
+                DefaultExt = ".csv"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, WindowsScheduledTaskInventoryService.BuildCsv(allTasks), new System.Text.UTF8Encoding(true));
+                taskStatus.Text = "Inventário de tarefas exportado: " + dialog.FileName;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao exportar inventário de tarefas: " + ex);
+                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        openTaskScheduler.Click += async (_, _) => await OpenTargetAsync("taskschd.msc");
+        taskButtons.Children.Add(refreshTasks);
+        taskButtons.Children.Add(cancelTasks);
+        taskButtons.Children.Add(exportTasks);
+        taskButtons.Children.Add(openTaskScheduler);
+        taskPanel.Children.Add(taskSearch);
+        taskPanel.Children.Add(taskStatus);
+        taskPanel.Children.Add(taskGrid);
+        taskPanel.Children.Add(taskDetails);
+        taskPanel.Children.Add(taskButtons);
+        taskCard.Child = taskPanel;
+        root.Children.Add(taskCard);
+
+        root.Children.Add(NoteCard("Ações de serviço e tarefas", "A Toolbox é somente leitura. A página Debloat contém listas curtas de seis serviços e seis tarefas opcionais, com backup, confirmação, verificação e restauração; não há desligamento em massa. Windows Search, impressão, Store, Defender, Firewall, Windows Update, manutenção, rede, áudio e anti-cheats permanecem protegidos."));
         RenderResults();
         return root;
         return root;
