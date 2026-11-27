@@ -675,6 +675,43 @@ public partial class MainWindow : Window
         else
             root.Children.Add(NoteCard("Inicialização", "Nenhuma entrada desativada pelo ynoez."));
 
+        root.Children.Add(Heading("Serviços opcionais do Windows", 15));
+        root.Children.Add(Body("Somente serviços previamente avaliados como opcionais aparecem aqui. Desativar exige UAC, salva o tipo de inicialização e tenta parar o serviço sem forçar o encerramento de dependências. Windows Search, impressão, Store, Defender, Windows Update, rede, áudio, NVIDIA, Vanguard e FACEIT não fazem parte do catálogo."));
+        var serviceManager = new ServiceTweakService();
+        foreach (var service in serviceManager.GetStatuses())
+        {
+            var details = service.Definition.Description +
+                "\nEstado: " + service.State + " | Inicialização: " + service.StartMode +
+                (service.DelayedAutoStart ? " (atrasada)" : "");
+            if (service.DisabledByYnoez)
+            {
+                root.Children.Add(ActionCard(service.Definition.DisplayName, details,
+                    "Restaurar serviço", async () =>
+                    {
+                        if (MessageBox.Show("Restaurar o serviço \"" + service.Definition.Name + "\" ao estado anterior? Pode ser solicitado UAC.",
+                            "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                            return;
+                        await Task.Run(() => serviceManager.Restore(service.Definition));
+                        MessageBox.Show("Serviço restaurado e verificado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Debloat");
+                    }, "BACKUP"));
+            }
+            else if (string.Equals(service.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase))
+                root.Children.Add(NoteCard(service.Definition.DisplayName + " — já desativado", details + "\nO Windows já mantém este serviço desativado."));
+            else
+            {
+                root.Children.Add(ActionCard(service.Definition.DisplayName, details,
+                    "Desativar serviço", async () =>
+                    {
+                        if (MessageBox.Show("Desativar \"" + service.Definition.Name + "\"? Se estiver em execução, o ynoez tentará pará-lo sem encerrar serviços dependentes. A alteração é reversível, mas pode remover a função descrita. Pode ser solicitado UAC.",
+                            "Confirmar serviço opcional", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                            return;
+                        await Task.Run(() => serviceManager.Disable(service.Definition));
+                        MessageBox.Show("Serviço desativado. Backup do estado original salvo.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Debloat");
+                    }, service.Definition.Risk.ToUpperInvariant()));
+            }
+        }
         root.Children.Add(ProtectedItemsCard());
         return root;
     }
