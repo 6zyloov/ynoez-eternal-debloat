@@ -43,7 +43,7 @@
                     <StackPanel Grid.Row="2" Margin="20,4,12,10" VerticalAlignment="Bottom">
                         <Border Height="1" Background="#292929" Margin="0,0,0,10" />
                         <TextBlock Text="LOCAL MODE  •  NO TELEMETRY" FontSize="8" Foreground="#787878" />
-                        <TextBlock Text="ynoez 0.1.0" FontSize="9" Foreground="#FF80FF" Margin="0,4,0,0" />
+                        <TextBlock Text="ynoez 0.1.1" FontSize="9" Foreground="#FF80FF" Margin="0,4,0,0" />
                     </StackPanel>
                 </Grid>
             </Border>
