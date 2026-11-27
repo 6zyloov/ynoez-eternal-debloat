@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "id": "gigabyte-a520m-k-v2",
+  "manufacturer": "GIGABYTE",
+  "product": "A520M K V2",
+  "chipset": "AMD A520",
+  "platform": "AM4",
+  "memory": "DDR4, dual-channel, 2 DIMM slots",
+  "network": "Gigabit Ethernet (GbE)",
+  "audio": "Realtek HD Audio (onboard audio device must be detected)",
+  "features": [
+    "Smart Fan 5",
+    "Q-Flash",
+    "M.2 PCIe 3.0 x4 / SATA support",
+    "GIGABYTE APP Center"
+  ],
+  "revisionLinks": [
+    {
+      "revision": "1.0",
+      "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support",
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support#support-dl-bios"
+    },
+    {
+      "revision": "1.1",
+      "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/support",
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/support#support-dl-bios"
+    },
+    {
+      "revision": "1.2",
+      "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support",
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support#support-dl-bios"
+    }
+  ],
+  "utilities": [
+    {
+      "name": "GIGABYTE APP Center",
+      "purpose": "Portal oficial para utilitários e drivers compatíveis com a placa.",
+      "safety": "Instale apenas o que for necessário e compatível com a revisão e o Windows detectados."
+    },
+    {
+      "name": "EasyTune",
+      "purpose": "Ajustes avançados de sistema, clocks e tensões no Windows.",
+      "safety": "Informativo. O ynoez não aplica overclock, alteração de tensão ou Smart Quick Boost automaticamente."
+    },
+    {
+      "name": "System Information Viewer (SIV) / Smart Fan 5",
+      "purpose": "Monitoramento e controle de ventoinhas/sensores quando suportados pela placa e firmware.",
+      "safety": "Confirmar sensores e conectores antes de alterar curvas."
+    },
+    {
+      "name": "@BIOS / Q-Flash",
+      "purpose": "Utilitários de atualização/recuperação de firmware fornecidos pela fabricante.",
+      "safety": "O ynoez apenas abre a página oficial. Não baixa nem grava BIOS automaticamente. Confirmar revisão, CPU e notas de versão."
+    }
+  ],
+  "safeRecommendations": [
+    "Identificar a revisão física da placa antes de selecionar BIOS ou drivers.",
+    "Manter o driver de chipset AMD e os drivers LAN/áudio compatíveis com a revisão e versão do Windows.",
+    "Diagnosticar perda de pacotes e economia de energia do adaptador antes de alterar parâmetros de rede.",
+    "Monitorar temperatura e ventoinhas antes de alterar curvas ou limites térmicos.",
+    "Preservar TPM, Secure Boot, SVM, IOMMU/DMA, VBS/HVCI e as proteções exigidas por anti-cheats."
+  ],
+  "blockedAutomaticActions": [
+    "Flash/atualização de BIOS",
+    "Alteração de tensão, clock, PBO ou overclock automático",
+    "Desativação de TPM, Secure Boot, SVM, IOMMU/DMA, VBS ou HVCI",
+    "Desativação em massa de serviços/driver de chipset, LAN ou áudio"
+  ],
+  "manualUrl": "https://download.gigabyte.com/FileList/Manual/mb_manual_a520m-k-series_e.pdf"
+}
