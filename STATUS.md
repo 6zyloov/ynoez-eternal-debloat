@@ -37,7 +37,7 @@
 - O modo automático roda somente enquanto o ynoez está aberto; ao parar, tenta restaurar o plano original. Se falhar, mantém metadados e exportação .pow para nova tentativa na abertura seguinte. O bloqueio de suspensão termina quando o app fecha.
 - A telemetria de GPU depende do driver/Windows; temperatura de CPU e sensores AMD/Intel ainda não estão integrados.
 - O benchmark precisa ser testado com jogos reais; PresentMon exige permissão ETW e não mede ganho causado por tweaks sozinho.
-- O monitor de rede ajuda a separar ICMP de TCP e gateway de destino, mas não determina sozinho a causa de desconexões do roteador/ISP.
+- O monitor de rede ajuda a separar ICMP de TCP e gateway de destino, mas não determina sozinho a causa de desconexões do roteador/ISP. A coleta continua com a janela na bandeja enquanto o PC está acordado; suspensão, hibernação ou desligamento pausam a coleta.
 - Ainda falta validação física com Vanguard/FACEIT, assinatura Authenticode e teste de recuperação em Windows real. O verificador de versões não substitui assinatura nem atualização automática.
 
 ## Limites adicionais

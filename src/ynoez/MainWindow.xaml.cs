@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private bool _sessionEnding;
     private bool _trayIconVisible;
     private HwndSource? _windowSource;
+    private bool _trayHookAttached;
 
     private const uint TrayNimAdd = 0x00000000;
     private const uint TrayNimDelete = 0x00000002;
@@ -121,7 +122,8 @@ public partial class MainWindow : Window
         {
             Application.Current.SessionEnding -= Application_SessionEnding;
             RemoveTrayIcon();
-            _windowSource?.RemoveHook(TrayWindowProc);
+            if (_trayHookAttached) _windowSource?.RemoveHook(TrayWindowProc);
+            _trayHookAttached = false;
             _appxInventoryCts?.Cancel();
             _systemAppxInventoryCts?.Cancel();
             _programInventoryCts?.Cancel();
@@ -139,7 +141,11 @@ public partial class MainWindow : Window
     {
         var handle = new WindowInteropHelper(this).Handle;
         _windowSource = HwndSource.FromHwnd(handle);
-        _windowSource?.AddHook(TrayWindowProc);
+        if (_windowSource is not null)
+        {
+            _windowSource.AddHook(TrayWindowProc);
+            _trayHookAttached = true;
+        }
         await RefreshHardwareAsync();
         ShowPage("Home");
     }
@@ -946,7 +952,7 @@ public partial class MainWindow : Window
         var monitorCard = MakeCard();
         var monitorPanel = new StackPanel { Margin = new Thickness(20) };
         monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
-        monitorPanel.Children.Add(Body("Registra a cada 5 segundos o gateway atual, dois destinos públicos (Cloudflare e Google), ICMP, TCP/443 e resolução DNS. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo."));
+        monitorPanel.Children.Add(Body("Registra a cada 5 segundos o gateway atual, dois destinos públicos (Cloudflare e Google), ICMP, TCP/443 e resolução DNS. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo. A coleta pausa enquanto o Windows estiver em suspensão/hibernação ou o computador estiver desligado."));
         var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var monitorButtons = new WrapPanel();
         var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
@@ -2369,6 +2375,25 @@ public partial class MainWindow : Window
         var handle = new WindowInteropHelper(this).Handle;
         if (handle == IntPtr.Zero) return false;
 
+        _windowSource ??= HwndSource.FromHwnd(handle);
+        if (_windowSource is null)
+        {
+            AppLog.Write("Não foi possível obter a origem da janela para registrar os eventos da bandeja.");
+            return false;
+        }
+        if (!_trayHookAttached)
+        {
+            _windowSource.AddHook(TrayWindowProc);
+            _trayHookAttached = true;
+        }
+
+        var icon = LoadSystemIcon(IntPtr.Zero, new IntPtr(32512));
+        if (icon == IntPtr.Zero)
+        {
+            AppLog.Write("O Windows não forneceu um ícone padrão para a bandeja.");
+            return false;
+        }
+
         var data = new NotifyIconData
         {
             Size = (uint)Marshal.SizeOf<NotifyIconData>(),
@@ -2376,7 +2401,7 @@ public partial class MainWindow : Window
             Id = 1,
             Flags = TrayNifMessage | TrayNifIcon | TrayNifTip,
             CallbackMessage = TrayCallbackMessage,
-            Icon = LoadSystemIcon(IntPtr.Zero, new IntPtr(32512)),
+            Icon = icon,
             ToolTip = "ynoez — operações continuam em segundo plano",
             Info = string.Empty,
             InfoTitle = string.Empty,
