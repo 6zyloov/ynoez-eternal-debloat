@@ -8,8 +8,9 @@ $projectFile = Join-Path $root "src\ynoez\ynoez.csproj"
 if (-not (Test-Path $projectFile -PathType Leaf)) { throw "Projeto principal não encontrado: $projectFile" }
 [xml]$project = Get-Content $projectFile
 $version = [string]$project.Project.PropertyGroup.Version
-if ([string]::IsNullOrWhiteSpace($version) -or $version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+
-) {
+try { $parsedVersion = [version]$version }
+catch { throw "Versão do projeto inválida: '$version'." }
+if ($parsedVersion.Build -lt 0 -or $parsedVersion.Revision -ne -1) {
     throw "Versão do projeto fora do formato MAJOR.MINOR.PATCH: '$version'."
 }
 $versionQuad = "$version.0"
