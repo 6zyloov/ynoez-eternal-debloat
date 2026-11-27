@@ -70,7 +70,7 @@ public static class NetworkMonitorService
         using var ping = new Ping();
         try
         {
-            var reply = await ping.SendPingAsync(host, 1800, new byte[32], new PingOptions(), token);
+            var reply = await ping.SendPingAsync(IPAddress.Parse(host), TimeSpan.FromMilliseconds(1800), new byte[32], new PingOptions(), token);
             return reply.Status == IPStatus.Success
                 ? new ProbeResult("OK", reply.RoundtripTime)
                 : new ProbeResult(reply.Status.ToString(), null);
