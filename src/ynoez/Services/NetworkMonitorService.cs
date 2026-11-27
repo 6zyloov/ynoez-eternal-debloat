@@ -31,7 +31,7 @@ public static class NetworkMonitorService
 
         await using var stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
-        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external,external_status,external_ms,external_tcp_status,external_tcp_ms,gateway_loss_60s_pct,external_loss_60s_pct,external_tcp_failure_60s_pct,external_jitter_60s_ms,external_tcp_jitter_60s_ms");
+        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external,external_status,external_ms,external_tcp_status,external_tcp_ms,gateway_loss_60s_pct,external_loss_60s_pct,external_tcp_failure_60s_pct,gateway_jitter_60s_ms,external_jitter_60s_ms,external_tcp_jitter_60s_ms");
         await writer.FlushAsync();
         AppLog.Write("Monitoramento contínuo de rede iniciado: " + file);
         var window = new Queue<(long Tick, NetworkMonitorSample Sample)>();
@@ -81,6 +81,7 @@ public static class NetworkMonitorService
                     sample.GatewayLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
                     sample.ExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
                     sample.ExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+                    sample.GatewayJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
                     sample.ExternalJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
                     sample.ExternalTcpJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty));
                 await writer.FlushAsync();

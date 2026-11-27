@@ -732,8 +732,8 @@ public partial class MainWindow : Window
             Height = 240,
             Margin = new Thickness(0, 10, 0, 10)
         };
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Interface", Binding = new Binding(nameof(NetworkAdapterStatistics.Name)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Status", Binding = new Binding(nameof(NetworkAdapterStatistics.Status)), Width = new DataGridLength(75) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterStatistics.Name)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(NetworkAdapterStatistics.Status)), Width = new DataGridLength(75) });
         statsGrid.Columns.Add(new DataGridTextColumn { Header = "Link", Binding = new Binding(nameof(NetworkAdapterStatistics.LinkSpeedDisplay)), Width = new DataGridLength(85) });
         statsGrid.Columns.Add(new DataGridTextColumn { Header = "Recebido", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesReceivedDisplay)), Width = new DataGridLength(85) });
         statsGrid.Columns.Add(new DataGridTextColumn { Header = "Enviado", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesSentDisplay)), Width = new DataGridLength(85) });
@@ -917,7 +917,7 @@ public partial class MainWindow : Window
         var appxCard = MakeCard();
         var appxPanel = new StackPanel { Margin = new Thickness(20) };
         appxPanel.Children.Add(Heading("Inventário de aplicativos AppX", 15));
-        appxPanel.Children.Add(Body("Lista os pacotes AppX/MSIX instalados somente para o usuário atual, com versão, editor, estado e sinalizadores de pacote. Esta tela é somente leitura: não oferece remoção em massa nem presume que um pacote seja seguro de remover. Store, Calculadora, Bloco de Notas e componentes de shell ficam identificados como protegidos."));
+        appxPanel.Children.Add(Body("Lista pacotes principais, frameworks, recursos, bundles e opcionais AppX/MSIX instalados para o usuário atual, com versão, editor, estado e sinalizadores de pacote. Esta tela é somente leitura: não oferece remoção em massa nem presume que um pacote seja seguro de remover. Store, Calculadora, Bloco de Notas e componentes de shell ficam identificados como protegidos."));
         var appxStatus = Body("Inventário ainda não consultado.");
         var appxGrid = new DataGrid
         {

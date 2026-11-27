@@ -287,6 +287,8 @@ public sealed class RegistryTweakServiceTests
         var packages = AppPackageInventoryService.ParseJson("{\"Name\":\"Example.App\",\"PackageFullName\":\"Example.App_1.0_x64\",\"Version\":\"1.0.0.0\"}");
         var package = Assert.Single(packages);
         Assert.Equal("Example.App", package.Name);
+        Assert.False(package.IsBundle);
+        Assert.False(package.IsOptional);
         Assert.Equal("Inventário — remoção não avaliada", package.Classification);
     }
 

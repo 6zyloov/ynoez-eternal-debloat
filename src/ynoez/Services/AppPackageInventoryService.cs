@@ -7,8 +7,8 @@ namespace ynoez.Services;
 
 public sealed record AppxPackageInfo(
     string Name, string PackageFullName, string Version, string Publisher,
-    string Status, bool IsFramework, bool IsResourcePackage, bool NonRemovable,
-    string Classification, string InstallLocation);
+    string Status, bool IsFramework, bool IsResourcePackage, bool IsBundle, bool IsOptional,
+    bool NonRemovable, string Classification, string InstallLocation);
 
 public static class AppPackageInventoryService
 {
@@ -30,7 +30,7 @@ public static class AppPackageInventoryService
     {
         const string script =
             "$ErrorActionPreference='Stop'; " +
-            "$items=@(Get-AppxPackage -ErrorAction Stop | Select-Object Name,PackageFullName,Version,Publisher,Status,IsFramework,IsResourcePackage,NonRemovable,InstallLocation); " +
+            "$items=@(Get-AppxPackage -PackageTypeFilter Main,Framework,Resource,Bundle,Optional -ErrorAction Stop | Select-Object Name,PackageFullName,Version,Publisher,Status,IsFramework,IsResourcePackage,IsBundle,IsOptional,NonRemovable,InstallLocation); " +
             "ConvertTo-Json -InputObject $items -Depth 4 -Compress";
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         using var process = new Process
@@ -91,13 +91,15 @@ public static class AppPackageInventoryService
             var fullName = GetString(item, "PackageFullName");
             var framework = GetBool(item, "IsFramework");
             var resource = GetBool(item, "IsResourcePackage");
+            var bundle = GetBool(item, "IsBundle");
+            var optional = GetBool(item, "IsOptional");
             var nonRemovable = GetBool(item, "NonRemovable");
-            var classification = nonRemovable || framework || resource || IsProtected(name)
+            var classification = nonRemovable || framework || resource || bundle || optional || IsProtected(name)
                 ? "Protegido / componente do Windows"
                 : "Inventário — remoção não avaliada";
             return new AppxPackageInfo(name, fullName, GetString(item, "Version"),
                 GetString(item, "Publisher"), GetString(item, "Status"), framework,
-                resource, nonRemovable, classification, GetString(item, "InstallLocation"));
+                resource, bundle, optional, nonRemovable, classification, GetString(item, "InstallLocation"));
         })
         .Where(x => !string.IsNullOrWhiteSpace(x.Name))
         .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
@@ -111,11 +113,11 @@ public static class AppPackageInventoryService
             "appx-inventory-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N")[..8] + ".csv");
         var lines = new List<string>
         {
-            "Name,PackageFullName,Version,Publisher,Status,IsFramework,IsResourcePackage,NonRemovable,Classification,InstallLocation"
+            "Name,PackageFullName,Version,Publisher,Status,IsFramework,IsResourcePackage,IsBundle,IsOptional,NonRemovable,Classification,InstallLocation"
         };
         lines.AddRange(packages.Select(x => string.Join(",",
             Csv(x.Name), Csv(x.PackageFullName), Csv(x.Version), Csv(x.Publisher), Csv(x.Status),
-            x.IsFramework, x.IsResourcePackage, x.NonRemovable, Csv(x.Classification), Csv(x.InstallLocation))));
+            x.IsFramework, x.IsResourcePackage, x.IsBundle, x.IsOptional, x.NonRemovable, Csv(x.Classification), Csv(x.InstallLocation))));
         File.WriteAllLines(path, lines, new UTF8Encoding(true));
         AppLog.Write("Inventário AppX exportado: " + path + " (" + packages.Count + " pacotes).");
         return path;
