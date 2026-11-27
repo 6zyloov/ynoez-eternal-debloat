@@ -53,9 +53,12 @@ public sealed class ServiceTweakService
         {
             var info = ReadService(definition.Name);
             if (info is null) continue;
-            var backup = ReadBackup(definition.Name);
+            OptionalServiceBackup? backup = null;
+            var hasBackup = File.Exists(GetBackupPath(definition.Name));
+            try { backup = ReadBackup(definition.Name); }
+            catch (Exception ex) { AppLog.Write("Backup de serviço inválido (" + definition.Name + "): " + ex.Message); }
             result.Add(new OptionalServiceStatus(definition, true, info.State, info.StartMode,
-                info.Delayed, backup is not null, backup?.WasRunning ?? false));
+                info.Delayed, hasBackup, backup?.WasRunning ?? false));
         }
         return result;
     }

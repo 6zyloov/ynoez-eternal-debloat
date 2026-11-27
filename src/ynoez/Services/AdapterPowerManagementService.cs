@@ -28,12 +28,13 @@ public sealed class AdapterPowerManagementService
     {
         var outputPath = Path.Combine(AppPaths.Data, "adapter-power-" + Guid.NewGuid().ToString("N") + ".json");
         var path = EscapePowerShell(outputPath);
-        var script = "$ErrorActionPreference='Stop'; $items = @(Get-NetAdapter -Physical | ForEach-Object { " +
+        var script = "$ErrorActionPreference='Stop'; try { $items = @(Get-NetAdapter -Physical | ForEach-Object { " +
             "$a=$_; try { $p=Get-NetAdapterPowerManagement -Name $a.Name -ErrorAction Stop; " +
             "[pscustomobject]@{ Name=$a.Name; InterfaceDescription=$a.InterfaceDescription; Status=[string]$a.Status; " +
             "LinkSpeed=[string]$a.LinkSpeed; SelectiveSuspend=[string]$p.SelectiveSuspend; " +
             "DeviceSleepOnDisconnect=[string]$p.DeviceSleepOnDisconnect } } catch {} }); " +
-            "ConvertTo-Json -InputObject @($items) -Depth 4 | Set-Content -LiteralPath '" + path + "' -Encoding UTF8";
+            "ConvertTo-Json -InputObject @($items) -Depth 4 | Set-Content -LiteralPath '" + path + "' -Encoding UTF8 " +
+            "} catch { exit 2 }; exit 0";
         RunElevated(script);
 
         try
