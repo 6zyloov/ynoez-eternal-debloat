@@ -557,7 +557,7 @@ public partial class MainWindow : Window
         var monitorCard = MakeCard();
         var monitorPanel = new StackPanel { Margin = new Thickness(20) };
         monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
-        monitorPanel.Children.Add(Body("Registra a cada 5 segundos a latência e o estado do gateway e de 1.1.1.1. Ideal para sessões longas ou períodos AFK. O CSV fica em C:\\ynoez\\Logs; o monitor não altera a rede."));
+        monitorPanel.Children.Add(Body("Registra a cada 5 segundos gateway, ICMP e TCP/443. A janela estatística usa exatamente os últimos 60 segundos, com perda e jitter separados por protocolo — útil para distinguir ICMP filtrado de perda real de conectividade. O CSV fica em C:\\ynoez\\Logs; nenhuma configuração é alterada."));
         var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var monitorButtons = new WrapPanel();
         var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
@@ -578,8 +578,10 @@ public partial class MainWindow : Window
                         " | Gateway: " + sample.GatewayStatus + (sample.GatewayMilliseconds.HasValue ? " " + sample.GatewayMilliseconds + " ms" : "") +
                         " | Internet ICMP: " + sample.ExternalStatus + (sample.ExternalMilliseconds.HasValue ? " " + sample.ExternalMilliseconds + " ms" : "") +
                         " | TCP 443: " + sample.ExternalTcpStatus +
-                        " | Perda 60s: " + sample.ExternalLoss60sPercent.ToString("0") + "%" +
-                        " | Jitter 60s: " + (sample.ExternalJitter60sMilliseconds.HasValue ? sample.ExternalJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—");
+                        " | Perda ICMP 60s: " + sample.ExternalLoss60sPercent.ToString("0") + "%" +
+                        " | Falha TCP 60s: " + sample.ExternalTcpFailure60sPercent.ToString("0") + "%" +
+                        " | Jitter ICMP: " + (sample.ExternalJitter60sMilliseconds.HasValue ? sample.ExternalJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—") +
+                        " | Jitter TCP: " + (sample.ExternalTcpJitter60sMilliseconds.HasValue ? sample.ExternalTcpJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—");
                 }, token);
                 monitorStatus.Text = "Monitor encerrado. CSV salvo em: " + logFile;
             }

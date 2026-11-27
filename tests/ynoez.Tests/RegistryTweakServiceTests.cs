@@ -186,6 +186,26 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void NetworkWindow_UsesActualLossAndKeepsNoGatewaySeparate()
+    {
+        var samples = new[]
+        {
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 20, "OK", 30, 0, 0, 0, null, null),
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 30, "TIMEOUT", null, 0, 0, 0, null, null),
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "TIMEOUT", null, "OK", 50, 0, 0, 0, null, null),
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 40, "OK", 70, 0, 0, 0, null, null)
+        };
+
+        var summary = NetworkMonitorService.SummarizeWindow(samples);
+
+        Assert.Equal(0, summary.GatewayLossPercent);
+        Assert.Equal(25, summary.ExternalLossPercent);
+        Assert.Equal(25, summary.ExternalTcpFailurePercent);
+        Assert.Equal(15, summary.ExternalJitterMilliseconds);
+        Assert.Equal(26.6666667, summary.ExternalTcpJitterMilliseconds!.Value, 5);
+    }
+
+    [Fact]
     public void ScheduledTaskCatalog_ContainsOnlyExplicitOptionalTasks()
     {
         var catalog = ScheduledTaskTweakService.GetCatalog();

@@ -10,7 +10,12 @@ namespace ynoez.Services;
 public sealed record NetworkMonitorSample(
     DateTimeOffset Timestamp, string Gateway, string GatewayStatus, long? GatewayMilliseconds,
     string ExternalStatus, long? ExternalMilliseconds, string ExternalTcpStatus, long? ExternalTcpMilliseconds,
-    double GatewayLoss60sPercent, double ExternalLoss60sPercent, double? ExternalJitter60sMilliseconds);
+    double GatewayLoss60sPercent, double ExternalLoss60sPercent, double ExternalTcpFailure60sPercent,
+    double? ExternalJitter60sMilliseconds, double? ExternalTcpJitter60sMilliseconds);
+
+public sealed record NetworkWindowSummary(
+    double GatewayLossPercent, double ExternalLossPercent, double ExternalTcpFailurePercent,
+    double? ExternalJitterMilliseconds, double? ExternalTcpJitterMilliseconds);
 
 public static class NetworkMonitorService
 {
@@ -20,15 +25,16 @@ public static class NetworkMonitorService
             throw new ArgumentOutOfRangeException(nameof(interval), "O intervalo mínimo é de 2 segundos.");
 
         Directory.CreateDirectory(AppPaths.Logs);
-        var file = Path.Combine(AppPaths.Logs, "network-monitor-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".csv");
+        var file = Path.Combine(AppPaths.Logs, "network-monitor-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") +
+            "-" + Guid.NewGuid().ToString("N")[..8] + ".csv");
         var gatewayAddress = GetDefaultGateway()?.ToString() ?? string.Empty;
 
         await using var stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
-        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external,external_status,external_ms,external_tcp_status,external_tcp_ms,gateway_loss_60s_pct,external_loss_60s_pct,external_jitter_60s_ms");
+        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external,external_status,external_ms,external_tcp_status,external_tcp_ms,gateway_loss_60s_pct,external_loss_60s_pct,external_tcp_failure_60s_pct,external_jitter_60s_ms,external_tcp_jitter_60s_ms");
         await writer.FlushAsync();
         AppLog.Write("Monitoramento contínuo de rede iniciado: " + file);
-        var window = new Queue<NetworkMonitorSample>();
+        var window = new Queue<(long Tick, NetworkMonitorSample Sample)>();
 
         try
         {
@@ -46,22 +52,21 @@ public static class NetworkMonitorService
                 var raw = new NetworkMonitorSample(DateTimeOffset.Now, gatewayAddress,
                     gatewayTask.Result.Status, gatewayTask.Result.Milliseconds,
                     externalTask.Result.Status, externalTask.Result.Milliseconds,
-                    tcpTask.Result.Status, tcpTask.Result.Milliseconds, 0, 0, null);
-                window.Enqueue(raw);
-                while (window.Count > 12) window.Dequeue();
-                var samples = window.ToArray();
-                var gatewayLoss = 100d * samples.Count(x => x.GatewayMilliseconds is null) / samples.Length;
-                var externalLoss = 100d * samples.Count(x => x.ExternalMilliseconds is null) / samples.Length;
-                var jitterValues = samples.Zip(samples.Skip(1), (a, b) =>
-                    a.ExternalMilliseconds.HasValue && b.ExternalMilliseconds.HasValue
-                        ? Math.Abs((double)b.ExternalMilliseconds.Value - a.ExternalMilliseconds.Value)
-                        : (double?)null).Where(x => x.HasValue).Select(x => x!.Value).ToArray();
-                var jitter = jitterValues.Length > 0 ? jitterValues.Average() : (double?)null;
+                    tcpTask.Result.Status, tcpTask.Result.Milliseconds, 0, 0, 0, null, null);
+                var tick = System.Diagnostics.Stopwatch.GetTimestamp();
+                window.Enqueue((tick, raw));
+                while (window.Count > 0 &&
+                    (tick - window.Peek().Tick) / (double)System.Diagnostics.Stopwatch.Frequency > 60d)
+                    window.Dequeue();
+                var samples = window.Select(x => x.Sample).ToArray();
+                var summary = SummarizeWindow(samples);
                 var sample = raw with
                 {
-                    GatewayLoss60sPercent = gatewayLoss,
-                    ExternalLoss60sPercent = externalLoss,
-                    ExternalJitter60sMilliseconds = jitter
+                    GatewayLoss60sPercent = summary.GatewayLossPercent,
+                    ExternalLoss60sPercent = summary.ExternalLossPercent,
+                    ExternalTcpFailure60sPercent = summary.ExternalTcpFailurePercent,
+                    ExternalJitter60sMilliseconds = summary.ExternalJitterMilliseconds,
+                    ExternalTcpJitter60sMilliseconds = summary.ExternalTcpJitterMilliseconds
                 };
 
                 await writer.WriteLineAsync(string.Join(",",
@@ -74,7 +79,9 @@ public static class NetworkMonitorService
                     sample.ExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                     sample.GatewayLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
                     sample.ExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
-                    sample.ExternalJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty));
+                    sample.ExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+                    sample.ExternalJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
+                    sample.ExternalTcpJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty));
                 await writer.FlushAsync();
                 onSample?.Invoke(sample);
 
@@ -88,6 +95,33 @@ public static class NetworkMonitorService
             AppLog.Write("Monitoramento de rede interrompido: " + file);
             return file;
         }
+    }
+
+    public static NetworkWindowSummary SummarizeWindow(IReadOnlyList<NetworkMonitorSample> samples)
+    {
+        if (samples.Count == 0) return new NetworkWindowSummary(0, 0, 0, null, null);
+
+        var gatewaySamples = samples.Where(x => !string.Equals(x.GatewayStatus, "NO_GATEWAY", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var gatewayLoss = gatewaySamples.Length == 0 ? 0 :
+            100d * gatewaySamples.Count(x => !x.GatewayMilliseconds.HasValue) / gatewaySamples.Length;
+        var externalLoss = 100d * samples.Count(x => !x.ExternalMilliseconds.HasValue) / samples.Count;
+        var tcpFailure = 100d * samples.Count(x => !x.ExternalTcpMilliseconds.HasValue) / samples.Count;
+        return new NetworkWindowSummary(gatewayLoss, externalLoss, tcpFailure,
+            CalculateJitter(samples.Select(x => x.ExternalMilliseconds)),
+            CalculateJitter(samples.Select(x => x.ExternalTcpMilliseconds)));
+    }
+
+    private static double? CalculateJitter(IEnumerable<long?> values)
+    {
+        long? previous = null;
+        var differences = new List<double>();
+        foreach (var value in values)
+        {
+            if (!value.HasValue) continue;
+            if (previous.HasValue) differences.Add(Math.Abs((double)value.Value - previous.Value));
+            previous = value.Value;
+        }
+        return differences.Count == 0 ? null : differences.Average();
     }
 
     private static async Task<ProbeResult> ProbeTcpAsync(string host, int port, CancellationToken token)
