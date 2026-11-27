@@ -18,6 +18,7 @@ Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual tom
 - **Tweaks:** perfis Performance/Equilibrado/AFK; fallback explícito para Equilibrado quando um plano opcional não existe; bloqueio da suspensão automática no AFK; sessão automática com backup/restauração e recuperação após encerramento inesperado; 11 ajustes HKCU com detecção, consentimento, verificação e reversão.
 - **Execução em segundo plano:** fechar a janela com uma operação longa ativa oculta o ynoez na bandeja do sistema em vez de encerrar o monitor de rede, o perfil automático, o benchmark ou a manutenção do Windows; duplo clique no ícone reabre a janela e o menu da bandeja permite encerrar explicitamente.
 - **Network:** inventário somente leitura de interfaces, drivers, endereços, gateways, DNS e MTU; diagnóstico cancelável de gateway, dois destinos públicos, ICMP, TCP/443, DNS IPv4/IPv6 e tracert; monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, Cloudflare e Google, DNS, janela móvel real de 60 segundos, perda/jitter por protocolo e hipótese de causa, com CSV; contadores RX/TX e consulta/ajuste reversível de energia em adaptadores compatíveis.
+- **Auditoria avançada de NIC:** enumera, sem UAC e sem escrita, as propriedades publicadas por drivers físicos via NetAdapter; classifica EEE, Interrupt Moderation, RSS, LSO, Checksum Offload, Flow Control, Speed & Duplex e buffers, exibe orientação condicional e exporta CSV. Os valores são específicos de fabricante/modelo e não são alterados automaticamente.
 - **Debloat:** limpeza seletiva de Temp e caches Brave/Discord, preservando perfis e credenciais; inventários de programas Win32 (HKLM/HKCU 32/64 bits) e AppX/MSIX somente leitura para usuário atual, todos os perfis e pacotes provisionados, com busca e exportação CSV; gerenciador de inicialização HKCU + arquivos da pasta pessoal com backup e reversão (HKLM e pasta Startup compartilhada somente leitura); whitelist de seis serviços opcionais e seis tarefas agendadas opcionais com backup, verificação e restauração.
 - **Motherboard:** identificação da placa e revisão, perfil A520M K V2 com fontes oficiais por revisão.
 - **Toolbox:** pesquisa de recursos/configurações Windows e consulta de serviços protegidos.
@@ -37,7 +38,7 @@ O projeto não automatiza flash de BIOS, overclock, tensão, PBO, BCD/HPET/timer
 
 ## Build e testes
 
-O GitHub Actions compila em Windows x64, executa testes de Registro em HKCU isolado, inicialização temporária, resolução de planos de energia, manifesto SHA-256 dos snapshots, estatísticas da janela de rede, parser CSV do PresentMon e whitelists de serviços/tarefas antes de publicar o executável autocontido e instalador.
+O GitHub Actions compila em Windows x64, executa testes de Registro em HKCU isolado, inicialização temporária, resolução de planos de energia, manifesto SHA-256 dos snapshots, estatísticas da janela de rede, parser e auditoria de propriedades avançadas de NIC, parser CSV do PresentMon e whitelists de serviços/tarefas antes de publicar o executável autocontido e instalador.
 
 A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, PresentMon com jogos reais, energia de NIC, hardware físico e compatibilidade com Vanguard/FACEIT numa máquina real.
 
