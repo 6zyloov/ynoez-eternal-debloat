@@ -6,7 +6,7 @@ A versão estável do aplicativo é definida em um único lugar: a propriedade `
 
 ## Propagação para o instalador
 
-O script `scripts/build-installer.ps1` lê a versão do projeto, valida que ela tem três componentes numéricos e fornece macros ao Inno Setup. O instalador usa essas macros para:
+O script `scripts/build-installer.ps1` lê a versão do projeto, valida que ela tem três componentes numéricos e substitui marcadores explícitos no template `installer/ynoez.iss`, criando temporariamente `installer/ynoez.generated.iss` ao lado dele. O arquivo temporário contém valores literais (sem interpolação de versão do ISPP), é compilado e removido em `finally`. O instalador usa esses valores para:
 
 - AppVersion e AppVerName;
 - nome `ynoez-setup-X.Y.Z.exe`;
