@@ -81,8 +81,8 @@ try {
     }
 
     $fileInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
-    $actualFileVersion = ($fileInfo.FileVersion ?? "").Trim()
-    $actualProductName = ($fileInfo.ProductName ?? "").Trim()
+    $actualFileVersion = ([string]$fileInfo.FileVersion).Trim()
+    $actualProductName = ([string]$fileInfo.ProductName).Trim()
     if ($actualFileVersion -ne $versionQuad) {
         throw "Versão PE do instalador ('$actualFileVersion') difere do projeto ('$versionQuad')."
     }
