@@ -52,7 +52,7 @@ public static class NetworkMonitorService
                 var raw = new NetworkMonitorSample(DateTimeOffset.Now, gatewayAddress,
                     gatewayTask.Result.Status, gatewayTask.Result.Milliseconds,
                     externalTask.Result.Status, externalTask.Result.Milliseconds,
-                    tcpTask.Result.Status, tcpTask.Result.Milliseconds, 0, 0, 0, null, null);
+                    tcpTask.Result.Status, tcpTask.Result.Milliseconds, 0, 0, 0, null, null, null);
                 var tick = System.Diagnostics.Stopwatch.GetTimestamp();
                 window.Enqueue((tick, raw));
                 while (window.Count > 0 &&
