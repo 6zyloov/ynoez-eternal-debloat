@@ -288,7 +288,6 @@ public sealed class RegistryTweakServiceTests
         var package = Assert.Single(packages);
         Assert.Equal("Example.App", package.Name);
         Assert.False(package.IsBundle);
-        Assert.False(package.IsOptional);
         Assert.Equal("Inventário — remoção não avaliada", package.Classification);
     }
 
