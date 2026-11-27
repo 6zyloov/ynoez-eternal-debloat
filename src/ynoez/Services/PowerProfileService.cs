@@ -21,6 +21,8 @@ public static class PowerProfileService
 {
     private const uint PowerRequestContextSimpleString = 0x00000001;
     private static readonly object PowerRequestSync = new();
+    // Serializes manual/automatic plan changes and recovery during application shutdown.
+    private static readonly object ProfileOperationSync = new();
     private static IntPtr _systemSleepRequest = IntPtr.Zero;
     private static bool _systemSleepRequestActive;
     private static readonly string BaseBackupPath = Path.Combine(AppPaths.Data, "power-profile-base.json");
@@ -72,10 +74,17 @@ public static class PowerProfileService
         return match.Value;
     }
 
-    public static string Apply(PowerProfileMode mode) => ApplyCore(mode, createPersistentBackup: true, persistState: true);
+    public static string Apply(PowerProfileMode mode)
+    {
+        lock (ProfileOperationSync)
+            return ApplyCore(mode, createPersistentBackup: true, persistState: true);
+    }
 
-    public static string ApplyForAutomaticSession(PowerProfileMode mode) =>
-        ApplyCore(mode, createPersistentBackup: false, persistState: false);
+    public static string ApplyForAutomaticSession(PowerProfileMode mode)
+    {
+        lock (ProfileOperationSync)
+            return ApplyCore(mode, createPersistentBackup: false, persistState: false);
+    }
 
     private static string ApplyCore(PowerProfileMode mode, bool createPersistentBackup, bool persistState)
     {
@@ -223,6 +232,12 @@ public static class PowerProfileService
 
     public static PowerProfileSession CaptureAutomaticSession()
     {
+        lock (ProfileOperationSync)
+            return CaptureAutomaticSessionCore();
+    }
+
+    private static PowerProfileSession CaptureAutomaticSessionCore()
+    {
         if (File.Exists(SessionPath))
             throw new InvalidOperationException("Existe uma sessão automática anterior sem restauração. Restaure-a antes de iniciar outra.");
         Directory.CreateDirectory(AppPaths.Backups);
@@ -252,6 +267,12 @@ public static class PowerProfileService
     }
 
     public static string RestoreAutomaticSession()
+    {
+        lock (ProfileOperationSync)
+            return RestoreAutomaticSessionCore();
+    }
+
+    private static string RestoreAutomaticSessionCore()
     {
         if (!File.Exists(SessionPath))
         {
@@ -308,6 +329,12 @@ public static class PowerProfileService
     }
 
     public static string RestoreOriginal()
+    {
+        lock (ProfileOperationSync)
+            return RestoreOriginalCore();
+    }
+
+    private static string RestoreOriginalCore()
     {
         if (!File.Exists(BaseBackupPath))
         {
