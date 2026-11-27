@@ -247,7 +247,7 @@ public partial class MainWindow : Window
         var benchmarkCard = MakeCard();
         var benchmarkPanel = new StackPanel { Margin = new Thickness(20) };
         benchmarkPanel.Children.Add(Heading("Benchmark de FPS e frametime", 15));
-        benchmarkPanel.Children.Add(Body("Captura frames reais do jogo com PresentMon oficial. Na primeira captura, o executável será baixado do GitHub e validado por SHA-256. A captura pode solicitar UAC para obter permissão ETW; nenhum ajuste do Windows será aplicado."));
+        benchmarkPanel.Children.Add(Body("Captura frames reais do jogo com PresentMon oficial. Na primeira captura, o executável será baixado do GitHub e validado por SHA-256. A captura pode solicitar UAC para obter permissão ETW e não instala driver de kernel. Compatibilidade com Vanguard/FACEIT ainda precisa de teste no PC; se o anti-cheat bloquear a captura, não force."));
         var targetRow = new WrapPanel { Margin = new Thickness(0, 10, 0, 8) };
         var targetBox = new ComboBox
         {
