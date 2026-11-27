@@ -1,5 +1,7 @@
 # Roteiro de engenharia — ynoez até a versão estável
 
+**Atualização 0.2.2:** já existem motor reversível HKCU, inicialização HKCU, whitelist curta de serviços opcionais, perfis de energia automáticos, telemetria CPU/RAM/GPU, PresentMon com CSV, diagnóstico ICMP/TCP/DNS/rota e ajustes seletivos de energia de NIC. Os itens abaixo continuam sendo os critérios restantes; CI não equivale a validação em hardware real.
+
 Não há data artificial de entrega. Uma versão só avança quando passa pelos critérios de qualidade abaixo.
 
 ## Fase 0 — Auditoria e especificação (em andamento)
@@ -13,19 +15,19 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Migrar code-behind para MVVM com DI e serviços assíncronos.
 - [ ] Separar UI, domínio, infraestrutura Windows e catálogo JSON.
 - [ ] Criar catálogo versionado de ações com ID estável, build mínimo/máximo, hardware, risco, reinício, pré-condições, detector, plano, apply, verify e undo.
-- [ ] Criar motor transacional com journal, snapshots por ação, undo idempotente, recuperação após crash e dry-run.
-- [ ] Criar suíte xUnit e pipeline Windows para build, análise, testes e empacotamento.
+- [x] Criar motor transacional inicial HKCU com backup por valor, verificação e undo; journal global e recuperação após crash ainda pendentes.
+- [x] Criar suíte xUnit inicial e pipeline Windows para build, testes e empacotamento; análise estática/SBOM ainda pendentes.
 - [ ] Adicionar verificação de integridade/assinatura de artefatos e SBOM.
 
 ## Fase 2 — Observabilidade e inventário
 - [ ] Inventário detalhado CPU, GPU, RAM/slots/SPD quando permitido, placa/revisão, BIOS, PCIe, monitores, discos, drivers, áudio e NIC.
-- [ ] Monitoramento ao vivo com providers por fabricante e indicação de fonte/precisão.
+- [x] Monitoramento inicial CPU/RAM via APIs Windows e GPU 3D via NVIDIA SMI/WMI com indicação de fonte; sensores de temperatura por fabricante ainda pendentes.
 - [ ] Health check com problemas reais priorizados (ex.: memória em single channel, XMP/DOCP, refresh rate, driver ausente, plano de energia, temperaturas).
 - [ ] Exportar relatório local para suporte e baseline.
 
 ## Fase 3 — Toolbox e debloat
 - [ ] Lista de apps instalados (Win32, Store/Appx, provisionados) com publisher, versão, tamanho estimado, origem e método oficial de remoção.
-- [ ] Startup: Run keys, Startup folders, tarefas de logon e serviços; toggle reversível quando possível.
+- [x] Startup Run keys HKCU reversíveis e serviços opcionais por whitelist; Startup folders e tarefas de logon ainda pendentes.
 - [ ] Catálogo de apps opcionais com re-instalação documentada e proteção por dependências.
 - [ ] Pesquisa unificada de configurações, serviços, tarefas, recursos e painéis do Windows.
 - [ ] Debloat de Windows 10/11 separado por build, edição, idioma e perfil do usuário.
@@ -33,17 +35,17 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Manter Store, Print, Calculator, Clipboard, Notepad, Windows Search, NVIDIA Instant Replay, Defender, Update e componentes anti-cheat protegidos.
 
 ## Fase 4 — Jogos e latência
-- [ ] Detecção de jogos/launchers e perfil por jogo.
+- [x] Detecção inicial por lista configurável de processos e perfis Performance/Equilibrado/AFK; perfis avançados por jogo ainda pendentes.
 - [ ] Sessão de jogo com snapshot de processos/serviços alterados, allowlist e restauração ao fechar.
 - [ ] Não encerrar scripts, downloads, Roblox, automações XT, overlays necessários, Discord/voice ou processos marcados como essenciais.
-- [ ] Benchmarks via PresentMon: FPS médio, 1%/0,1% lows, frametime e duração; comparar cenários repetidos.
+- [x] Captura PresentMon com FPS médio, 1% low (P99 inverso), frametime e duração; comparação automática e 0,1% low ainda pendentes.
 - [ ] Perfis de GPU por vendor, sem prometer ganhos universais e sem forçar prioridade/afinidade sem evidência.
 
 ## Fase 5 — Rede e energia
-- [ ] Monitoramento persistente de gateway, DNS, múltiplos destinos e IPv4/IPv6 com timestamps.
-- [ ] Separar perda local, Wi-Fi, gateway, DNS, rota e destino; exportar CSV/JSON.
-- [ ] Jitter/latência com percentis e janela configurável; traceroute sob demanda.
-- [ ] Inventário de NIC, driver, energia, EEE, interrupt moderation e advanced properties; mostrar valor atual e recomendação condicionada.
+- [x] Monitoramento persistente ICMP gateway/1.1.1.1, TCP 443 e timestamps; monitor DNS e IPv6 persistente ainda pendentes.
+- [x] Diagnóstico pontual ICMP/TCP/DNS IPv4/IPv6/tracert e monitor com perda/jitter/CSV; correlação automática de incidentes ainda pendente.
+- [x] Jitter/perda em janela móvel de 60s e tracert sob demanda; percentis e janela configurável ainda pendentes.
+- [x] Consulta inicial de Selective Suspend/Device Sleep com alteração reversível quando suportada; driver, EEE, interrupt moderation e advanced properties ainda pendentes.
 - [ ] Perfis de energia Performance/Balanced/AFK sem matar processos e com retorno automático seguro.
 - [ ] Diagnóstico de desconexões de madrugada/AFK sem alegar que o app controla quedas do ISP/roteador.
 
