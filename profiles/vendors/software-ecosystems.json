@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-27",
+  "vendors": [
+    {
+      "id": "gigabyte",
+      "name": "GIGABYTE",
+      "central": "APP Center",
+      "tools": [
+        "@BIOS",
+        "EasyTune",
+        "Smart Backup",
+        "System Information Viewer",
+        "Q-Flash"
+      ],
+      "compatibilityRule": "Available APP Center applications and supported functions vary by motherboard model. Check exact model/revision support page.",
+      "officialSources": [
+        "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/sp"
+      ]
+    },
+    {
+      "id": "asus",
+      "name": "ASUS",
+      "central": "Armoury Crate",
+      "additionalTools": [
+        "AI Suite (per-model availability)"
+      ],
+      "compatibilityRule": "Armoury Crate targets supported products; verify the exact motherboard model and official supported-device list. Do not assume universal support.",
+      "officialSources": [
+        "https://www.asus.com/support/faq/1041776/"
+      ]
+    },
+    {
+      "id": "msi",
+      "name": "MSI",
+      "central": "MSI Center",
+      "features": [
+        "Hardware Monitoring",
+        "User Scenario",
+        "Fan Center/Cooling Wizard",
+        "System Diagnosis",
+        "Live Update",
+        "Feature Sets"
+      ],
+      "compatibilityRule": "MSI states that if MSI Center is absent from the exact product's Utility download page, that product does not support MSI Center.",
+      "officialSources": [
+        "https://www.msi.com/support/technical_details/MB_SW_MSI_Center",
+        "https://us.msi.com/support/technical_details/MB_SW_MSI_Center_Inst"
+      ]
+    },
+    {
+      "id": "asrock",
+      "name": "ASRock",
+      "central": "APP Shop",
+      "additionalTools": [
+        "Auto Driver Installer (per-model availability)"
+      ],
+      "compatibilityRule": "Official utility catalog names supported models and OS. Verify exact model rather than enabling the utility globally.",
+      "officialSources": [
+        "https://www.asrock.com/feature/appshop/",
+        "https://www.asrock.com/Support/index.asp?cat=Utilities"
+      ]
+    }
+  ]
+}

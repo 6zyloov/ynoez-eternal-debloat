@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-27",
+  "profiles": [
+    {
+      "id": "gigabyte-a520m-k-v2",
+      "vendor": "GIGABYTE",
+      "model": "A520M K V2",
+      "category": "motherboard",
+      "status": "documented-initial",
+      "profile": "profiles/motherboards/gigabyte/a520m-k-v2/profile.json",
+      "revisions": [
+        "1.0",
+        "1.1",
+        "1.2"
+      ]
+    }
+  ]
+}
