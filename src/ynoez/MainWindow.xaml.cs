@@ -956,7 +956,7 @@ public partial class MainWindow : Window
         var monitorCard = MakeCard();
         var monitorPanel = new StackPanel { Margin = new Thickness(20) };
         monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
-        monitorPanel.Children.Add(Body("Registra a cada 5 segundos o gateway atual, dois destinos públicos (Cloudflare e Google), ICMP, TCP/443 e resolução DNS. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo. A coleta pausa enquanto o Windows estiver em suspensão/hibernação ou o computador estiver desligado."));
+        monitorPanel.Children.Add(Body("Registra a cada 5 segundos os gateways IPv4/IPv6 quando reportados, dois destinos públicos (Cloudflare e Google) por ICMP e TCP/443 em IPv4 e IPv6, além de resolução DNS e contagem de respostas A/AAAA. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo. A coleta pausa enquanto o Windows estiver em suspensão/hibernação ou o computador estiver desligado."));
         var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var monitorButtons = new WrapPanel();
         var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
@@ -980,6 +980,15 @@ public partial class MainWindow : Window
                         " | 1.1.1.1 ICMP/TCP: " + sample.ExternalStatus + "/" + sample.ExternalTcpStatus +
                         " | 8.8.8.8 ICMP/TCP: " + sample.SecondaryExternalStatus + "/" + sample.SecondaryExternalTcpStatus +
                         " | DNS: " + sample.DnsStatus + (sample.DnsMilliseconds.HasValue ? " " + sample.DnsMilliseconds.Value.ToString("0.0") + " ms" : "") +
+                        " | Respostas DNS A/AAAA: " + sample.DnsIpv4AddressCount + "/" + sample.DnsIpv6AddressCount +
+                        " | IPv6 GW: " + (string.IsNullOrWhiteSpace(sample.Ipv6Gateway) ? "—" : sample.Ipv6Gateway) +
+                        " " + sample.Ipv6GatewayStatus +
+                        " | IPv6 CF ICMP/TCP: " + sample.Ipv6ExternalStatus + "/" + sample.Ipv6ExternalTcpStatus +
+                        " | IPv6 Google ICMP/TCP: " + sample.Ipv6SecondaryExternalStatus + "/" + sample.Ipv6SecondaryExternalTcpStatus +
+                        " | Perda 60s IPv6 GW/CF/Google: " + sample.Ipv6GatewayLoss60sPercent.ToString("0") + "/" +
+                            sample.Ipv6ExternalLoss60sPercent.ToString("0") + "/" + sample.Ipv6SecondaryExternalLoss60sPercent.ToString("0") + "%" +
+                        " | Falha TCP IPv6 CF/Google: " + sample.Ipv6ExternalTcpFailure60sPercent.ToString("0") + "/" +
+                            sample.Ipv6SecondaryExternalTcpFailure60sPercent.ToString("0") + "%" +
                         " | Perda 60s GW/CF/Google: " + sample.GatewayLoss60sPercent.ToString("0") + "/" +
                             sample.ExternalLoss60sPercent.ToString("0") + "/" + sample.SecondaryExternalLoss60sPercent.ToString("0") + "%" +
                         " | Falha TCP CF/Google: " + sample.ExternalTcpFailure60sPercent.ToString("0") + "/" +
