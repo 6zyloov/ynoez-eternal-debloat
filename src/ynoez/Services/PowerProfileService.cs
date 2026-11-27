@@ -1,5 +1,7 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -9,12 +11,22 @@ public enum PowerProfileMode { Performance, Balanced, Afk }
 
 public sealed record PowerProfileState(string Mode, string AppliedGuid, DateTimeOffset AppliedAt);
 public sealed record PowerProfileBackup(string OriginalGuid, DateTimeOffset SavedAt, string? ExportPath = null);
+public sealed record PowerProfileSession(string OriginalGuid, string ExportPath, DateTimeOffset StartedAt);
 
 public static class PowerProfileService
 {
+    private const uint EsContinuous = 0x80000000;
+    private const uint EsSystemRequired = 0x00000001;
     private static readonly string BaseBackupPath = Path.Combine(AppPaths.Data, "power-profile-base.json");
     private static readonly string StatePath = Path.Combine(AppPaths.Data, "power-profile-state.json");
+    private static readonly string SessionPath = Path.Combine(AppPaths.Data, "auto-profile-session.json");
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly Regex GuidPattern = new(@"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$", RegexOptions.Compiled);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint SetThreadExecutionState(uint esFlags);
+
+    public static bool HasInterruptedAutomaticSession => File.Exists(SessionPath);
 
     public static string GetActiveSchemeGuid()
     {
@@ -25,29 +37,23 @@ public static class PowerProfileService
         return match.Value;
     }
 
-    public static string Apply(PowerProfileMode mode)
+    public static string Apply(PowerProfileMode mode) => ApplyCore(mode, createPersistentBackup: true, persistState: true);
+
+    public static string ApplyForAutomaticSession(PowerProfileMode mode) =>
+        ApplyCore(mode, createPersistentBackup: false, persistState: false);
+
+    private static string ApplyCore(PowerProfileMode mode, bool createPersistentBackup, bool persistState)
     {
         var targetGuid = GetTargetGuid(mode);
         var current = GetActiveSchemeGuid();
         if (string.Equals(current, targetGuid, StringComparison.OrdinalIgnoreCase))
-            return "O plano solicitado já está ativo. Nenhuma alteração foi necessária.";
+        {
+            SetExecutionRequirement(mode);
+            return "O plano solicitado já está ativo.";
+        }
 
-        if (File.Exists(BaseBackupPath))
-        {
-            var existing = JsonSerializer.Deserialize<PowerProfileBackup>(File.ReadAllText(BaseBackupPath), JsonOptions)
-                ?? throw new InvalidDataException("Backup do plano base inválido; a alteração foi bloqueada.");
-            if (!Regex.IsMatch(existing.OriginalGuid, @"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$"))
-                throw new InvalidDataException("GUID no backup do plano base inválido; a alteração foi bloqueada.");
-        }
-        else
-        {
-            Directory.CreateDirectory(AppPaths.Backups);
-            var exportPath = Path.Combine(AppPaths.Backups, "power-profile-base-" + current + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".pow");
-            var export = RunPowerCfg("/export " + Quote(exportPath) + " " + current);
-            if (export.ExitCode != 0 || !File.Exists(exportPath))
-                throw new InvalidOperationException("Não foi possível exportar o plano original antes da alteração. Nenhum perfil foi aplicado. " + export.Error);
-            WriteAtomic(BaseBackupPath, JsonSerializer.Serialize(new PowerProfileBackup(current, DateTimeOffset.UtcNow, exportPath), JsonOptions));
-        }
+        if (createPersistentBackup)
+            EnsurePersistentBackup(current);
 
         var result = RunPowerCfg("/setactive " + targetGuid);
         if (result.ExitCode != 0)
@@ -55,42 +61,170 @@ public static class PowerProfileService
 
         var active = GetActiveSchemeGuid();
         if (!string.Equals(active, targetGuid, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("O Windows não confirmou o plano solicitado; o backup original foi mantido.");
+        {
+            TrySetActive(current);
+            throw new InvalidOperationException("O Windows não confirmou o plano solicitado; o plano anterior foi recuperado quando possível.");
+        }
 
-        var state = new PowerProfileState(mode.ToString(), active, DateTimeOffset.UtcNow);
-        WriteAtomic(StatePath, JsonSerializer.Serialize(state, JsonOptions));
-        AppLog.Write("Perfil de energia aplicado: " + mode + " (" + active + ")");
+        try
+        {
+            SetExecutionRequirement(mode);
+            if (persistState)
+            {
+                var state = new PowerProfileState(mode.ToString(), active, DateTimeOffset.UtcNow);
+                WriteAtomic(StatePath, JsonSerializer.Serialize(state, JsonOptions));
+            }
+        }
+        catch
+        {
+            TrySetActive(current);
+            TryClearExecutionRequirement();
+            throw;
+        }
+
+        AppLog.Write("Perfil de energia aplicado: " + mode + " (" + active + ")" +
+            (mode == PowerProfileMode.Afk ? "; suspensão automática bloqueada enquanto o ynoez estiver aberto." : ""));
         return mode switch
         {
             PowerProfileMode.Performance => "Perfil Alto desempenho ativado. O plano original está exportado para restauração.",
             PowerProfileMode.Balanced => "Perfil Equilibrado ativado. O plano original está exportado para restauração.",
-            PowerProfileMode.Afk => "Perfil Economia de energia ativado. Aplicativos e processos permanecem abertos.",
+            PowerProfileMode.Afk => "Perfil AFK ativado. O sistema não entrará em suspensão automática enquanto o ynoez estiver aberto; a tela pode apagar conforme o plano do Windows.",
             _ => "Perfil aplicado."
         };
+    }
+
+    private static void EnsurePersistentBackup(string current)
+    {
+        if (File.Exists(BaseBackupPath))
+        {
+            var existing = JsonSerializer.Deserialize<PowerProfileBackup>(File.ReadAllText(BaseBackupPath), JsonOptions)
+                ?? throw new InvalidDataException("Backup do plano base inválido; a alteração foi bloqueada.");
+            if (!GuidPattern.IsMatch(existing.OriginalGuid))
+                throw new InvalidDataException("GUID no backup do plano base inválido; a alteração foi bloqueada.");
+            return;
+        }
+
+        Directory.CreateDirectory(AppPaths.Backups);
+        var exportPath = Path.Combine(AppPaths.Backups,
+            "power-profile-base-" + current + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".pow");
+        var export = RunPowerCfg("/export " + Quote(exportPath) + " " + current);
+        if (export.ExitCode != 0 || !File.Exists(exportPath))
+            throw new InvalidOperationException("Não foi possível exportar o plano original antes da alteração. Nenhum perfil foi aplicado. " + export.Error);
+        WriteAtomic(BaseBackupPath,
+            JsonSerializer.Serialize(new PowerProfileBackup(current, DateTimeOffset.UtcNow, exportPath), JsonOptions));
+    }
+
+    public static PowerProfileSession CaptureAutomaticSession()
+    {
+        if (File.Exists(SessionPath))
+            throw new InvalidOperationException("Existe uma sessão automática anterior sem restauração. Restaure-a antes de iniciar outra.");
+        Directory.CreateDirectory(AppPaths.Backups);
+        Directory.CreateDirectory(AppPaths.Data);
+        var originalGuid = GetActiveSchemeGuid();
+        var exportPath = Path.Combine(AppPaths.Backups, "auto-profile-original-" + Guid.NewGuid().ToString("N") + ".pow");
+        var export = RunPowerCfg("/export " + Quote(exportPath) + " " + originalGuid);
+        if (export.ExitCode != 0 || !File.Exists(exportPath))
+            throw new InvalidOperationException("Não foi possível salvar o plano original da sessão automática. A automação não foi iniciada. " + export.Error);
+
+        var session = new PowerProfileSession(originalGuid, exportPath, DateTimeOffset.UtcNow);
+        try
+        {
+            WriteAtomic(SessionPath, JsonSerializer.Serialize(session, JsonOptions));
+        }
+        catch
+        {
+            try { File.Delete(exportPath); } catch { }
+            throw;
+        }
+        AppLog.Write("Plano de energia da sessão automática salvo: " + originalGuid);
+        return session;
+    }
+
+    public static string RestoreAutomaticSession()
+    {
+        if (!File.Exists(SessionPath))
+        {
+            TryClearExecutionRequirement();
+            return "Não existe uma sessão automática pendente de restauração.";
+        }
+
+        var session = JsonSerializer.Deserialize<PowerProfileSession>(File.ReadAllText(SessionPath), JsonOptions)
+            ?? throw new InvalidDataException("Metadados da sessão automática estão inválidos.");
+        if (!GuidPattern.IsMatch(session.OriginalGuid))
+            throw new InvalidDataException("GUID do plano de energia da sessão automática inválido.");
+
+        var exportPath = ValidateSessionExportPath(session.ExportPath);
+        var active = "";
+        try { active = GetActiveSchemeGuid(); } catch { }
+
+        if (!string.Equals(active, session.OriginalGuid, StringComparison.OrdinalIgnoreCase))
+        {
+            var activate = RunPowerCfg("/setactive " + session.OriginalGuid);
+            if (activate.ExitCode == 0)
+            {
+                try { active = GetActiveSchemeGuid(); } catch { active = ""; }
+            }
+
+            if (!string.Equals(active, session.OriginalGuid, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!File.Exists(exportPath))
+                    throw new InvalidOperationException("O plano original não está disponível e o arquivo exportado da sessão não foi encontrado. O backup foi mantido.");
+                var import = RunPowerCfg("/import " + Quote(exportPath) + " " + session.OriginalGuid);
+                if (import.ExitCode != 0)
+                    throw new InvalidOperationException("Não foi possível importar o plano original da sessão: " + import.Error);
+                activate = RunPowerCfg("/setactive " + session.OriginalGuid);
+                if (activate.ExitCode != 0)
+                    throw new InvalidOperationException("O plano original foi importado, mas não pôde ser ativado: " + activate.Error);
+                active = GetActiveSchemeGuid();
+            }
+        }
+
+        if (!string.Equals(active, session.OriginalGuid, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("A restauração automática não foi confirmada. O backup foi mantido.");
+
+        SetExecutionRequirement(PowerProfileMode.Balanced);
+        TryClearExecutionRequirement();
+        File.Delete(SessionPath);
+        if (File.Exists(exportPath)) File.Delete(exportPath);
+        AppLog.Write("Plano de energia anterior à sessão automática restaurado: " + active);
+        return "Plano de energia anterior à automação restaurado e verificado.";
+    }
+
+    public static void RecoverInterruptedAutomaticSession()
+    {
+        if (!File.Exists(SessionPath)) return;
+        var message = RestoreAutomaticSession();
+        AppLog.Write("Recuperação de sessão automática interrompida: " + message);
     }
 
     public static string RestoreOriginal()
     {
         if (!File.Exists(BaseBackupPath))
+        {
+            TryClearExecutionRequirement();
             return "Não existe um plano original salvo pelo gerenciador de perfis.";
+        }
 
         var backup = JsonSerializer.Deserialize<PowerProfileBackup>(File.ReadAllText(BaseBackupPath), JsonOptions)
             ?? throw new InvalidDataException("Backup do plano de energia inválido.");
-        if (!Regex.IsMatch(backup.OriginalGuid, @"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$"))
+        if (!GuidPattern.IsMatch(backup.OriginalGuid))
             throw new InvalidDataException("GUID do plano original inválido.");
 
         var result = RunPowerCfg("/setactive " + backup.OriginalGuid);
         var active = "";
         if (result.ExitCode == 0)
         {
-            try { active = GetActiveSchemeGuid(); }
-            catch { active = ""; }
+            try { active = GetActiveSchemeGuid(); } catch { active = ""; }
         }
 
         if (!string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(backup.ExportPath) && File.Exists(backup.ExportPath))
         {
-            var import = RunPowerCfg("/import " + Quote(backup.ExportPath) + " " + backup.OriginalGuid);
+            var exportPath = Path.GetFullPath(backup.ExportPath);
+            var backupsRoot = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
+            if (!exportPath.StartsWith(backupsRoot, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Caminho do backup do plano original fora da pasta Backups.");
+            var import = RunPowerCfg("/import " + Quote(exportPath) + " " + backup.OriginalGuid);
             if (import.ExitCode != 0)
                 throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
             result = RunPowerCfg("/setactive " + backup.OriginalGuid);
@@ -100,7 +234,18 @@ public static class PowerProfileService
         if (result.ExitCode != 0 || !string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Falha ao restaurar/verificar o plano original: " + result.Error);
 
+        TryClearExecutionRequirement();
         File.Delete(BaseBackupPath);
+        if (!string.IsNullOrWhiteSpace(backup.ExportPath))
+        {
+            try
+            {
+                var export = Path.GetFullPath(backup.ExportPath);
+                var root = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
+                if (export.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(export)) File.Delete(export);
+            }
+            catch (Exception ex) { AppLog.Write("Não foi possível remover o arquivo .pow após restauração: " + ex.Message); }
+        }
         if (File.Exists(StatePath)) File.Delete(StatePath);
         AppLog.Write("Plano de energia original restaurado: " + active);
         return "Plano de energia original restaurado e verificado.";
@@ -122,6 +267,41 @@ public static class PowerProfileService
         return match.Value;
     }
 
+    public static void ClearExecutionRequirement() => SetExecutionRequirement(PowerProfileMode.Balanced);
+
+    private static void SetExecutionRequirement(PowerProfileMode mode)
+    {
+        var flags = mode == PowerProfileMode.Afk ? EsContinuous | EsSystemRequired : EsContinuous;
+        if (SetThreadExecutionState(flags) == 0)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Não foi possível atualizar a política de suspensão do Windows.");
+    }
+
+    private static void TryClearExecutionRequirement()
+    {
+        try
+        {
+            if (SetThreadExecutionState(EsContinuous) == 0)
+                AppLog.Write("O Windows não confirmou a liberação do bloqueio temporário de suspensão.");
+        }
+        catch (Exception ex) { AppLog.Write("Falha ao liberar bloqueio de suspensão: " + ex.Message); }
+    }
+
+    private static string ValidateSessionExportPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) throw new InvalidDataException("Caminho de exportação da sessão vazio.");
+        var fullPath = Path.GetFullPath(path);
+        var root = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(Path.GetExtension(fullPath), ".pow", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Caminho da exportação da sessão fora da pasta Backups.");
+        return fullPath;
+    }
+
+    private static void TrySetActive(string guid)
+    {
+        try { RunPowerCfg("/setactive " + guid); } catch { }
+    }
+
     private static (int ExitCode, string Output, string Error) RunPowerCfg(string arguments)
     {
         using var process = new Process
@@ -141,10 +321,11 @@ public static class PowerProfileService
         return (process.ExitCode, outputTask.GetAwaiter().GetResult(), errorTask.GetAwaiter().GetResult());
     }
 
-    private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
+    private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
 
     private static void WriteAtomic(string path, string content)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temp = path + ".tmp";
         File.WriteAllText(temp, content);
         File.Move(temp, path, overwrite: true);

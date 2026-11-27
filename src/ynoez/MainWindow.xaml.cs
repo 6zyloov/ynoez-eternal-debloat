@@ -394,7 +394,7 @@ public partial class MainWindow : Window
             MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Balanced), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "PADRÃO"));
-        root.Children.Add(ActionCard("AFK / Economia", "Ativa o plano de economia de energia. Roblox, XT, downloads, Discord e outros processos continuam abertos; o ynoez não mata processos.", "Ativar AFK", () =>
+        root.Children.Add(ActionCard("AFK / Economia", "Ativa o plano de economia e bloqueia a suspensão automática enquanto o ynoez estiver aberto, permitindo que Roblox, XT e downloads continuem ativos. A tela pode apagar normalmente; desligar, fechar a tampa ou faltar energia ainda interrompe tudo.", "Ativar AFK", () =>
         {
             if (_autoProfileCts is not null)
             {
@@ -414,7 +414,7 @@ public partial class MainWindow : Window
         var autoCard = MakeCard();
         var autoPanel = new StackPanel { Margin = new Thickness(20) };
         autoPanel.Children.Add(Heading("Perfis automáticos", 15));
-        autoPanel.Children.Add(Body("Verifica jogos conhecidos e o tempo sem entrada do teclado/mouse. Jogo com usuário ativo = Performance; uso comum = Equilibrado; 15 minutos sem entrada = AFK. Nenhum processo é encerrado. O perfil automático funciona enquanto o ynoez estiver aberto."));
+        autoPanel.Children.Add(Body("Verifica jogos conhecidos e inatividade. Jogo ativo = Performance; uso comum = Equilibrado; 15 minutos sem entrada = AFK. No AFK, o ynoez bloqueia a suspensão automática para manter XT e downloads em execução, mas permite apagar a tela. O plano anterior é salvo e restaurado ao parar; se o app fechar inesperadamente, tenta restaurá-lo na próxima abertura. Não impede suspensão manual, tampa fechada ou perda de energia."));
         var autoStatus = new TextBlock { Text = "Automação desligada.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var autoButtons = new WrapPanel();
         var startAuto = new Button { Content = "Ativar automático", Style = (Style)FindResource("AccentButton"), MinWidth = 140, Margin = new Thickness(0, 0, 8, 0) };
@@ -440,7 +440,7 @@ public partial class MainWindow : Window
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                autoStatus.Text = "Automação parada. O último plano selecionado permanece ativo.";
+                autoStatus.Text = "Automação parada. O plano anterior à sessão foi restaurado e verificado.";
             }
             catch (Exception ex)
             {

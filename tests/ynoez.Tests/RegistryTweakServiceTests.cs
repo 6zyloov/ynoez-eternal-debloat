@@ -176,6 +176,16 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void PowerProfileSession_UsesUniqueBackupPathUnderBackups()
+    {
+        var backupRoot = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
+        var sample = Path.GetFullPath(Path.Combine(AppPaths.Backups, "auto-profile-original-" + Guid.NewGuid().ToString("N") + ".pow"));
+        Assert.StartsWith(backupRoot, sample, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(".pow", Path.GetExtension(sample));
+        Assert.Matches("^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$", Guid.NewGuid().ToString());
+    }
+
+    [Fact]
     public void PresentMonCsvParser_ComputesAverageAndOnePercentLow()
     {
         var path = Path.Combine(Path.GetTempPath(), "ynoez-presentmon-" + Guid.NewGuid().ToString("N") + ".csv");

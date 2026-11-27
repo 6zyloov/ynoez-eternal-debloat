@@ -18,30 +18,49 @@ public static class AutoProfileService
 
     public static async Task RunAsync(Action<AutoProfileStatus>? onStatus, CancellationToken token)
     {
-        var settings = LoadSettings();
-        var idleThreshold = TimeSpan.FromMinutes(settings.IdleThresholdMinutes);
-        var pollInterval = TimeSpan.FromSeconds(settings.PollIntervalSeconds);
-        PowerProfileMode? lastMode = null;
-        while (true)
+        var session = PowerProfileService.CaptureAutomaticSession();
+        try
         {
-            token.ThrowIfCancellationRequested();
-            var idle = GetIdleTime();
-            var game = FindRunningGame(settings.ProcessNames);
-            var desired = idle >= idleThreshold
-                ? PowerProfileMode.Afk
-                : game.Length > 0 ? PowerProfileMode.Performance : PowerProfileMode.Balanced;
-
-            var target = PowerProfileService.GetTargetGuid(desired);
-            var active = PowerProfileService.GetActiveSchemeGuid();
-            if (!string.Equals(active, target, StringComparison.OrdinalIgnoreCase))
-                PowerProfileService.Apply(desired);
-
-            if (lastMode != desired)
+            var settings = LoadSettings();
+            var idleThreshold = TimeSpan.FromMinutes(settings.IdleThresholdMinutes);
+            var pollInterval = TimeSpan.FromSeconds(settings.PollIntervalSeconds);
+            PowerProfileMode? lastMode = null;
+            while (true)
             {
-                onStatus?.Invoke(new AutoProfileStatus(desired, game.Length > 0, idle, game));
-                lastMode = desired;
+                token.ThrowIfCancellationRequested();
+                var idle = GetIdleTime();
+                var game = FindRunningGame(settings.ProcessNames);
+                var desired = idle >= idleThreshold
+                    ? PowerProfileMode.Afk
+                    : game.Length > 0 ? PowerProfileMode.Performance : PowerProfileMode.Balanced;
+
+                var target = PowerProfileService.GetTargetGuid(desired);
+                var active = PowerProfileService.GetActiveSchemeGuid();
+                if (!string.Equals(active, target, StringComparison.OrdinalIgnoreCase))
+                    PowerProfileService.ApplyForAutomaticSession(desired);
+                else if (lastMode != desired)
+                    PowerProfileService.ApplyForAutomaticSession(desired);
+
+                if (lastMode != desired)
+                {
+                    onStatus?.Invoke(new AutoProfileStatus(desired, game.Length > 0, idle, game));
+                    lastMode = desired;
+                }
+                await Task.Delay(pollInterval, token);
             }
-            await Task.Delay(pollInterval, token);
+        }
+        finally
+        {
+            try
+            {
+                var message = PowerProfileService.RestoreAutomaticSession();
+                AppLog.Write("Sessão automática finalizada: " + message);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao restaurar plano original após sessão automática. O backup foi preservado para recuperação na próxima abertura: " + ex);
+                throw;
+            }
         }
     }
 
@@ -74,17 +93,17 @@ public static class AutoProfileService
     {
         foreach (var name in processNames)
         {
+            Process[] processes = Array.Empty<Process>();
             try
             {
-                var processes = Process.GetProcessesByName(name);
-                if (processes.Length > 0)
-                {
-                    foreach (var process in processes) process.Dispose();
-                    return name;
-                }
-                foreach (var process in processes) process.Dispose();
+                processes = Process.GetProcessesByName(name);
+                if (processes.Length > 0) return name;
             }
             catch { }
+            finally
+            {
+                foreach (var process in processes) process.Dispose();
+            }
         }
         return string.Empty;
     }
