@@ -51,7 +51,7 @@ foreach ($token in $tokens) {
         throw "O template não contém o marcador obrigatório $token."
     }
 }
-if ([regex]::Matches($template, [regex]::Escape("__APP_VERSION__")).Count -ne 2 -or
+if ([regex]::Matches($template, [regex]::Escape("__APP_VERSION__")).Count -ne 3 -or
     [regex]::Matches($template, [regex]::Escape("__APP_VERSION_QUAD__")).Count -ne 1) {
     throw "Quantidade inesperada de marcadores de versão no template Inno Setup."
 }
