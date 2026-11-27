@@ -59,7 +59,7 @@ public static class OptimizationCatalogService
     {
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+            using var key = Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
             return int.TryParse(Convert.ToString(key?.GetValue("CurrentBuildNumber")), out var build) ? build : 0;
         }
         catch { return 0; }
