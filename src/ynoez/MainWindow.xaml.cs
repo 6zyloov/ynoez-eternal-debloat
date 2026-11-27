@@ -353,6 +353,288 @@ public partial class MainWindow : Window
         benchmarkCard.Child = benchmarkPanel;
         root.Children.Add(benchmarkCard);
 
+        var sessionCard = MakeCard();
+        var sessionPanel = new StackPanel { Margin = new Thickness(20) };
+        sessionPanel.Children.Add(Heading("Comparação A/B com três rodadas", 15));
+        sessionPanel.Children.Add(Body("Cria uma referência com 3 capturas e depois compara com outras 3 capturas do mesmo jogo e duração. Usa a mediana das rodadas para reduzir ruído. Mantenha o mesmo mapa/cena, resolução, limite de FPS e condições térmicas. O ynoez registra as notas, mas não controla a cena nem garante condições idênticas."));
+        var sceneNotes = new TextBox
+        {
+            Text = "",
+            MinWidth = 300,
+            Height = 34,
+            FontSize = 11,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(0, 8, 0, 8),
+            ToolTip = "Anote mapa, modo, local/cena, resolução, limite de FPS e demais condições mantidas."
+        };
+        var sceneLabel = Body("Notas da cena/configuração (use a mesma descrição nas duas fases):");
+        var sessionStatus = Body("Nenhuma referência A/B salva para este jogo.");
+        var sessionButtons = new WrapPanel();
+        var createBaseline = new Button { Content = "Criar referência (3x)", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 8) };
+        var recordAfter = new Button { Content = "Comparar após ajustes (3x)", Style = (Style)FindResource("QuietButton"), Margin = new Thickness(0, 0, 8, 8) };
+        var cancelSeries = new Button { Content = "Cancelar série", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 8) };
+        async Task RunBenchmarkSeriesAsync(bool baselinePhase)
+        {
+            if (_benchmarkCts is not null) return;
+            if (targetBox.SelectedItem is not CaptureTarget selectedTarget)
+            {
+                MessageBox.Show("Abra um jogo compatível e clique em Atualizar jogos.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            var selectedDuration = durationBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is int selectedSeconds
+                ? selectedSeconds : 60;
+            var sessionService = new BenchmarkSessionService();
+            BenchmarkSessionDocument? reference = null;
+            if (!baselinePhase)
+            {
+                reference = sessionService.FindLatestReference(selectedTarget.ProcessName, selectedDuration);
+                if (reference is null)
+                {
+                    MessageBox.Show("Não há referência pendente de comparação para este jogo e duração. Crie primeiro uma referência com 3 rodadas.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            var message = baselinePhase
+                ? "O ynoez fará 3 capturas consecutivas de " + selectedDuration + " segundos. Mantenha o jogo na mesma cena e não altere configurações durante as rodadas. A permissão ETW/UAC pode aparecer em cada captura. Criar a referência?"
+                : "O ynoez fará 3 capturas consecutivas de " + selectedDuration + " segundos para comparar com a referência salva. Reaplique apenas os ajustes que deseja avaliar e mantenha a mesma cena/configuração. A permissão ETW/UAC pode aparecer em cada captura. Continuar?";
+            if (MessageBox.Show(message, "Benchmark A/B", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            var notes = sceneNotes.Text.Trim();
+            _benchmarkCts = new CancellationTokenSource();
+            var token = _benchmarkCts.Token;
+            createBaseline.IsEnabled = false;
+            recordAfter.IsEnabled = false;
+            startBenchmark.IsEnabled = false;
+            stopBenchmark.IsEnabled = false;
+            cancelSeries.IsEnabled = true;
+            var runs = new List<FrameBenchmarkSummary>(3);
+            try
+            {
+                for (var index = 0; index < 3; index++)
+                {
+                    var currentRun = index + 1;
+                    sessionStatus.Text = (baselinePhase ? "Referência" : "Pós-ajustes") +
+                        " • rodada " + currentRun + "/3: preparando captura de " + selectedTarget.ProcessName + "…";
+                    var result = await PresentMonService.CaptureAsync(selectedTarget, selectedDuration,
+                        messageText => sessionStatus.Text = (baselinePhase ? "Referência" : "Pós-ajustes") +
+                            " • rodada " + currentRun + "/3 • " + messageText, token);
+                    runs.Add(result);
+                    if (index < 2) await Task.Delay(2000, token);
+                }
+
+                if (baselinePhase)
+                {
+                    var saved = sessionService.CreateBaseline(selectedTarget.ProcessName, selectedDuration, notes, runs);
+                    var median = BenchmarkSessionService.Aggregate(runs);
+                    sessionStatus.Text = "Referência salva • 3 rodadas • mediana " +
+                        median.MedianAverageFps.ToString("0.0") + " FPS • 1% low " +
+                        median.MedianOnePercentLowFps.ToString("0.0") + " FPS • variação entre rodadas " +
+                        median.AverageFpsSpreadPercent.ToString("0.0") + "% • ID " + saved.Id;
+                }
+                else
+                {
+                    var comparison = sessionService.RecordAfterRuns(reference!.Id, notes, runs);
+                    sessionStatus.Text =
+                        "RESULTADO A/B — " + comparison.ProcessName + " • " + comparison.DurationSeconds + " s por rodada • 3 + 3 rodadas" +
+                        "\nReferência: " + comparison.Baseline.MedianAverageFps.ToString("0.0") + " FPS médios (mediana), 1% low " +
+                            comparison.Baseline.MedianOnePercentLowFps.ToString("0.0") + ", 0,1% low " + comparison.Baseline.MedianOneTenthPercentLowFps.ToString("0.0") +
+                        "\nPós-ajustes: " + comparison.After.MedianAverageFps.ToString("0.0") + " FPS médios (mediana), 1% low " +
+                            comparison.After.MedianOnePercentLowFps.ToString("0.0") + ", 0,1% low " + comparison.After.MedianOneTenthPercentLowFps.ToString("0.0") +
+                        "\nVariação: FPS médio " + comparison.Changes.AverageFpsChangePercent.ToString("+0.0;-0.0;0.0") +
+                            "% • 1% low " + comparison.Changes.OnePercentLowChangePercent.ToString("+0.0;-0.0;0.0") +
+                            "% • 0,1% low " + comparison.Changes.OneTenthPercentLowChangePercent.ToString("+0.0;-0.0;0.0") +
+                            "% • frametime " + comparison.Changes.AverageFrameTimeChangePercent.ToString("+0.0;-0.0;0.0") + "%" +
+                        "\nDispersão do FPS entre rodadas: base " + comparison.Baseline.AverageFpsSpreadPercent.ToString("0.0") +
+                            "% • pós " + comparison.After.AverageFpsSpreadPercent.ToString("0.0") + "%" +
+                        "\nCena base: " + (string.IsNullOrWhiteSpace(comparison.SceneNotes) ? "sem notas" : comparison.SceneNotes) +
+                        "\nCena pós: " + (string.IsNullOrWhiteSpace(comparison.AfterSceneNotes) ? "sem notas" : comparison.AfterSceneNotes) +
+                        "\nOs números são medianas das capturas, não uma prova isolada de causalidade. Compare se mapa, resolução, temperatura, jogadores e processos estavam equivalentes.";
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                sessionStatus.Text = "Série de benchmark cancelada. Capturas já concluídas foram preservadas como CSVs individuais; a série incompleta não foi salva como referência.";
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                sessionStatus.Text = "A permissão ETW/UAC foi cancelada. A série não foi salva.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Benchmark A/B falhou: " + ex);
+                sessionStatus.Text = "Falha na série de benchmark: " + ex.Message;
+            }
+            finally
+            {
+                _benchmarkCts?.Dispose();
+                _benchmarkCts = null;
+                createBaseline.IsEnabled = true;
+                recordAfter.IsEnabled = true;
+                startBenchmark.IsEnabled = true;
+                stopBenchmark.IsEnabled = false;
+                cancelSeries.IsEnabled = false;
+            }
+        }
+        createBaseline.Click += async (_, _) => await RunBenchmarkSeriesAsync(true);
+        recordAfter.Click += async (_, _) => await RunBenchmarkSeriesAsync(false);
+        cancelSeries.Click += (_, _) => _benchmarkCts?.Cancel();
+        sessionButtons.Children.Add(createBaseline);
+        sessionButtons.Children.Add(recordAfter);
+        sessionButtons.Children.Add(cancelSeries);
+        sessionPanel.Children.Add(sceneLabel);
+        sessionPanel.Children.Add(sceneNotes);
+        sessionPanel.Children.Add(sessionStatus);
+        sessionPanel.Children.Add(sessionButtons);
+        sessionPanel.Children.Add(NoteCard("Como interpretar a comparação", "Uma diferença pequena pode ser apenas variação normal. A dispersão das três rodadas ajuda a identificar medições instáveis; não transforme uma diferença de poucos pontos percentuais em promessa de FPS. O perfil/driver, mapa, limite de FPS e temperatura precisam ser comparáveis."));
+        sessionCard.Child = sessionPanel;
+        root.Children.Add(sessionCard);
+
+        var sessionCard = MakeCard();
+        var sessionPanel = new StackPanel { Margin = new Thickness(20) };
+        sessionPanel.Children.Add(Heading("Comparação A/B com três rodadas", 15));
+        sessionPanel.Children.Add(Body("Cria uma referência com 3 capturas e depois compara com outras 3 capturas do mesmo jogo e duração. Usa a mediana das rodadas para reduzir ruído. Mantenha o mesmo mapa/cena, resolução, limite de FPS e condições térmicas. O ynoez registra as notas, mas não controla a cena nem garante condições idênticas."));
+        var sceneNotes = new TextBox
+        {
+            Text = "",
+            MinWidth = 300,
+            Height = 34,
+            FontSize = 11,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(0, 8, 0, 8),
+            ToolTip = "Anote mapa, modo, local/cena, resolução, limite de FPS e demais condições mantidas."
+        };
+        var sceneLabel = Body("Notas da cena/configuração (use a mesma descrição nas duas fases):");
+        var sessionStatus = Body("Nenhuma referência A/B salva para este jogo.");
+        var sessionButtons = new WrapPanel();
+        var createBaseline = new Button { Content = "Criar referência (3x)", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 8) };
+        var recordAfter = new Button { Content = "Comparar após ajustes (3x)", Style = (Style)FindResource("QuietButton"), Margin = new Thickness(0, 0, 8, 8) };
+        var cancelSeries = new Button { Content = "Cancelar série", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 8) };
+        async Task RunBenchmarkSeriesAsync(bool baselinePhase)
+        {
+            if (_benchmarkCts is not null) return;
+            if (targetBox.SelectedItem is not CaptureTarget selectedTarget)
+            {
+                MessageBox.Show("Abra um jogo compatível e clique em Atualizar jogos.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            var selectedDuration = durationBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is int selectedSeconds
+                ? selectedSeconds : 60;
+            var sessionService = new BenchmarkSessionService();
+            BenchmarkSessionDocument? reference = null;
+            if (!baselinePhase)
+            {
+                reference = sessionService.FindLatestReference(selectedTarget.ProcessName, selectedDuration);
+                if (reference is null)
+                {
+                    MessageBox.Show("Não há referência pendente de comparação para este jogo e duração. Crie primeiro uma referência com 3 rodadas.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            var message = baselinePhase
+                ? "O ynoez fará 3 capturas consecutivas de " + selectedDuration + " segundos. Mantenha o jogo na mesma cena e não altere configurações durante as rodadas. A permissão ETW/UAC pode aparecer em cada captura. Criar a referência?"
+                : "O ynoez fará 3 capturas consecutivas de " + selectedDuration + " segundos para comparar com a referência salva. Reaplique apenas os ajustes que deseja avaliar e mantenha a mesma cena/configuração. A permissão ETW/UAC pode aparecer em cada captura. Continuar?";
+            if (MessageBox.Show(message, "Benchmark A/B", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            var notes = sceneNotes.Text.Trim();
+            _benchmarkCts = new CancellationTokenSource();
+            var token = _benchmarkCts.Token;
+            createBaseline.IsEnabled = false;
+            recordAfter.IsEnabled = false;
+            startBenchmark.IsEnabled = false;
+            stopBenchmark.IsEnabled = false;
+            cancelSeries.IsEnabled = true;
+            var runs = new List<FrameBenchmarkSummary>(3);
+            try
+            {
+                for (var index = 0; index < 3; index++)
+                {
+                    var currentRun = index + 1;
+                    sessionStatus.Text = (baselinePhase ? "Referência" : "Pós-ajustes") +
+                        " • rodada " + currentRun + "/3: preparando captura de " + selectedTarget.ProcessName + "…";
+                    var result = await PresentMonService.CaptureAsync(selectedTarget, selectedDuration,
+                        messageText => sessionStatus.Text = (baselinePhase ? "Referência" : "Pós-ajustes") +
+                            " • rodada " + currentRun + "/3 • " + messageText, token);
+                    runs.Add(result);
+                    if (index < 2) await Task.Delay(2000, token);
+                }
+
+                if (baselinePhase)
+                {
+                    var saved = sessionService.CreateBaseline(selectedTarget.ProcessName, selectedDuration, notes, runs);
+                    var median = BenchmarkSessionService.Aggregate(runs);
+                    sessionStatus.Text = "Referência salva • 3 rodadas • mediana " +
+                        median.MedianAverageFps.ToString("0.0") + " FPS • 1% low " +
+                        median.MedianOnePercentLowFps.ToString("0.0") + " FPS • variação entre rodadas " +
+                        median.AverageFpsSpreadPercent.ToString("0.0") + "% • ID " + saved.Id;
+                }
+                else
+                {
+                    var comparison = sessionService.RecordAfterRuns(reference!.Id, notes, runs);
+                    sessionStatus.Text =
+                        "RESULTADO A/B — " + comparison.ProcessName + " • " + comparison.DurationSeconds + " s por rodada • 3 + 3 rodadas" +
+                        "\nReferência: " + comparison.Baseline.MedianAverageFps.ToString("0.0") + " FPS médios (mediana), 1% low " +
+                            comparison.Baseline.MedianOnePercentLowFps.ToString("0.0") + ", 0,1% low " + comparison.Baseline.MedianOneTenthPercentLowFps.ToString("0.0") +
+                        "\nPós-ajustes: " + comparison.After.MedianAverageFps.ToString("0.0") + " FPS médios (mediana), 1% low " +
+                            comparison.After.MedianOnePercentLowFps.ToString("0.0") + ", 0,1% low " + comparison.After.MedianOneTenthPercentLowFps.ToString("0.0") +
+                        "\nVariação: FPS médio " + comparison.Changes.AverageFpsChangePercent.ToString("+0.0;-0.0;0.0") +
+                            "% • 1% low " + comparison.Changes.OnePercentLowChangePercent.ToString("+0.0;-0.0;0.0") +
+                            "% • 0,1% low " + comparison.Changes.OneTenthPercentLowChangePercent.ToString("+0.0;-0.0;0.0") +
+                            "% • frametime " + comparison.Changes.AverageFrameTimeChangePercent.ToString("+0.0;-0.0;0.0") + "%" +
+                        "\nDispersão do FPS entre rodadas: base " + comparison.Baseline.AverageFpsSpreadPercent.ToString("0.0") +
+                            "% • pós " + comparison.After.AverageFpsSpreadPercent.ToString("0.0") + "%" +
+                        "\nCena base: " + (string.IsNullOrWhiteSpace(comparison.SceneNotes) ? "sem notas" : comparison.SceneNotes) +
+                        "\nCena pós: " + (string.IsNullOrWhiteSpace(comparison.AfterSceneNotes) ? "sem notas" : comparison.AfterSceneNotes) +
+                        "\nOs números são medianas das capturas, não uma prova isolada de causalidade. Compare se mapa, resolução, temperatura, jogadores e processos estavam equivalentes.";
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                sessionStatus.Text = "Série de benchmark cancelada. Capturas já concluídas foram preservadas como CSVs individuais; a série incompleta não foi salva como referência.";
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                sessionStatus.Text = "A permissão ETW/UAC foi cancelada. A série não foi salva.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Benchmark A/B falhou: " + ex);
+                sessionStatus.Text = "Falha na série de benchmark: " + ex.Message;
+            }
+            finally
+            {
+                _benchmarkCts?.Dispose();
+                _benchmarkCts = null;
+                createBaseline.IsEnabled = true;
+                recordAfter.IsEnabled = true;
+                startBenchmark.IsEnabled = true;
+                stopBenchmark.IsEnabled = false;
+                cancelSeries.IsEnabled = false;
+            }
+        }
+        createBaseline.Click += async (_, _) => await RunBenchmarkSeriesAsync(true);
+        recordAfter.Click += async (_, _) => await RunBenchmarkSeriesAsync(false);
+        cancelSeries.Click += (_, _) => _benchmarkCts?.Cancel();
+        sessionButtons.Children.Add(createBaseline);
+        sessionButtons.Children.Add(recordAfter);
+        sessionButtons.Children.Add(cancelSeries);
+        sessionPanel.Children.Add(sceneLabel);
+        sessionPanel.Children.Add(sceneNotes);
+        sessionPanel.Children.Add(sessionStatus);
+        sessionPanel.Children.Add(sessionButtons);
+        sessionPanel.Children.Add(NoteCard("Como interpretar a comparação", "Uma diferença pequena pode ser apenas variação normal. A dispersão das três rodadas ajuda a identificar medições instáveis; não transforme uma diferença de poucos pontos percentuais em promessa de FPS. O perfil/driver, mapa, limite de FPS e temperatura precisam ser comparáveis."));
+        sessionCard.Child = sessionPanel;
+        root.Children.Add(sessionCard);
+
         root.Children.Add(NoteCard("Precisão e compatibilidade", "O ynoez não instala driver de sensor nem altera tensão, clock, curva de ventoinha ou BIOS. Alguns sensores exigem permissões ou suporte específico do fabricante e podem aparecer como indisponíveis."));
         return root;
     }

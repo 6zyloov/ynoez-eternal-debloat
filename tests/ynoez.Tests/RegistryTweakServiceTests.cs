@@ -760,6 +760,78 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void BenchmarkSessions_UsesMediansAndComparesThreeRunsPerPhase()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "ynoez-benchmark-session-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var service = new BenchmarkSessionService(directory);
+            var baseline = new[]
+            {
+                MakeBenchmark("Game", 90, 45, 20, 11, 1),
+                MakeBenchmark("Game", 100, 50, 25, 10, 2),
+                MakeBenchmark("Game", 110, 55, 30, 9, 3)
+            };
+            var session = service.CreateBaseline("Game", 60, "Mapa treino", baseline);
+            Assert.NotNull(service.FindLatestReference("Game", 60));
+            Assert.Null(service.FindLatestReference("OtherGame", 60));
+            Assert.Null(service.FindLatestReference("Game", 30));
+
+            var after = new[]
+            {
+                MakeBenchmark("Game", 108, 54, 27, 9.2, 4),
+                MakeBenchmark("Game", 120, 60, 30, 8.5, 5),
+                MakeBenchmark("Game", 132, 66, 33, 8.0, 6)
+            };
+            var comparison = service.RecordAfterRuns(session.Id, "Mesmo mapa treino", after);
+
+            Assert.Equal(100, comparison.Baseline.MedianAverageFps, 3);
+            Assert.Equal(120, comparison.After.MedianAverageFps, 3);
+            Assert.Equal(20, comparison.Changes.AverageFpsChangePercent, 3);
+            Assert.Equal(20, comparison.Changes.OnePercentLowChangePercent, 3);
+            Assert.Equal(20, comparison.Changes.OneTenthPercentLowChangePercent, 3);
+            Assert.False(File.Exists(Path.Combine(directory, session.Id + ".tmp")));
+            Assert.Null(service.FindLatestReference("Game", 60));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BenchmarkSessions_RejectIncompleteOrMismatchedSeries()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "ynoez-benchmark-invalid-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var service = new BenchmarkSessionService(directory);
+            Assert.Throws<ArgumentException>(() =>
+                service.CreateBaseline("Game", 60, "", new[] { MakeBenchmark("Game", 90, 45, 20, 10, 1) }));
+            Assert.Throws<InvalidDataException>(() =>
+                service.CreateBaseline("Game", 60, "", new[]
+                {
+                    MakeBenchmark("Game", 90, 45, 20, 10, 1),
+                    MakeBenchmark("OtherGame", 100, 50, 25, 9, 2),
+                    MakeBenchmark("Game", 110, 55, 30, 8, 3)
+                }));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static FrameBenchmarkSummary MakeBenchmark(
+        string processName, double averageFps, double onePercent, double oneTenth, double frameTime, int minute)
+    {
+        var capturedAt = DateTimeOffset.UtcNow.AddMinutes(minute);
+        return new FrameBenchmarkSummary(processName, 123, "capture-" + minute + ".csv", 10000,
+            averageFps, onePercent, oneTenth, frameTime,
+            frameTime * 2, frameTime * 3, 1, 0, capturedAt);
+    }
+
+    [Fact]
     public void PresentMonCsvParser_ComputesAverageAndOnePercentLow()
     {
         var path = Path.Combine(Path.GetTempPath(), "ynoez-presentmon-" + Guid.NewGuid().ToString("N") + ".csv");
