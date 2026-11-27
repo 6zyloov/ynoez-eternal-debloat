@@ -1,6 +1,7 @@
 # Desenvolvimento — ynoez 0.3.0
 
 - Base de build atualizada para .NET 10 LTS (`net10.0-windows`), usando `System.Management 10.0.15`.
+- Pipeline do instalador agora lê a versão exclusivamente de `<Version>` no `ynoez.csproj`, propaga a versão para AppVersion, nome do instalador e metadados PE e verifica o FileVersion/ProductName gerado antes de publicar.
 
 ## Implementado nesta linha
 - Continuidade de operação pela bandeja do sistema: fechar a janela pelo usuário (sem desligar/sair do Windows) enquanto monitoramento de rede, perfil automático, telemetria, benchmark ou reparo Windows está ativo oculta a interface sem encerrar a operação. Duplo clique reabre; menu contextual oferece encerramento explícito.
