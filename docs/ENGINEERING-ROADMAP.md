@@ -31,6 +31,7 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [x] Startup Run keys HKCU reversíveis e serviços opcionais por whitelist; Startup folders e tarefas de logon ainda pendentes.
 - [ ] Catálogo de apps opcionais com re-instalação documentada e proteção por dependências.
 - [ ] Pesquisa unificada de configurações, serviços, tarefas, recursos e painéis do Windows.
+- [x] Inventário ao vivo de serviços Windows somente leitura, com busca, classificação de serviços protegidos e whitelist opcional, detalhe e exportação CSV. A pesquisa unificada de tarefas, recursos opcionais e painéis ainda está pendente.
 - [ ] Debloat de Windows 10/11 separado por build, edição, idioma e perfil do usuário.
 - [ ] Perfis Lite / Balanceado / Avançado; modo agressivo sempre desmarcado e com riscos explícitos.
 - [ ] Manter Store, Print, Calculator, Clipboard, Notepad, Windows Search, NVIDIA Instant Replay, Defender, Update e componentes anti-cheat protegidos.
