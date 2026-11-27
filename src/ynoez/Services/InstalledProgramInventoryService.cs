@@ -12,6 +12,14 @@ public sealed record InstalledProgramInfo(
 public static class InstalledProgramInventoryService
 {
     private const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+    private static readonly string[] ProtectedNameFragments =
+    {
+        "microsoft visual c++", "visual c++ redistributable", ".net runtime",
+        ".net desktop runtime", "windows desktop runtime", "webview2 runtime",
+        "nvidia", "amd chipset", "advanced micro devices", "realtek", "intel chipset",
+        "riot vanguard", "faceit anti-cheat", "easy anti-cheat", "battleye",
+        "windows driver package", "microsoft .net"
+    };
     public static IReadOnlyList<InstalledProgramInfo> GetInstalledPrograms(CancellationToken token)
     {
         var result = new List<InstalledProgramInfo>();
