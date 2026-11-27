@@ -1151,51 +1151,151 @@ public partial class MainWindow : Window
     private UIElement BuildRestore()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Restore", "Abra a restauração do sistema ou recupere o plano de energia salvo anteriormente."));
+        root.Children.Add(PageIntro("Restore", "Central de recuperação do ynoez. Cada backup permanece separado e só é consumido depois da verificação da restauração."));
+
         root.Children.Add(ActionCard("Restauração do Sistema", "Abre o utilitário nativo do Windows para escolher um ponto de restauração disponível.", "Abrir Restauração", () => OpenTargetAsync("rstrui.exe"), "WINDOWS"));
-        root.Children.Add(ActionCard("Restaurar plano de energia original", "Recupera o plano exportado antes do primeiro perfil manual do ynoez, com verificação e reimportação do arquivo .pow se necessário.", "Restaurar original", () =>
+        root.Children.Add(ActionCard("Restaurar plano de energia", "Reaplica o plano salvo antes da última alteração manual de energia feita pelo ynoez.", "Restaurar plano", () =>
         {
-            if (_autoProfileCts is not null)
-            {
-                MessageBox.Show("Pare os perfis automáticos antes de restaurar o plano original.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                return Task.CompletedTask;
-            }
-            var message = PowerProfileService.RestoreOriginal();
+            var message = BackupService.RestorePreviousPowerScheme();
             MessageBox.Show(message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "REVERSÍVEL"));
 
+        root.Children.Add(Heading("Backups de Registro", 15));
+        try
+        {
+            var tweaks = OptimizationCatalogService.LoadRegistryTweaks();
+            var registry = new RegistryTweakService();
+            var pending = tweaks.Where(x => registry.CanRestore(x.Id)).ToArray();
+            if (pending.Length == 0)
+                root.Children.Add(NoteCard("Registro", "Nenhum ajuste de Registro está aguardando restauração."));
+            foreach (var tweak in pending)
+            {
+                root.Children.Add(ActionCard(tweak.Name,
+                    tweak.Description + "\nCategoria: " + tweak.Category + " | Risco: " + tweak.Risk +
+                    "\nO backup original foi criado antes da primeira alteração.",
+                    "Restaurar valor original", () =>
+                    {
+                        if (MessageBox.Show("Restaurar o Registro para o estado anterior de \"" + tweak.Name + "\"?",
+                            "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                            return Task.CompletedTask;
+                        registry.Restore(tweak);
+                        MessageBox.Show("Valor original restaurado e verificado. O backup foi consumido.", "ynoez",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Restore");
+                        return Task.CompletedTask;
+                    }, "BACKUP"));
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Central de restauração do Registro falhou: " + ex);
+            root.Children.Add(NoteCard("Backups de Registro precisam de atenção", ex.Message));
+        }
+
+        root.Children.Add(Heading("Serviços opcionais", 15));
+        try
+        {
+            var manager = new ServiceTweakService();
+            var pending = manager.GetStatuses().Where(x => x.DisabledByYnoez).ToArray();
+            if (pending.Length == 0)
+                root.Children.Add(NoteCard("Serviços", "Nenhum serviço opcional desativado pelo ynoez está aguardando restauração."));
+            foreach (var service in pending)
+            {
+                root.Children.Add(ActionCard(service.Definition.DisplayName,
+                    service.Definition.Description + "\nEstado atual: " + service.State +
+                    "\nInicialização atual: " + service.StartMode,
+                    "Restaurar serviço", async () =>
+                    {
+                        if (MessageBox.Show("Restaurar o serviço \"" + service.Definition.Name + "\" ao estado salvo?",
+                            "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                            return;
+                        await Task.Run(() => manager.Restore(service.Definition));
+                        MessageBox.Show("Serviço restaurado e verificado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Restore");
+                    }, "BACKUP"));
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Central de restauração dos serviços falhou: " + ex);
+            root.Children.Add(NoteCard("Backups de serviços precisam de atenção", ex.Message));
+        }
+
+        root.Children.Add(Heading("Tarefas agendadas opcionais", 15));
+        try
+        {
+            var manager = new ScheduledTaskTweakService();
+            var pending = manager.GetStatuses().Where(x => x.DisabledByYnoez).ToArray();
+            if (pending.Length == 0)
+                root.Children.Add(NoteCard("Tarefas", "Nenhuma tarefa desativada pelo ynoez está aguardando restauração."));
+            foreach (var task in pending)
+            {
+                root.Children.Add(ActionCard(task.Definition.DisplayName,
+                    task.Definition.Description + "\nEstado atual: " + task.State,
+                    "Restaurar tarefa", async () =>
+                    {
+                        if (MessageBox.Show("Reativar a tarefa \"" + task.Definition.TaskName + "\" ao estado salvo?",
+                            "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                            return;
+                        await Task.Run(() => manager.Restore(task.Definition));
+                        MessageBox.Show("Tarefa reativada e verificada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Restore");
+                    }, "BACKUP"));
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Central de restauração de tarefas falhou: " + ex);
+            root.Children.Add(NoteCard("Backups de tarefas precisam de atenção", ex.Message));
+        }
+
+        root.Children.Add(Heading("Inicialização", 15));
+        try
+        {
+            var manager = new StartupManagerService();
+            var pending = manager.GetDisabledEntries();
+            if (pending.Count == 0)
+                root.Children.Add(NoteCard("Inicialização", "Nenhuma entrada está aguardando restauração."));
+            foreach (var entry in pending)
+            {
+                var source = entry.IsFile ? entry.OriginalFilePath ?? entry.Command : entry.Command;
+                root.Children.Add(ActionCard(entry.Name, source,
+                    entry.IsFile ? "Restaurar arquivo" : "Restaurar entrada", () =>
+                    {
+                        if (MessageBox.Show("Restaurar \"" + entry.Name + "\" à inicialização? O destino será validado antes da operação.",
+                            "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                            return Task.CompletedTask;
+                        manager.Restore(entry);
+                        MessageBox.Show("Entrada de inicialização restaurada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Restore");
+                        return Task.CompletedTask;
+                    }, "BACKUP"));
+            }
+        }
+        catch (InvalidDataException ex)
+        {
+            AppLog.Write("Manifesto de inicialização requer recuperação: " + ex);
+            root.Children.Add(NoteCard("Manifesto de inicialização corrompido — backups preservados", ex.Message));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Central de restauração da inicialização falhou: " + ex);
+            root.Children.Add(NoteCard("Inicialização", ex.Message));
+        }
+
         var backups = BackupService.ListBackups();
         var listCard = MakeCard();
         var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(Heading("Backups locais", 15));
+        panel.Children.Add(Heading("Snapshots locais", 15));
         panel.Children.Add(Body("Local: " + AppPaths.Backups));
-        panel.Children.Add(Body("Snapshots são inventários locais de hardware, plano de energia e configuração de rede. Não são uma imagem completa do Windows nem substituem um ponto de restauração ou backup externo."));
+        panel.Children.Add(Body("Snapshots guardam inventário e hashes de integridade. Eles não são uma imagem do Windows e não substituem um backup externo."));
         if (backups.Count == 0) panel.Children.Add(Body("Nenhum snapshot criado ainda."));
         foreach (var path in backups.Take(10))
-        {
-            var snapshotPath = path;
-            panel.Children.Add(ActionCard(
-                Path.GetFileName(snapshotPath) + " — " + Directory.GetCreationTime(snapshotPath).ToString("dd/MM/yyyy HH:mm"),
-                "Verifica a presença, o tamanho e o SHA-256 dos arquivos capturados. A verificação é somente leitura.",
-                "Verificar integridade",
-                async () =>
-                {
-                    var result = await BackupService.VerifyLocalSnapshotAsync(snapshotPath);
-                    MessageBox.Show(result.Details, result.IsValid ? "Snapshot íntegro" : "Verificação do snapshot",
-                        MessageBoxButton.OK, result.IsValid ? MessageBoxImage.Information : MessageBoxImage.Warning);
-                },
-                "SHA-256"));
-        }
-        var openBackupFolder = new Button { Content = "Abrir pasta Backups", Style = (Style)FindResource("QuietButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 10, 0, 0) };
-        openBackupFolder.Click += async (_, _) =>
-        {
-            try { await OpenTargetAsync(AppPaths.Backups); }
-            catch (Exception ex) { MessageBox.Show(ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        };
-        panel.Children.Add(openBackupFolder);
+            panel.Children.Add(Body(Path.GetFileName(path) + "  —  " + Directory.GetCreationTime(path).ToString("dd/MM/yyyy HH:mm")));
         listCard.Child = panel;
         root.Children.Add(listCard);
+        root.Children.Add(ActionCard("Abrir pasta de backups", "Abre a pasta de snapshots e arquivos de recuperação locais do ynoez.", "Abrir pasta", () => OpenTargetAsync(AppPaths.Backups), "LOCAL"));
         return root;
     }
 
