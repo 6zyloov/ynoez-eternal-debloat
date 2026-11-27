@@ -8,8 +8,9 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [x] Inspecionar a fonte 0.1.1 e identificar débitos técnicos.
 - [x] Pesquisar implementações públicas de WinUtil, Win11Debloat, Zenith, Optimizer, optimizerDuck, Winhance, AtlasOS e Sophia Script.
 - [x] Registrar diferenças de licença e não copiar código GPL para o núcleo MIT.
+- [x] Auditar estaticamente o código-fonte público do Stix Free Tweaking Utility (sem licença explícita) e registrar riscos em docs/STIX-SOURCE-AUDIT.md.
 - [ ] Extrair e analisar os recursos internos do instalador Stix; o arquivo recebido é um instalador Inno Setup, não o executável do painel em si.
-- [ ] Comparar telas/fluxos reais do Stix com screenshots fornecidos e validar fontes/assets licenciáveis.
+- [ ] Comparar telas/fluxos reais do Stix com screenshots fornecidos e validar fontes/assets licenciáveis. O código público confirma WinForms/Guna/Cuore, mas não substitui screenshots do instalador enviado.
 
 ## Fase 1 — Arquitetura e qualidade
 - [ ] Migrar code-behind para MVVM com DI e serviços assíncronos.
