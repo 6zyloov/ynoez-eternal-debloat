@@ -608,7 +608,10 @@ public sealed class RegistryTweakServiceTests
 
         Assert.Contains("REDE LOCAL", line);
         Assert.Contains("Há perda recorrente", line);
-        Assert.Equal(28, line.Split(',').Length);
+        var headerColumns = NetworkMonitorService.BuildCsvHeader().Split(',');
+        Assert.Equal(headerColumns.Length, line.Split(',').Length);
+        Assert.Equal("root_cause_category", headerColumns[^2]);
+        Assert.Equal("root_cause_assessment", headerColumns[^1]);
     }
 
     [Fact]
