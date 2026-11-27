@@ -13,6 +13,18 @@ on:
       - 'docs/**'
       - 'installer/**'
       - '.github/workflows/build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'global.json'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'README.md'
+      - 'STATUS.md'
+      - 'docs/**'
+      - 'installer/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 permissions:

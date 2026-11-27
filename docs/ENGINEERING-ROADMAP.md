@@ -46,7 +46,9 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [x] Monitoramento persistente ICMP gateway/1.1.1.1, TCP 443 e timestamps; monitor DNS e IPv6 persistente ainda pendentes.
 - [x] Diagnóstico pontual ICMP/TCP/DNS IPv4/IPv6/tracert e monitor com perda/jitter/CSV; correlação automática de incidentes ainda pendente.
 - [x] Jitter/perda em janela móvel de 60s e tracert sob demanda; percentis e janela configurável ainda pendentes.
-- [x] Consulta inicial de Selective Suspend/Device Sleep com alteração reversível quando suportada; driver, EEE, interrupt moderation e advanced properties ainda pendentes.
+- [x] Consulta de Selective Suspend/Device Sleep com alteração reversível quando suportada.
+- [x] Inventário somente leitura das propriedades avançadas expostas pelos drivers físicos (EEE, Interrupt Moderation, RSS, LSO, Checksum Offload, Flow Control, Speed & Duplex e buffers), com classificação e orientação condicional; nenhuma alteração é aplicada.
+- [ ] Validar cobertura e recomendações em NICs Ethernet e Wi-Fi reais de diferentes fabricantes e revisões de driver.
 - [ ] Perfis de energia Performance/Balanced/AFK sem matar processos e com retorno automático seguro.
 - [ ] Diagnóstico de desconexões de madrugada/AFK sem alegar que o app controla quedas do ISP/roteador.
 
