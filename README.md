@@ -15,7 +15,7 @@ Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual tom
 - **Home:** inventário de CPU, GPU, RAM, Windows, placa-mãe e BIOS; auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers do Windows Search, impressão, Store, Windows Update, Vanguard e FACEIT; verificação manual de atualização estável via GitHub, sem download nem instalação automática.
 - **Monitor:** CPU/RAM em tempo real; GPU 3D via NVIDIA SMI ou contadores do Windows; temperatura/VRAM/potência quando o driver NVIDIA oferece esses dados.
 - **Benchmark:** PresentMon 2.6.0 oficial, baixado somente quando solicitado e validado por SHA-256. Captura de 30–180 segundos, FPS médio, 1% low calculado pelo inverso do P99 de frametime, frametime médio e contagem de frames lentos. CSV salvo em `Logs\`. A captura pode solicitar UAC.
-- **Tweaks:** perfis Performance/Equilibrado/AFK; fallback explícito para Equilibrado quando um plano opcional não existe; bloqueio da suspensão automática no AFK; sessão automática com backup/restauração e recuperação após encerramento inesperado; 11 ajustes HKCU com detecção, consentimento, verificação e reversão.
+- **Tweaks:** perfis Performance/Equilibrado/AFK e AFK protegido. Jogos detectados e processos extras escolhidos pelo usuário não entram no plano de economia agressiva: durante inatividade usam Equilibrado com bloqueio da suspensão automática; jogo com entrada recente usa Performance. A economia agressiva só é aplicada quando não há jogo/processo protegido. A lista de processos protegidos é configurável na interface e persistida em Data/auto-profile-settings.json. Sessão automática com backup/restauração e recuperação após encerramento inesperado; 11 ajustes HKCU com detecção, consentimento, verificação e reversão.
 - **Execução em segundo plano:** fechar a janela com uma operação longa ativa oculta o ynoez na bandeja do sistema em vez de encerrar o monitor de rede, o perfil automático, o benchmark ou a manutenção do Windows; duplo clique no ícone reabre a janela e o menu da bandeja permite encerrar explicitamente.
 - **Network:** inventário somente leitura de interfaces, drivers, endereços, gateways, DNS e MTU; diagnóstico cancelável de gateway, dois destinos públicos, ICMP, TCP/443, DNS IPv4/IPv6 e tracert; monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, Cloudflare e Google, DNS, janela móvel real de 60 segundos, perda/jitter por protocolo e hipótese de causa, com CSV; contadores RX/TX e consulta/ajuste reversível de energia em adaptadores compatíveis.
 - **Debloat:** limpeza seletiva de Temp e caches Brave/Discord, preservando perfis e credenciais; inventários de programas Win32 (HKLM/HKCU 32/64 bits) e AppX/MSIX somente leitura para usuário atual, todos os perfis e pacotes provisionados, com busca e exportação CSV; gerenciador de inicialização HKCU + arquivos da pasta pessoal com backup e reversão (HKLM e pasta Startup compartilhada somente leitura); whitelist de seis serviços opcionais e seis tarefas agendadas opcionais com backup, verificação e restauração.
@@ -37,7 +37,7 @@ O projeto não automatiza flash de BIOS, overclock, tensão, PBO, BCD/HPET/timer
 
 ## Build e testes
 
-O GitHub Actions compila em Windows x64, executa testes de Registro em HKCU isolado, inicialização temporária, resolução de planos de energia, manifesto SHA-256 dos snapshots, estatísticas da janela de rede, parser CSV do PresentMon e whitelists de serviços/tarefas antes de publicar o executável autocontido e instalador.
+O GitHub Actions compila em Windows x64, executa testes de Registro em HKCU isolado, inicialização temporária, decisão e resolução dos perfis de energia, processos protegidos e AFK protegido, manifesto SHA-256 dos snapshots, estatísticas da janela de rede, parser CSV do PresentMon e whitelists de serviços/tarefas antes de publicar o executável autocontido e instalador.
 
 A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, PresentMon com jogos reais, energia de NIC, hardware físico e compatibilidade com Vanguard/FACEIT numa máquina real.
 
@@ -64,7 +64,7 @@ O executável autocontido será gerado em `dist\ynoez.exe`. Para instalar em `C:
 
 ## Próximas etapas
 
-Ainda faltam remoção AppX/provisioned com recuperação confiável, arquitetura MVVM/DI, assinatura Authenticode e validação física de compatibilidade. A remoção AppX continua indisponível enquanto não houver rollback confiável. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
+Ainda falta validar o AFK protegido em jogos/automação reais e testar remoção AppX/provisioned com recuperação confiável, arquitetura MVVM/DI, assinatura Authenticode e validação física de compatibilidade. A remoção AppX continua indisponível enquanto não houver rollback confiável. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
 
 ## Licença
 
