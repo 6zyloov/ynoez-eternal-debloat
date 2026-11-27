@@ -52,7 +52,12 @@ public static class BackupService
             };
             await WriteTextAtomicallyAsync(Path.Combine(folder, "backup.json"),
                 JsonSerializer.Serialize(result, JsonOptions));
-            AppLog.Write($"Snapshot local criado e verificado: {folder} ({files.Count} arquivos com SHA-256).");
+
+            var verification = await VerifyLocalSnapshotAsync(folder);
+            if (!verification.IsValid || verification.VerifiedFiles != files.Count)
+                throw new InvalidDataException("A verificação posterior do snapshot falhou: " + verification.Details);
+
+            AppLog.Write($"Snapshot local criado e verificado: {folder} ({verification.VerifiedFiles} arquivos com SHA-256).");
             return folder;
         }
         catch (Exception ex)
@@ -80,17 +85,25 @@ public static class BackupService
             throw new DirectoryNotFoundException("A pasta do snapshot não existe.");
 
         var result = new List<BackupFileInfo>();
-        foreach (var path in Directory.EnumerateFiles(fullFolder, "*", SearchOption.TopDirectoryOnly)
-                     .Where(path => !string.Equals(Path.GetFileName(path), "backup.json", StringComparison.OrdinalIgnoreCase))
+        foreach (var path in Directory.EnumerateFileSystemEntries(fullFolder, "*", SearchOption.TopDirectoryOnly)
                      .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
         {
+            var name = Path.GetFileName(path);
+            if (string.Equals(name, "backup.json", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var attributes = File.GetAttributes(path);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("O snapshot não pode conter links ou pontos de montagem: " + name);
+            if ((attributes & FileAttributes.Directory) != 0)
+                throw new InvalidDataException("O snapshot deve conter somente arquivos na raiz: " + name);
+
             var info = new FileInfo(path);
             await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
                 bufferSize: 64 * 1024, useAsync: true);
             var hash = await SHA256.HashDataAsync(stream);
             result.Add(new BackupFileInfo(info.Name, info.Length, Convert.ToHexString(hash).ToLowerInvariant()));
         }
-        return result;
+
     }
 
     public static async Task<SnapshotVerificationResult> VerifyLocalSnapshotAsync(
@@ -103,10 +116,14 @@ public static class BackupService
             throw new InvalidDataException("O snapshot precisa estar diretamente dentro da pasta Backups do ynoez.");
         if (!Directory.Exists(fullFolder))
             throw new DirectoryNotFoundException("A pasta do snapshot não existe.");
+        if ((File.GetAttributes(fullFolder) & FileAttributes.ReparsePoint) != 0)
+            return new SnapshotVerificationResult(false, 0, "A pasta do snapshot é um link ou ponto de montagem; a verificação foi bloqueada.");
 
         var manifestPath = Path.Combine(fullFolder, "backup.json");
         if (!File.Exists(manifestPath))
             return new SnapshotVerificationResult(false, 0, "Manifesto backup.json ausente. O snapshot pode estar incompleto ou ser de uma versão antiga.");
+        if ((File.GetAttributes(manifestPath) & FileAttributes.ReparsePoint) != 0)
+            return new SnapshotVerificationResult(false, 0, "O manifesto backup.json não pode ser um link ou ponto de montagem.");
 
         BackupResult manifest;
         try
@@ -119,8 +136,15 @@ public static class BackupService
             return new SnapshotVerificationResult(false, 0, "Manifesto inválido: " + ex.Message);
         }
 
+        string recordedFolder;
+        try { recordedFolder = Path.GetFullPath(manifest.Folder); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return new SnapshotVerificationResult(false, 0, "O caminho registrado no manifesto é inválido: " + ex.Message);
+        }
+
         if (string.IsNullOrWhiteSpace(manifest.Folder) ||
-            !string.Equals(Path.GetFullPath(manifest.Folder), fullFolder, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(recordedFolder, fullFolder, StringComparison.OrdinalIgnoreCase))
             return new SnapshotVerificationResult(false, 0, "O caminho registrado no manifesto não corresponde à pasta selecionada.");
         if (manifest.Files is null || manifest.Files.Count == 0)
             return new SnapshotVerificationResult(false, 0, "Este snapshot não contém hashes de integridade (formato antigo ou manifesto vazio).");
@@ -130,8 +154,8 @@ public static class BackupService
         var verified = 0;
         foreach (var file in manifest.Files)
         {
-            if (string.IsNullOrWhiteSpace(file.Name) ||
-                file.Name is "." or ".." ||
+            if (file is null || string.IsNullOrWhiteSpace(file.Name) ||
+                Path.IsPathRooted(file.Name) || file.Name is "." or ".." || file.Name.Contains(':') ||
                 !string.Equals(Path.GetFileName(file.Name), file.Name, StringComparison.Ordinal) ||
                 string.Equals(file.Name, "backup.json", StringComparison.OrdinalIgnoreCase) ||
                 !names.Add(file.Name))
@@ -139,7 +163,7 @@ public static class BackupService
                 issues.Add("Nome de arquivo inválido ou duplicado no manifesto.");
                 continue;
             }
-            if (file.Length < 0 || file.Sha256.Length != 64 ||
+            if (file.Length < 0 || string.IsNullOrWhiteSpace(file.Sha256) || file.Sha256.Length != 64 ||
                 !file.Sha256.All(Uri.IsHexDigit))
             {
                 issues.Add(file.Name + ": metadados de hash/tamanho inválidos.");
@@ -150,6 +174,12 @@ public static class BackupService
             if (!File.Exists(path))
             {
                 issues.Add(file.Name + ": arquivo ausente.");
+                continue;
+            }
+            var attributes = File.GetAttributes(path);
+            if ((attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+            {
+                issues.Add(file.Name + ": links e diretórios não podem ser validados como arquivos do snapshot.");
                 continue;
             }
 
@@ -171,12 +201,25 @@ public static class BackupService
             verified++;
         }
 
-        var actualNames = Directory.EnumerateFiles(fullFolder, "*", SearchOption.TopDirectoryOnly)
-            .Select(Path.GetFileName)
-            .Where(name => !string.Equals(name, "backup.json", StringComparison.OrdinalIgnoreCase))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var untracked in actualNames.Except(names, StringComparer.OrdinalIgnoreCase))
-            issues.Add(untracked + ": arquivo fora do manifesto.");
+        foreach (var entry in Directory.EnumerateFileSystemEntries(fullFolder, "*", SearchOption.TopDirectoryOnly))
+        {
+            var name = Path.GetFileName(entry);
+            if (string.Equals(name, "backup.json", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var attributes = File.GetAttributes(entry);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                issues.Add(name + ": link ou ponto de montagem fora do snapshot permitido.");
+                continue;
+            }
+            if ((attributes & FileAttributes.Directory) != 0)
+            {
+                issues.Add(name + ": pasta extra fora do manifesto.");
+                continue;
+            }
+            if (!names.Contains(name))
+                issues.Add(name + ": arquivo fora do manifesto.");
+        }
 
         return new SnapshotVerificationResult(
             issues.Count == 0 && verified == manifest.Files.Count,

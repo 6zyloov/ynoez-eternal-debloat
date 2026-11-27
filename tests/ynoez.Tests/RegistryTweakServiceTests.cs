@@ -400,6 +400,51 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public async Task SnapshotVerification_RejectsUnexpectedDirectoriesAndNullEntries()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-snapshot-extra-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(root, "snapshot-test");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            const string content = "verified";
+            var file = Path.Combine(folder, "data.txt");
+            await File.WriteAllTextAsync(file, content);
+            var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
+            var backup = new BackupResult
+            {
+                Folder = folder,
+                CreatedAt = DateTime.UtcNow,
+                Files = new[] { new BackupFileInfo("data.txt", new FileInfo(file).Length, hash) }
+            };
+            await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"),
+                System.Text.Json.JsonSerializer.Serialize(backup));
+            Directory.CreateDirectory(Path.Combine(folder, "unexpected"));
+
+            var result = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.False(result.IsValid);
+            Assert.Contains("pasta extra", result.Details, StringComparison.OrdinalIgnoreCase);
+
+            backup = new BackupResult
+            {
+                Folder = folder,
+                CreatedAt = DateTime.UtcNow,
+                Files = new BackupFileInfo[] { null! }
+            };
+            await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"),
+                System.Text.Json.JsonSerializer.Serialize(backup));
+            var nullEntry = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.False(nullEntry.IsValid);
+            Assert.Contains("Nome de arquivo", nullEntry.Details, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task SnapshotVerification_RejectsFoldersOutsideBackupRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "ynoez-backup-root-" + Guid.NewGuid().ToString("N"));

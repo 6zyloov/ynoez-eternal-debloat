@@ -1387,10 +1387,21 @@ public partial class MainWindow : Window
         panel.Children.Add(Body("Local: " + AppPaths.Backups));
         panel.Children.Add(Body("Snapshots guardam inventário e hashes de integridade. Eles não são uma imagem do Windows e não substituem um backup externo."));
         if (backups.Count == 0) panel.Children.Add(Body("Nenhum snapshot criado ainda."));
-        foreach (var path in backups.Take(10))
-            panel.Children.Add(Body(Path.GetFileName(path) + "  —  " + Directory.GetCreationTime(path).ToString("dd/MM/yyyy HH:mm")));
+        else panel.Children.Add(Body("Selecione um snapshot para calcular novamente os hashes e verificar se os arquivos continuam íntegros."));
         listCard.Child = panel;
         root.Children.Add(listCard);
+        foreach (var path in backups.Take(10))
+        {
+            var created = Directory.GetCreationTime(path).ToString("dd/MM/yyyy HH:mm");
+            root.Children.Add(ActionCard(Path.GetFileName(path), "Criado em " + created +
+                ". O teste compara tamanho, SHA-256 e a presença de arquivos/pastas fora do manifesto. Não restaura o Windows.",
+                "Verificar integridade", async () =>
+                {
+                    var result = await BackupService.VerifyLocalSnapshotAsync(path);
+                    MessageBox.Show(result.Details, result.IsValid ? "Snapshot íntegro" : "Snapshot não validado",
+                        MessageBoxButton.OK, result.IsValid ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                }, "SHA-256"));
+        }
         root.Children.Add(ActionCard("Abrir pasta de backups", "Abre a pasta de snapshots e arquivos de recuperação locais do ynoez.", "Abrir pasta", () => OpenTargetAsync(AppPaths.Backups), "LOCAL"));
         return root;
     }
