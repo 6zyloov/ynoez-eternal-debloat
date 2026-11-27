@@ -760,6 +760,31 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void WindowsIntegrityAudit_ParsesSecurityAndAntiCheatStatus()
+    {
+        const string json = "{\"CapturedAt\":\"2026-11-27T12:00:00Z\",\"DefenderRealtime\":true,\"DefenderTamperProtection\":true,\"FirewallEnabled\":true,\"TpmPresent\":true,\"TpmReady\":true,\"SecureBootEnabled\":true,\"VbsStatus\":2,\"HvciConfigured\":true,\"HvciRunning\":true,\"Services\":[{\"Name\":\"vgc\",\"Installed\":true,\"State\":\"Running\",\"StartMode\":\"Auto\",\"KernelDriver\":false},{\"Name\":\"vgk\",\"Installed\":true,\"State\":\"Running\",\"StartMode\":\"Boot\",\"KernelDriver\":true},{\"Name\":\"WSearch\",\"Installed\":true,\"State\":\"Running\",\"StartMode\":\"Auto\",\"KernelDriver\":false}]}";
+        var snapshot = WindowsIntegrityAuditService.ParseJson(json);
+        var rows = WindowsIntegrityAuditService.BuildRows(snapshot);
+
+        Assert.True(snapshot.DefenderRealtime);
+        Assert.True(snapshot.SecureBootEnabled);
+        Assert.True(snapshot.HvciRunning);
+        Assert.Contains(rows, x => x.Area == "Riot Vanguard — serviço" && x.Status == "Em execução");
+        Assert.Contains(rows, x => x.Area == "Riot Vanguard — driver" && x.Status == "Em execução");
+        Assert.Contains(rows, x => x.Area == "Windows Search" && x.Status == "Em execução");
+        Assert.Contains(rows, x => x.Area == "FACEIT Anti-Cheat" && x.Status == "Não instalado");
+    }
+
+    [Fact]
+    public void WindowsIntegrityAudit_RejectsDuplicateServicesAndUnknownVbsStates()
+    {
+        const string duplicate = "{\"CapturedAt\":\"2026-11-27T12:00:00Z\",\"VbsStatus\":0,\"Services\":[{\"Name\":\"vgc\",\"Installed\":true,\"State\":\"Running\",\"StartMode\":\"Auto\",\"KernelDriver\":false},{\"Name\":\"vgc\",\"Installed\":false,\"State\":\"Absent\",\"StartMode\":\"Unknown\",\"KernelDriver\":false}]}";
+        Assert.Throws<InvalidDataException>(() => WindowsIntegrityAuditService.ParseJson(duplicate));
+        Assert.Throws<InvalidDataException>(() => WindowsIntegrityAuditService.ParseJson(
+            "{\"CapturedAt\":\"2026-11-27T12:00:00Z\",\"VbsStatus\":9,\"Services\":[]}"));
+    }
+
+    [Fact]
     public void UpdateService_ParsesStableReleaseAndComparesVersions()
     {
         const string json = "{\"tag_name\":\"v0.4.0\",\"html_url\":\"https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0\",\"published_at\":\"2026-11-27T12:00:00Z\",\"draft\":false,\"prerelease\":false,\"body\":\"Melhorias e correções.\"}";

@@ -13,6 +13,7 @@ Cobertura automatizada inclui:
 - Benchmark: parser do CSV PresentMon, FPS médio, 1%/0,1% lows e comparação de métricas.
 - Inventários: classificação de componentes AppX e programas Win32, exportação CSV e neutralização de fórmulas em campos exportados.
 - Atualizações: comparar versões estáveis, rejeitar hosts/tags inconsistentes e não confiar em URLs de release fornecidas fora do repositório oficial.
+- Integridade: parser da auditoria Windows de Defender, Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers de proteção/anti-cheat.
 
 Cada teste de sistema cria dados isolados e limpa-os em `finally`. Nenhum teste deve alterar configurações reais de serviços, tarefas, adaptadores ou planos de energia da máquina do runner.
 

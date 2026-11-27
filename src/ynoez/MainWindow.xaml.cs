@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _autoProfileCts;
     private CancellationTokenSource? _metricsCts;
     private CancellationTokenSource? _benchmarkCts;
+    private CancellationTokenSource? _integrityAuditCts;
 
     private sealed record ToolboxEntry(string Name, string Description, string[] Keywords, string Target, string Kind = "Configuração", string? ServiceName = null);
 
@@ -67,7 +68,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _systemAppxInventoryCts?.Cancel(); _programInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
+        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _systemAppxInventoryCts?.Cancel(); _programInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); _integrityAuditCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -226,6 +227,72 @@ public partial class MainWindow : Window
         updatePanel.Children.Add(updateButtonRow);
         updateCard.Child = updatePanel;
         root.Children.Add(updateCard);
+
+        var integrityCard = MakeCard();
+        var integrityPanel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
+        integrityPanel.Children.Add(Heading("Integridade do Windows e anti-cheats", 15));
+        integrityPanel.Children.Add(Body("Auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update, Vanguard e FACEIT. Não altera configurações e não garante compatibilidade por si só; apenas registra o estado reportado pelo Windows."));
+        var integrityStatus = Body("Auditoria ainda não executada.");
+        var integrityGrid = new DataGrid
+        {
+            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
+            CanUserDeleteRows = false, CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"), AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft, Height = 280, Margin = new Thickness(0, 10, 0, 10)
+        };
+        integrityGrid.Columns.Add(new DataGridTextColumn { Header = "Área", Binding = new Binding(nameof(WindowsIntegrityAuditRow.Area)), Width = new DataGridLength(1.1, DataGridLengthUnitType.Star) });
+        integrityGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsIntegrityAuditRow.Status)), Width = new DataGridLength(125) });
+        integrityGrid.Columns.Add(new DataGridTextColumn { Header = "Detalhes", Binding = new Binding(nameof(WindowsIntegrityAuditRow.Details)), Width = new DataGridLength(2.2, DataGridLengthUnitType.Star) });
+        var integrityButtons = new WrapPanel();
+        var runIntegrity = new Button { Content = "Executar auditoria", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelIntegrity = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        runIntegrity.Click += async (_, _) =>
+        {
+            if (_integrityAuditCts is not null) return;
+            _integrityAuditCts = new CancellationTokenSource();
+            var token = _integrityAuditCts.Token;
+            runIntegrity.IsEnabled = false;
+            cancelIntegrity.IsEnabled = true;
+            integrityStatus.Text = "Consultando recursos de segurança e serviços protegidos…";
+            try
+            {
+                var snapshot = await WindowsIntegrityAuditService.CaptureAsync(token);
+                var rows = WindowsIntegrityAuditService.BuildRows(snapshot);
+                integrityGrid.ItemsSource = rows;
+                var issues = rows.Count(x => x.Status is "Desativado" or "Parado" or "Configurado, não ativo");
+                integrityStatus.Text = "Consulta concluída em " + snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") +
+                    " • " + rows.Count + " verificações • " + issues + " estados que merecem revisão." +
+                    "\nEstados 'Indisponível' ou 'Não instalado' não são tratados como prova de falha. Nenhuma alteração foi feita.";
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                integrityStatus.Text = "Auditoria cancelada. Nenhuma configuração foi alterada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Auditoria de integridade do Windows falhou: " + ex);
+                integrityStatus.Text = "Não foi possível concluir a auditoria: " + ex.Message;
+            }
+            finally
+            {
+                _integrityAuditCts?.Dispose();
+                _integrityAuditCts = null;
+                runIntegrity.IsEnabled = true;
+                cancelIntegrity.IsEnabled = false;
+            }
+        };
+        cancelIntegrity.Click += (_, _) => _integrityAuditCts?.Cancel();
+        integrityButtons.Children.Add(runIntegrity);
+        integrityButtons.Children.Add(cancelIntegrity);
+        integrityPanel.Children.Add(integrityStatus);
+        integrityPanel.Children.Add(integrityGrid);
+        integrityPanel.Children.Add(integrityButtons);
+        integrityPanel.Children.Add(NoteCard("Interpretação correta", "TPM, Secure Boot e VBS podem variar conforme firmware e política do Windows. Vanguard/FACEIT podem exigir configurações específicas da versão do jogo/anti-cheat. O ynoez não desativa nem reconfigura essas proteções e não declara compatibilidade sem teste no PC real."));
+        integrityCard.Child = integrityPanel;
+        root.Children.Add(integrityCard);
 
         var actions = new WrapPanel { Margin = new Thickness(0, 15, 0, 0) };
         actions.Children.Add(SmallAction("Abrir Toolbox", () => ShowPage("Toolbox")));
