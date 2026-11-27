@@ -19,7 +19,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Management" Version="9.0.2" />
-    <None Update="Toolbox\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Toolbox\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Optimization\**\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

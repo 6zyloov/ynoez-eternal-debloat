@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _networkMonitorCts;
     private CancellationTokenSource? _autoProfileCts;
     private CancellationTokenSource? _metricsCts;
+    private CancellationTokenSource? _benchmarkCts;
 
     private sealed record ToolboxEntry(string Name, string Description, string[] Keywords, string Target, string Kind = "Configuração", string? ServiceName = null);
 
@@ -61,7 +62,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); };
+        Closed += (_, _) => { _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -242,6 +243,93 @@ public partial class MainWindow : Window
         panel.Children.Add(buttons);
         card.Child = panel;
         root.Children.Add(card);
+
+        var benchmarkCard = MakeCard();
+        var benchmarkPanel = new StackPanel { Margin = new Thickness(20) };
+        benchmarkPanel.Children.Add(Heading("Benchmark de FPS e frametime", 15));
+        benchmarkPanel.Children.Add(Body("Captura frames reais do jogo com PresentMon oficial. Na primeira captura, o executável será baixado do GitHub e validado por SHA-256. A captura pode solicitar UAC para obter permissão ETW; nenhum ajuste do Windows será aplicado."));
+        var targetRow = new WrapPanel { Margin = new Thickness(0, 10, 0, 8) };
+        var targetBox = new ComboBox
+        {
+            MinWidth = 280, Height = 34, Background = CardBrush, Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft, DisplayMemberPath = nameof(CaptureTarget.DisplayName),
+            ItemsSource = PresentMonService.GetRunningTargets()
+        };
+        if (targetBox.Items.Count > 0) targetBox.SelectedIndex = 0;
+        var refreshTargets = new Button { Content = "Atualizar jogos", Style = (Style)FindResource("QuietButton"), Margin = new Thickness(8, 0, 0, 0) };
+        refreshTargets.Click += (_, _) =>
+        {
+            targetBox.ItemsSource = PresentMonService.GetRunningTargets();
+            if (targetBox.Items.Count > 0) targetBox.SelectedIndex = 0;
+        };
+        targetRow.Children.Add(targetBox);
+        targetRow.Children.Add(refreshTargets);
+        var durationBox = new ComboBox
+        {
+            MinWidth = 140, Height = 32, Background = CardBrush, Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft, Margin = new Thickness(0, 0, 0, 8)
+        };
+        foreach (var seconds in new[] { 30, 60, 120, 180 })
+            durationBox.Items.Add(new ComboBoxItem { Content = seconds + " segundos", Tag = seconds });
+        durationBox.SelectedIndex = 1;
+        var benchmarkStatus = Body("Nenhuma captura executada.");
+        var benchmarkButtons = new WrapPanel();
+        var startBenchmark = new Button { Content = "Iniciar benchmark", Style = (Style)FindResource("AccentButton"), MinWidth = 145, Margin = new Thickness(0, 0, 8, 0) };
+        var stopBenchmark = new Button { Content = "Parar captura", Style = (Style)FindResource("QuietButton"), MinWidth = 115, IsEnabled = false };
+        startBenchmark.Click += async (_, _) =>
+        {
+            if (_benchmarkCts is not null) return;
+            if (targetBox.SelectedItem is not CaptureTarget target)
+            {
+                MessageBox.Show("Abra um jogo compatível e clique em Atualizar jogos.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            var seconds = durationBox.SelectedItem is ComboBoxItem item && item.Tag is int value ? value : 60;
+            _benchmarkCts = new CancellationTokenSource();
+            var token = _benchmarkCts.Token;
+            startBenchmark.IsEnabled = false;
+            stopBenchmark.IsEnabled = true;
+            try
+            {
+                var result = await PresentMonService.CaptureAsync(target, seconds,
+                    message => benchmarkStatus.Text = message, token);
+                benchmarkStatus.Text =
+                    "Jogo: " + result.ProcessName + " | Frames: " + result.FrameCount +
+                    "\nFPS médio: " + result.AverageFps.ToString("0.0") +
+                    " | 1% low: " + result.OnePercentLowFps.ToString("0.0") +
+                    "\nFrametime médio: " + result.AverageFrameTimeMs.ToString("0.00") + " ms" +
+                    " | P99: " + result.P99FrameTimeMs.ToString("0.00") + " ms" +
+                    "\nFrames acima de 33,3 ms: " + result.FramesOver33Ms +
+                    " | acima de 50 ms: " + result.FramesOver50Ms +
+                    "\nCSV: " + result.CsvPath;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                benchmarkStatus.Text = "Captura interrompida.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Benchmark PresentMon falhou: " + ex);
+                benchmarkStatus.Text = "Falha no benchmark: " + ex.Message;
+            }
+            finally
+            {
+                _benchmarkCts?.Dispose();
+                _benchmarkCts = null;
+                startBenchmark.IsEnabled = true;
+                stopBenchmark.IsEnabled = false;
+            }
+        };
+        stopBenchmark.Click += (_, _) => _benchmarkCts?.Cancel();
+        benchmarkButtons.Children.Add(startBenchmark);
+        benchmarkButtons.Children.Add(stopBenchmark);
+        benchmarkPanel.Children.Add(targetRow);
+        benchmarkPanel.Children.Add(durationBox);
+        benchmarkPanel.Children.Add(benchmarkStatus);
+        benchmarkPanel.Children.Add(benchmarkButtons);
+        benchmarkCard.Child = benchmarkPanel;
+        root.Children.Add(benchmarkCard);
+
         root.Children.Add(NoteCard("Precisão e compatibilidade", "O ynoez não instala driver de sensor nem altera tensão, clock, curva de ventoinha ou BIOS. Alguns sensores exigem permissões ou suporte específico do fabricante e podem aparecer como indisponíveis."));
         return root;
     }

@@ -13,7 +13,7 @@ public static class AppPaths
     public static void EnsureStructure()
     {
         foreach (var path in new[] { Toolbox, Data, Backups, Logs, Downloads }) Directory.CreateDirectory(path);
-        foreach (var folder in new[] { "Debloat", "Internet", "Windows", "Servicos", "Drivers", "GPU", "CPU", "RAM", "Energia", "Jogos", "Brave", "Discord", "Ferramentas", "Diagnostico", "Restauracao", "Placas-mae" })
+        foreach (var folder in new[] { "Debloat", "Internet", "Windows", "Servicos", "Drivers", "GPU", "CPU", "RAM", "Energia", "Jogos", "Brave", "Discord", "Ferramentas", "Diagnostico", "Restauracao", "Placas-mae", "Performance" })
             Directory.CreateDirectory(Path.Combine(Toolbox, folder));
     }
 }
