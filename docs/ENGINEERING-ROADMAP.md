@@ -36,7 +36,10 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Manter Store, Print, Calculator, Clipboard, Notepad, Windows Search, NVIDIA Instant Replay, Defender, Update e componentes anti-cheat protegidos.
 
 ## Fase 4 — Jogos e latência
-- [x] Detecção inicial por lista configurável de processos e perfis Performance/Equilibrado/AFK; perfis avançados por jogo ainda pendentes.
+- [x] Detecção inicial de jogos e perfis Performance/Equilibrado/AFK.
+- [x] AFK protegido: jogos e processos selecionados pelo usuário usam plano Equilibrado com bloqueio de suspensão quando há inatividade; economia agressiva só é permitida sem carga protegida.
+- [x] Cadastro de processos protegidos na interface, persistido em Data, com validação de nomes e sem encerrar processos.
+- [ ] Validar em sessões prolongadas de Roblox e automações reais, incluindo mudança do processo ativo e retomada após cancelamento.
 - [ ] Sessão de jogo com snapshot de processos/serviços alterados, allowlist e restauração ao fechar.
 - [ ] Não encerrar scripts, downloads, Roblox, automações XT, overlays necessários, Discord/voice ou processos marcados como essenciais.
 - [x] Captura PresentMon com FPS médio, 1% low (P99 inverso), frametime e duração; comparação automática e 0,1% low ainda pendentes.

@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace ynoez.Services;
 
-public enum PowerProfileMode { Performance, Balanced, Afk }
+public enum PowerProfileMode { Performance, Balanced, Afk, ProtectedAfk }
 
 public sealed record PowerProfileState(string Mode, string AppliedGuid, DateTimeOffset AppliedAt);
 public sealed record PowerProfileBackup(string OriginalGuid, DateTimeOffset SavedAt, string? ExportPath = null);
@@ -128,7 +128,9 @@ public static class PowerProfileService
         }
 
         AppLog.Write("Perfil solicitado: " + mode + "; plano aplicado: " + resolution.AppliedMode + " (" + active + ")" +
-            (mode == PowerProfileMode.Afk ? "; suspensão automática bloqueada enquanto o ynoez estiver aberto." : ""));
+            (mode is PowerProfileMode.Afk or PowerProfileMode.ProtectedAfk
+                ? "; suspensão automática bloqueada enquanto a sessão automática estiver ativa."
+                : ""));
         return DescribeAppliedProfile(resolution, alreadyActive: false);
     }
 
@@ -142,13 +144,18 @@ public static class PowerProfileService
         }
 
         if (alreadyActive)
+        {
+            if (resolution.RequestedMode == PowerProfileMode.ProtectedAfk)
+                return "AFK protegido ativo: o plano Equilibrado está aplicado e a suspensão automática está bloqueada enquanto a tarefa protegida estiver sendo monitorada.";
             return "O plano " + resolution.AppliedMode + " já estava ativo. A política de suspensão foi atualizada conforme o perfil.";
+        }
 
         return resolution.AppliedMode switch
         {
             PowerProfileMode.Performance => "Perfil Alto desempenho ativado. O plano original está exportado para restauração.",
             PowerProfileMode.Balanced => "Perfil Equilibrado ativado. O plano original está exportado para restauração.",
             PowerProfileMode.Afk => "Perfil AFK ativado. O sistema não entrará em suspensão automática enquanto o ynoez estiver aberto; a tela pode apagar conforme o plano do Windows.",
+            PowerProfileMode.ProtectedAfk => "AFK protegido ativado: usa o plano Equilibrado, mantém jogos/tarefas protegidas em execução e bloqueia a suspensão automática. A tela pode apagar normalmente.",
             _ => "Perfil aplicado."
         };
     }
@@ -393,7 +400,7 @@ public static class PowerProfileService
         var requestedAlias = mode switch
         {
             PowerProfileMode.Performance => "SCHEME_MIN",
-            PowerProfileMode.Balanced => "SCHEME_BALANCED",
+            PowerProfileMode.Balanced or PowerProfileMode.ProtectedAfk => "SCHEME_BALANCED",
             PowerProfileMode.Afk => "SCHEME_MAX",
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
@@ -401,7 +408,7 @@ public static class PowerProfileService
         if (requestedGuid is not null)
             return new PowerProfileResolution(mode, mode, requestedAlias, requestedAlias, requestedGuid);
 
-        if (mode != PowerProfileMode.Balanced)
+        if (mode is not PowerProfileMode.Balanced and not PowerProfileMode.ProtectedAfk)
         {
             var balancedGuid = NormalizeGuid(queryAlias("SCHEME_BALANCED"));
             if (balancedGuid is not null)
@@ -426,7 +433,7 @@ public static class PowerProfileService
 
     private static void SetExecutionRequirement(PowerProfileMode mode)
     {
-        if (mode != PowerProfileMode.Afk)
+        if (mode is not PowerProfileMode.Afk and not PowerProfileMode.ProtectedAfk)
         {
             TryClearExecutionRequirement();
             return;
@@ -436,7 +443,10 @@ public static class PowerProfileService
         {
             if (_systemSleepRequest == IntPtr.Zero)
             {
-                var reason = Marshal.StringToHGlobalUni("ynoez AFK: manter jogos, scripts e downloads ativos");
+                var reasonText = mode == PowerProfileMode.ProtectedAfk
+                    ? "ynoez AFK protegido: manter jogo/tarefa escolhida ativa no plano Equilibrado"
+                    : "ynoez AFK: manter o sistema ativo no plano Economia";
+                var reason = Marshal.StringToHGlobalUni(reasonText);
                 try
                 {
                     var context = new PowerRequestContext
