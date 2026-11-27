@@ -827,6 +827,35 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void BenchmarkSessions_RejectsCorruptPartialAfterSeriesAndPreservesFile()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "ynoez-benchmark-corrupt-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var service = new BenchmarkSessionService(directory);
+            var baseline = new[]
+            {
+                MakeBenchmark("Game", 90, 45, 20, 11, 1),
+                MakeBenchmark("Game", 100, 50, 25, 10, 2),
+                MakeBenchmark("Game", 110, 55, 30, 9, 3)
+            };
+            var session = service.CreateBaseline("Game", 60, "", baseline);
+            var path = Path.Combine(directory, session.Id + ".json");
+            var original = File.ReadAllText(path);
+            var corrupt = original.Replace("\"AfterRuns\": []", "\"AfterRuns\": [{}]", StringComparison.Ordinal);
+            Assert.NotEqual(original, corrupt);
+            File.WriteAllText(path, corrupt);
+
+            Assert.Null(service.FindLatestReference("Game", 60));
+            Assert.Equal(corrupt, File.ReadAllText(path));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void BenchmarkSessions_RejectIncompleteOrMismatchedSeries()
     {
         var directory = Path.Combine(Path.GetTempPath(), "ynoez-benchmark-invalid-" + Guid.NewGuid().ToString("N"));

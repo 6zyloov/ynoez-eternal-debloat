@@ -20,6 +20,8 @@
 - Central Restore consolida recuperação de Registro, plano base/AFK interrompido, serviços opcionais, adaptadores de rede, tarefas, inicialização e snapshots. Backups órfãos ou corrompidos permanecem preservados.
 - Testes Windows de transações de Registro, tipos originais, backups corrompidos, inicialização HKCU e pasta Startup temporária, fallback de energia, manifesto SHA-256 de snapshots, métricas da janela de rede, parser PresentMon e whitelists de serviços/tarefas.
 - CI Windows executa testes antes de publicar o executável autocontido.
+- Verificador manual de atualização consulta somente quando solicitado a release estável do repositório GitHub, valida tag/URL e abre a página oficial; não baixa nem instala silenciosamente.
+- Pipeline separada de release por tag vX.Y.Z, com teste Windows, instalador Inno Setup, pacote portátil e manifesto SHA-256.
 
 ## Base existente mantida
 - Shell WPF com referência visual Stix, Home, Monitor, Backup, Tweaks, Network, Debloat, Motherboard, Toolbox, Restore e Logs.
