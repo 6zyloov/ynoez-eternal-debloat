@@ -1,11 +1,14 @@
 using System.IO;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Input;
 using System.Windows.Data;
+using System.Windows.Interop;
 using Microsoft.Win32;
 using ynoez.Services;
 
@@ -34,6 +37,49 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _benchmarkCts;
     private CancellationTokenSource? _integrityAuditCts;
     private CancellationTokenSource? _windowsRepairCts;
+    private bool _allowClose;
+    private bool _trayIconVisible;
+    private HwndSource? _windowSource;
+
+    private const uint TrayNimAdd = 0x00000000;
+    private const uint TrayNimDelete = 0x00000002;
+    private const uint TrayNifMessage = 0x00000001;
+    private const uint TrayNifIcon = 0x00000002;
+    private const uint TrayNifTip = 0x00000004;
+    private const int TrayCallbackMessage = 0x8000 + 41;
+    private const int WmLeftButtonDoubleClick = 0x0203;
+    private const int WmRightButtonUp = 0x0205;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct NotifyIconData
+    {
+        public uint Size;
+        public IntPtr WindowHandle;
+        public uint Id;
+        public uint Flags;
+        public uint CallbackMessage;
+        public IntPtr Icon;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string ToolTip;
+        public uint State;
+        public uint StateMask;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string Info;
+        public uint TimeoutOrVersion;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string InfoTitle;
+        public uint InfoFlags;
+        public Guid ItemGuid;
+        public IntPtr BalloonIcon;
+    }
+
+    [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShellNotifyIcon(uint message, ref NotifyIconData data);
+
+    [DllImport("user32.dll", EntryPoint = "LoadIconW", CharSet = CharSet.Unicode)]
+    private static extern IntPtr LoadSystemIcon(IntPtr instance, IntPtr iconName);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr windowHandle);
 
     private sealed record ToolboxEntry(string Name, string Description, string[] Keywords, string Target, string Kind = "Configuração", string? ServiceName = null);
 
@@ -69,11 +115,28 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _systemAppxInventoryCts?.Cancel(); _programInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); _integrityAuditCts?.Cancel(); _windowsRepairCts?.Cancel(); };
+        Closed += (_, _) =>
+        {
+            RemoveTrayIcon();
+            _windowSource?.RemoveHook(TrayWindowProc);
+            _appxInventoryCts?.Cancel();
+            _systemAppxInventoryCts?.Cancel();
+            _programInventoryCts?.Cancel();
+            _networkDiagnosticCts?.Cancel();
+            _networkMonitorCts?.Cancel();
+            _autoProfileCts?.Cancel();
+            _metricsCts?.Cancel();
+            _benchmarkCts?.Cancel();
+            _integrityAuditCts?.Cancel();
+            _windowsRepairCts?.Cancel();
+        };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        var handle = new WindowInteropHelper(this).Handle;
+        _windowSource = HwndSource.FromHwnd(handle);
+        _windowSource?.AddHook(TrayWindowProc);
         await RefreshHardwareAsync();
         ShowPage("Home");
     }
@@ -2266,6 +2329,139 @@ public partial class MainWindow : Window
             current = VisualTreeHelper.GetParent(current);
         }
         DragMove();
+    }
+
+    private void Window_Closing(object? sender, CancelEventArgs e)
+    {
+        if (!_allowClose && HasBackgroundWork())
+        {
+            if (!EnsureTrayIcon())
+            {
+                AppLog.Write("Não foi possível criar o ícone da bandeja; a janela não será ocultada.");
+                return;
+            }
+
+            e.Cancel = true;
+            Hide();
+            AppLog.Write("Janela ocultada na bandeja; operações em segundo plano continuam ativas.");
+            return;
+        }
+
+        RemoveTrayIcon();
+    }
+
+    private bool HasBackgroundWork() =>
+        _networkMonitorCts is not null ||
+        _autoProfileCts is not null ||
+        _metricsCts is not null ||
+        _benchmarkCts is not null ||
+        _windowsRepairCts is not null;
+
+    private bool EnsureTrayIcon()
+    {
+        if (_trayIconVisible) return true;
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return false;
+
+        var data = new NotifyIconData
+        {
+            Size = (uint)Marshal.SizeOf<NotifyIconData>(),
+            WindowHandle = handle,
+            Id = 1,
+            Flags = TrayNifMessage | TrayNifIcon | TrayNifTip,
+            CallbackMessage = TrayCallbackMessage,
+            Icon = LoadSystemIcon(IntPtr.Zero, new IntPtr(32512)),
+            ToolTip = "ynoez — operações continuam em segundo plano",
+            Info = string.Empty,
+            InfoTitle = string.Empty,
+            ItemGuid = Guid.Empty
+        };
+
+        if (!ShellNotifyIcon(TrayNimAdd, ref data))
+        {
+            AppLog.Write("Shell_NotifyIcon falhou ao registrar a bandeja. Win32=" + Marshal.GetLastWin32Error());
+            return false;
+        }
+
+        _trayIconVisible = true;
+        return true;
+    }
+
+    private void RemoveTrayIcon()
+    {
+        if (!_trayIconVisible) return;
+        var handle = new WindowInteropHelper(this).Handle;
+        var data = new NotifyIconData
+        {
+            Size = (uint)Marshal.SizeOf<NotifyIconData>(),
+            WindowHandle = handle,
+            Id = 1,
+            ToolTip = string.Empty,
+            Info = string.Empty,
+            InfoTitle = string.Empty,
+            ItemGuid = Guid.Empty
+        };
+        ShellNotifyIcon(TrayNimDelete, ref data);
+        _trayIconVisible = false;
+    }
+
+    private IntPtr TrayWindowProc(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != TrayCallbackMessage || !_trayIconVisible)
+            return IntPtr.Zero;
+
+        var notification = unchecked((int)lParam.ToInt64());
+        if (notification == WmLeftButtonDoubleClick)
+        {
+            handled = true;
+            Dispatcher.BeginInvoke(new Action(RestoreFromTray));
+        }
+        else if (notification == WmRightButtonUp)
+        {
+            handled = true;
+            Dispatcher.BeginInvoke(new Action(ShowTrayMenu));
+        }
+        return IntPtr.Zero;
+    }
+
+    private void ShowTrayMenu()
+    {
+        var menu = new ContextMenu
+        {
+            Placement = PlacementMode.MousePoint,
+            StaysOpen = false
+        };
+        var status = new MenuItem
+        {
+            Header = HasBackgroundWork() ? "ynoez está trabalhando em segundo plano" : "ynoez está aberto",
+            IsEnabled = false
+        };
+        var open = new MenuItem { Header = "Abrir ynoez" };
+        open.Click += (_, _) => RestoreFromTray();
+        var exit = new MenuItem { Header = "Encerrar ynoez e interromper operações" };
+        exit.Click += (_, _) => ExitFromTray();
+        menu.Items.Add(status);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(open);
+        menu.Items.Add(exit);
+        SetForegroundWindow(new WindowInteropHelper(this).Handle);
+        menu.IsOpen = true;
+    }
+
+    private void RestoreFromTray()
+    {
+        RemoveTrayIcon();
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        Focus();
+    }
+
+    private void ExitFromTray()
+    {
+        _allowClose = true;
+        RemoveTrayIcon();
+        Close();
     }
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;

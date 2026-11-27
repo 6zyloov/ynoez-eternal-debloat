@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="ynoez 0.3.0" Width="1141" Height="768" MinWidth="1060" MinHeight="680"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResizeWithGrip" Background="#121212" Foreground="#FFFFFF"
-        FontFamily="{StaticResource AppFont}" Loaded="Window_Loaded">
+        FontFamily="{StaticResource AppFont}" Loaded="Window_Loaded" Closing="Window_Closing">
     <Grid Background="#121212">
         <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Grid Grid.Row="0" Background="#121212" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
