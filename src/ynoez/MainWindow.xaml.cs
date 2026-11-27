@@ -298,7 +298,19 @@ public partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(profile.ManualUrl))
                 root.Children.Add(ActionCard("Manual da placa-mãe", "Documentação oficial da série A520M K. Confirme o sufixo V2 e a revisão física antes de seguir instruções de firmware ou conectores.", "Abrir manual", () => OpenTargetAsync(profile.ManualUrl), "DOCUMENTAÇÃO"));
             if (revision is not null)
-                root.Children.Add(ActionCard("BIOS da revisão " + revision.Revision, "Consulta apenas. Compare a versão instalada, a CPU suportada, as notas de versão e as instruções oficiais. O ynoez não faz flash de firmware.", "Consultar BIOS", () => OpenTargetAsync(revision.Bios), "SOMENTE CONSULTA"));
+            {
+                var biosCard = MakeCard();
+                var biosPanel = new StackPanel { Margin = new Thickness(20) };
+                biosPanel.Children.Add(Heading("Última BIOS listada pela Gigabyte", 15));
+                biosPanel.Children.Add(KeyValue("Revisão", revision.Revision));
+                biosPanel.Children.Add(KeyValue("Versão listada", revision.LatestBiosVersion));
+                biosPanel.Children.Add(KeyValue("Data de publicação", revision.LatestBiosReleaseDate));
+                foreach (var note in revision.LatestBiosNotes) biosPanel.Children.Add(Bullet(note));
+                biosPanel.Children.Add(Body("Consulta verificada em " + revision.BiosCheckedAt + ". Isto não significa que a atualização seja obrigatória: compare com a BIOS instalada, CPU suportada e notas oficiais antes de decidir."));
+                biosCard.Child = biosPanel;
+                root.Children.Add(biosCard);
+                root.Children.Add(ActionCard("Página de BIOS da revisão " + revision.Revision, "Consulta oficial apenas. A atualização de firmware continua manual, depende da revisão física e não é executada pelo ynoez.", "Abrir página de BIOS", () => OpenTargetAsync(revision.Bios), "SOMENTE CONSULTA"));
+            }
             else
                 root.Children.Add(NoteCard("Revisão física obrigatória", "A página do modelo oferece revisões 1.0, 1.1 e 1.2. A versão SMBIOS não foi suficiente para escolher uma delas; confira a serigrafia impressa na própria placa antes de abrir ou instalar BIOS."));
 

@@ -28,6 +28,10 @@ public sealed class MotherboardRevisionLink
     public string Revision { get; init; } = "";
     public string Support { get; init; } = "";
     public string Bios { get; init; } = "";
+    public string LatestBiosVersion { get; init; } = "";
+    public string LatestBiosReleaseDate { get; init; } = "";
+    public string BiosCheckedAt { get; init; } = "";
+    public List<string> LatestBiosNotes { get; init; } = new();
 }
 
 public sealed class MotherboardUtility

@@ -18,17 +18,41 @@
     {
       "revision": "1.0",
       "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support",
-      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support#support-dl-bios"
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support#support-dl-bios",
+      "latestBiosVersion": "F7d",
+      "latestBiosReleaseDate": "2026-11-17",
+      "biosCheckedAt": "2026-11-27",
+      "latestBiosNotes": [
+        "AMD AGESA ComboV2 1.2.0.12",
+        "Correções para AMD TPM Reference Code Errata (CVE-2026-6726 e CVE-2026-6727)",
+        "Correção de vulnerabilidades críticas de firmware EDK II (CVE-2026-97631)"
+      ]
     },
     {
       "revision": "1.1",
       "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/support",
-      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/support#support-dl-bios"
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/support#support-dl-bios",
+      "latestBiosVersion": "FFd",
+      "latestBiosReleaseDate": "2026-11-17",
+      "biosCheckedAt": "2026-11-27",
+      "latestBiosNotes": [
+        "AMD AGESA ComboV2 1.2.0.12",
+        "Correções para AMD TPM Reference Code Errata (CVE-2026-6726 e CVE-2026-6727)",
+        "Correção de vulnerabilidades críticas de firmware EDK II (CVE-2026-97631)"
+      ]
     },
     {
       "revision": "1.2",
       "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support",
-      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support#support-dl-bios"
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support#support-dl-bios",
+      "latestBiosVersion": "F2d",
+      "latestBiosReleaseDate": "2026-11-17",
+      "biosCheckedAt": "2026-11-27",
+      "latestBiosNotes": [
+        "AMD AGESA ComboV2 1.2.0.12",
+        "Correções para AMD TPM Reference Code Errata (CVE-2026-6726 e CVE-2026-6727)",
+        "Correção de vulnerabilidades críticas de firmware EDK II (CVE-2026-97631)"
+      ]
     }
   ],
   "utilities": [
