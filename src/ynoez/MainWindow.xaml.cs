@@ -786,7 +786,45 @@ public partial class MainWindow : Window
         var autoCard = MakeCard();
         var autoPanel = new StackPanel { Margin = new Thickness(20) };
         autoPanel.Children.Add(Heading("Perfis automáticos", 15));
-        autoPanel.Children.Add(Body("Verifica jogos conhecidos e inatividade. Jogo ativo = Performance; uso comum = Equilibrado; 15 minutos sem entrada = AFK. No AFK, o ynoez bloqueia a suspensão automática para manter XT e downloads em execução, mas permite apagar a tela. O plano anterior é salvo e restaurado ao parar; se o app fechar inesperadamente, tenta restaurá-lo na próxima abertura. Não impede suspensão manual, tampa fechada ou perda de energia."));
+        autoPanel.Children.Add(Body("Jogo com atividade recente = Performance. Jogo ou processo protegido durante inatividade = AFK protegido: plano Equilibrado + bloqueio de suspensão, sem usar o plano Economia agressiva. Somente quando nenhum jogo/processo protegido estiver rodando e houver 15 minutos sem entrada o ynoez usa AFK / Economia. Não encerra processos; o plano original é salvo e restaurado ao parar."));
+        autoPanel.Children.Add(Heading("Processos que devem permanecer protegidos", 13));
+        autoPanel.Children.Add(Body("Jogos conhecidos já são protegidos automaticamente. Adicione outros processos importantes (por exemplo, o executável do seu bot/automação) separados por ponto e vírgula. Use apenas o nome do processo, sem caminho ou argumentos; o sufixo .exe é opcional."));
+        var protectedInput = new TextBox
+        {
+            Text = string.Join("; ", AutoProfileService.GetProtectedProcessNames()),
+            MinHeight = 36,
+            Padding = new Thickness(10, 8, 10, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 4, 0, 8)
+        };
+        var saveProtected = new Button
+        {
+            Content = "Salvar processos protegidos",
+            Style = (Style)FindResource("QuietButton"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        saveProtected.Click += (_, _) =>
+        {
+            try
+            {
+                var names = AutoProfileService.SaveProtectedProcessNames(
+                    protectedInput.Text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                autoStatus.Text = names.Count == 0
+                    ? "Nenhum processo extra cadastrado. Jogos conhecidos continuam protegidos."
+                    : "Processos protegidos salvos: " + string.Join(", ", names) +
+                      ". A lista será carregada na próxima ativação da automação.";
+            }
+            catch (Exception ex)
+            {
+                autoStatus.Text = "Não foi possível salvar a lista: " + ex.Message;
+            }
+        };
+        autoPanel.Children.Add(protectedInput);
+        autoPanel.Children.Add(saveProtected);
         var autoStatus = new TextBlock { Text = "Automação desligada.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var autoButtons = new WrapPanel();
         var startAuto = new Button { Content = "Ativar automático", Style = (Style)FindResource("AccentButton"), MinWidth = 140, Margin = new Thickness(0, 0, 8, 0) };
@@ -806,10 +844,11 @@ public partial class MainWindow : Window
                 await AutoProfileService.RunAsync(status =>
                 {
                     if (!Dispatcher.HasShutdownStarted)
-                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + status.Mode +
-                            (status.UsedFallback ? " (plano efetivo: " + status.AppliedMode + ")" : "") +
+                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + AutoProfileService.GetModeDisplayName(status.Mode) +
+                            (status.UsedFallback ? " (plano efetivo: " + AutoProfileService.GetModeDisplayName(status.AppliedMode) + ")" : "") +
                             " | Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") + " min" +
-                            (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : ""));
+                            (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : "") +
+                            (status.ActiveProtectedProcess.Length > 0 ? " | Processo protegido: " + status.ActiveProtectedProcess : ""));
                 }, token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
