@@ -232,6 +232,9 @@ public sealed class StartupManagerService
             throw new InvalidDataException("O backup não corresponde ao arquivo de inicialização.");
         if (!File.Exists(backupPath))
             throw new FileNotFoundException("O backup do arquivo de inicialização não foi encontrado.", backupPath);
+        var backupAttributes = File.GetAttributes(backupPath);
+        if ((backupAttributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+            throw new InvalidDataException("O backup do arquivo de inicialização é um link ou diretório; a restauração foi bloqueada.");
         if (File.Exists(originalPath))
             throw new IOException("Já existe um arquivo com esse nome na pasta de inicialização. O backup foi mantido para evitar sobrescrita.");
 
@@ -278,6 +281,13 @@ public sealed class StartupManagerService
         if (!string.Equals(parent, _userStartupDirectory, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(Path.GetFileName(full), expectedName, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("O arquivo não pertence diretamente à pasta de inicialização atual.");
+        if (File.Exists(full))
+        {
+            var attributes = File.GetAttributes(full);
+            if ((attributes & FileAttributes.ReparsePoint) != 0
+                || (attributes & FileAttributes.Directory) != 0)
+                throw new InvalidDataException("Links e diretórios não podem ser movidos para a pasta de recuperação.");
+        }
         return full;
     }
 

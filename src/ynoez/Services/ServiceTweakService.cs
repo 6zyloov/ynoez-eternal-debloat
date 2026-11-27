@@ -84,6 +84,10 @@ public sealed class ServiceTweakService
         return result;
     }
 
+    public static bool IsRestorableStartMode(string? mode) =>
+        string.Equals(mode, "Auto", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mode, "Manual", StringComparison.OrdinalIgnoreCase);
+
     public void Disable(OptionalServiceDefinition definition)
     {
         Validate(definition.Name);
@@ -91,6 +95,9 @@ public sealed class ServiceTweakService
             ?? throw new InvalidOperationException("O serviço não está instalado nesta edição do Windows.");
         if (string.Equals(info.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("O serviço já está desativado.");
+        if (!IsRestorableStartMode(info.StartMode))
+            throw new InvalidOperationException("O modo original '" + info.StartMode +
+                "' não tem restauração suportada. Nenhuma alteração foi aplicada.");
         var backupPath = GetBackupPath(definition.Name);
         if (File.Exists(backupPath))
             throw new InvalidOperationException("Já existe um backup deste serviço. Restaure-o antes de aplicar novamente.");

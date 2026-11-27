@@ -236,6 +236,19 @@ public sealed class RegistryTweakServiceTests
 
 
     [Fact]
+    public void OptionalServiceManager_RejectsUnrestorableServiceStartModes()
+    {
+        Assert.True(ServiceTweakService.IsRestorableStartMode("Auto"));
+        Assert.True(ServiceTweakService.IsRestorableStartMode("Manual"));
+        Assert.True(ServiceTweakService.IsRestorableStartMode("auto"));
+        Assert.False(ServiceTweakService.IsRestorableStartMode("Disabled"));
+        Assert.False(ServiceTweakService.IsRestorableStartMode("Boot"));
+        Assert.False(ServiceTweakService.IsRestorableStartMode("System"));
+        Assert.False(ServiceTweakService.IsRestorableStartMode("Unknown"));
+        Assert.False(ServiceTweakService.IsRestorableStartMode(null));
+    }
+
+    [Fact]
     public void OptionalServiceCatalog_ExcludesProtectedWindowsAndAntiCheatServices()
     {
         var names = ServiceTweakService.GetCatalog().Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);

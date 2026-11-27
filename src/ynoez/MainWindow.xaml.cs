@@ -1272,9 +1272,19 @@ public partial class MainWindow : Window
             {
                 if (!service.Available)
                 {
-                    root.Children.Add(NoteCard(service.Definition.DisplayName + " — backup preservado",
+                    root.Children.Add(ActionCard(service.Definition.DisplayName + " — tentativa de recuperação",
                         service.Definition.Description + "\n" + service.State +
-                        "\nO serviço não pode ser consultado neste momento. O backup não será apagado."));
+                        "\nA consulta WMI falhou ou o serviço não foi encontrado. Você pode tentar a restauração explícita via PowerShell; ela só consome o backup se o estado anterior for confirmado.",
+                        "Tentar restaurar", async () =>
+                        {
+                            if (MessageBox.Show("Tentar restaurar o serviço \"" + service.Definition.Name +
+                                "\" a partir do backup, mesmo sem consulta WMI disponível? O backup será mantido se a confirmação falhar.",
+                                "Confirmar recuperação", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                                return;
+                            await Task.Run(() => manager.Restore(service.Definition));
+                            MessageBox.Show("Restauração confirmada pelo Windows.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                            ShowPage("Restore");
+                        }, "BACKUP"));
                     continue;
                 }
                 root.Children.Add(ActionCard(service.Definition.DisplayName,
