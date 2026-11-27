@@ -33,7 +33,7 @@ public sealed class AdapterPowerManagementService
             "[pscustomobject]@{ Name=$a.Name; InterfaceDescription=$a.InterfaceDescription; Status=[string]$a.Status; " +
             "LinkSpeed=[string]$a.LinkSpeed; SelectiveSuspend=[string]$p.SelectiveSuspend; " +
             "DeviceSleepOnDisconnect=[string]$p.DeviceSleepOnDisconnect } } catch {} }); " +
-            "$items | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath '" + path + "' -Encoding UTF8";
+            "ConvertTo-Json -InputObject @($items) -Depth 4 | Set-Content -LiteralPath '" + path + "' -Encoding UTF8";
         RunElevated(script);
 
         try
@@ -76,15 +76,11 @@ public sealed class AdapterPowerManagementService
         WriteAtomic(backupPath, JsonSerializer.Serialize(backup, JsonOptions));
 
         var script = BuildSetScript(adapter.Name,
-            adapter.SelectiveSuspend == "Enabled" ? "Disabled" : adapter.SelectiveSuspend,
-            adapter.DeviceSleepOnDisconnect == "Enabled" ? "Disabled" : adapter.DeviceSleepOnDisconnect);
+            string.Equals(adapter.SelectiveSuspend, "Enabled", StringComparison.OrdinalIgnoreCase) ? "Disabled" : adapter.SelectiveSuspend,
+            string.Equals(adapter.DeviceSleepOnDisconnect, "Enabled", StringComparison.OrdinalIgnoreCase) ? "Disabled" : adapter.DeviceSleepOnDisconnect);
         try
         {
             RunElevated(script);
-            var after = GetSingleAdapter(adapter.Name);
-            if ((backup.SelectiveSuspend == "Enabled" && after.SelectiveSuspend != "Disabled")
-                || (backup.DeviceSleepOnDisconnect == "Enabled" && after.DeviceSleepOnDisconnect != "Disabled"))
-                throw new InvalidOperationException("O driver não confirmou a alteração. O backup foi mantido.");
             AppLog.Write("Economia de energia do adaptador reduzida: " + adapter.Name);
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
@@ -106,28 +102,25 @@ public sealed class AdapterPowerManagementService
             throw new InvalidDataException("O nome do adaptador não corresponde ao backup.");
 
         RunElevated(BuildSetScript(adapterName, backup.SelectiveSuspend, backup.DeviceSleepOnDisconnect));
-        var after = GetSingleAdapter(adapterName);
-        if (IsSupported(backup.SelectiveSuspend) && after.SelectiveSuspend != backup.SelectiveSuspend
-            || IsSupported(backup.DeviceSleepOnDisconnect) && after.DeviceSleepOnDisconnect != backup.DeviceSleepOnDisconnect)
-            throw new InvalidOperationException("A restauração do adaptador não foi confirmada; o backup foi mantido.");
 
         File.Delete(backupPath);
         AppLog.Write("Configuração de energia do adaptador restaurada: " + adapterName);
     }
-
-    private AdapterPowerStatus GetSingleAdapter(string name) =>
-        GetPhysicalAdapters().FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))
-        ?? throw new InvalidOperationException("O adaptador não foi encontrado após a alteração.");
 
     private static string BuildSetScript(string name, string selectiveSuspend, string deviceSleep)
     {
         var n = EscapePowerShell(name);
         var s = EscapePowerShell(selectiveSuspend);
         var d = EscapePowerShell(deviceSleep);
-        return "$ErrorActionPreference='Stop'; $n='" + n + "'; $p=@{Name=$n;NoRestart=$true}; " +
-            "if ('" + s + "' -in @('Enabled','Disabled')) { $p.SelectiveSuspend='" + s + "' }; " +
-            "if ('" + d + "' -in @('Enabled','Disabled')) { $p.DeviceSleepOnDisconnect='" + d + "' }; " +
-            "if ($p.Count -gt 2) { Set-NetAdapterPowerManagement @p -ErrorAction Stop }; exit 0";
+        return "$ErrorActionPreference='Stop'; $n='" + n + "'; $s='" + s + "'; $d='" + d + "'; try { " +
+            "$p=@{Name=$n;NoRestart=$true}; " +
+            "if ($s -in @('Enabled','Disabled')) { $p.SelectiveSuspend=$s }; " +
+            "if ($d -in @('Enabled','Disabled')) { $p.DeviceSleepOnDisconnect=$d }; " +
+            "if ($p.Count -gt 2) { Set-NetAdapterPowerManagement @p -ErrorAction Stop }; " +
+            "$after=Get-NetAdapterPowerManagement -Name $n -ErrorAction Stop; " +
+            "if ($s -in @('Enabled','Disabled') -and [string]$after.SelectiveSuspend -ne $s) { throw 'SelectiveSuspend não confirmado' }; " +
+            "if ($d -in @('Enabled','Disabled') -and [string]$after.DeviceSleepOnDisconnect -ne $d) { throw 'DeviceSleepOnDisconnect não confirmado' }; " +
+            "} catch { exit 2 }; exit 0";
     }
 
     private static bool IsSupported(string value) =>
@@ -143,8 +136,7 @@ public sealed class AdapterPowerManagementService
 
     private static void ValidateName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 128
-            || name.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is ' ' or '-' or '_' or '(' or ')')))
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 128 || name.Any(char.IsControl))
             throw new ArgumentException("Nome de adaptador inválido.", nameof(name));
     }
 
