@@ -18,7 +18,7 @@
 - Verificador manual de atualização: consulta somente quando solicitado o endpoint de release estável oficial do GitHub, valida tag/URL/repositório e apenas abre a página oficial quando há versão mais nova; não baixa nem instala automaticamente. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
 - Diagnóstico de rede: ICMP, TCP/443, DNS IPv4/IPv6 e tracert.
 - Monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, ICMP/TCP para Cloudflare e Google, resolução DNS, janela móvel real de 60 segundos e hipótese de causa, com exportação CSV.
-- Inventário de adaptadores físicos e virtuais com endereços, DNS, gateways, MTU e versão de driver quando o WMI informa; exportação CSV, somente leitura. Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
+- Inventário de adaptadores físicos e virtuais com endereços, DNS, gateways, MTU e versão de driver quando o WMI informa; exportação CSV, somente leitura. Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador. Auditoria adicional somente leitura das propriedades avançadas expostas pelo driver físico (EEE, Interrupt Moderation, RSS, LSO, Checksum Offload, Flow Control, Speed & Duplex e buffers), com classificação e orientação condicional; relatório CSV, sem aplicar tweaks.
 - Central Restore consolida recuperação de Registro, plano base/AFK interrompido, serviços opcionais, adaptadores de rede, tarefas, inicialização e snapshots. Backups órfãos ou corrompidos permanecem preservados.
 - Testes Windows de transações de Registro, tipos originais, backups corrompidos, inicialização HKCU e pasta Startup temporária, fallback de energia, manifesto SHA-256 de snapshots, métricas da janela de rede, parser PresentMon e whitelists de serviços/tarefas.
 - Auditoria de integridade somente leitura para Defender/Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update e estados conhecidos de serviços/drivers Vanguard/FACEIT; não declara compatibilidade por conta própria.
@@ -50,6 +50,6 @@
 ## Próxima linha de engenharia
 1. Comparação A/B repetida e controlada de benchmarks por jogo, agregação de várias sessões e controle/registro de cena, temperaturas e processos concorrentes.
 2. Inventário AppX/Win32/provisionados e remoção só quando houver pacote de recuperação confiável.
-3. Diagnóstico de NIC mais completo (driver, EEE, interrupt moderation e propriedades avançadas) com recomendações condicionais.
+3. Validar o inventário de propriedades avançadas em NICs Realtek, Intel, MediaTek e Wi-Fi reais; expandir recomendações somente com documentação do fabricante e testes controlados.
 4. Migrar code-behind para MVVM/DI e ampliar testes de falhas, concorrência e recuperação após crash.
 5. Atualizador com validação criptográfica, assinatura Authenticode e testes físicos em hardware real.
