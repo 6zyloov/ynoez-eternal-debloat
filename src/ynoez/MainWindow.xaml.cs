@@ -968,7 +968,7 @@ public partial class MainWindow : Window
             var token = _networkMonitorCts.Token;
             startMonitor.IsEnabled = false;
             stopMonitor.IsEnabled = true;
-            monitorStatus.Text = "Monitorando gateway, Cloudflare, Google e DNS…";
+            monitorStatus.Text = "Monitorando gateways IPv4/IPv6, Cloudflare, Google e DNS…";
             try
             {
                 var logFile = await NetworkMonitorService.RunAsync(TimeSpan.FromSeconds(5), sample =>
