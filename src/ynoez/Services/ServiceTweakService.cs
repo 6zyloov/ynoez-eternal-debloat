@@ -96,6 +96,11 @@ public sealed class ServiceTweakService
             try { File.Delete(backupPath); } catch { }
             throw new OperationCanceledException("A elevação foi cancelada. Nenhuma alteração foi aplicada.", ex);
         }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            try { File.Delete(backupPath); } catch { }
+            throw new OperationCanceledException("A elevação foi cancelada. Nenhuma alteração foi aplicada.", ex);
+        }
         catch
         {
             // Keep the backup if any part of the operation is uncertain.
