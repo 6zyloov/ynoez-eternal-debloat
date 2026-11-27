@@ -99,5 +99,6 @@
     "The manufacturer provides separate support pages for revisions 1.0, 1.1 and 1.2.",
     "The actual physical revision must be verified before BIOS selection.",
     "Specifications and driver availability can change; refresh official support data before shipping a recommendation."
-  ]
+  ],
+  "manualUrl": "https://download.gigabyte.com/FileList/Manual/mb_manual_a520m-k-series_e.pdf"
 }
