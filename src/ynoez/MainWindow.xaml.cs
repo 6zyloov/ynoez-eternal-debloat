@@ -229,6 +229,7 @@ public partial class MainWindow : Window
                             return Task.CompletedTask;
                         service.Apply(tweak);
                         MessageBox.Show("Ajuste aplicado e verificado. O backup original foi preservado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Tweaks");
                         return Task.CompletedTask;
                     },
                     tweak.Risk.ToUpperInvariant()));
@@ -245,6 +246,7 @@ public partial class MainWindow : Window
                                 return Task.CompletedTask;
                             service.Restore(tweak);
                             MessageBox.Show("Estado original restaurado e verificado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                            ShowPage("Tweaks");
                             return Task.CompletedTask;
                         },
                         "REVERSÃO"));

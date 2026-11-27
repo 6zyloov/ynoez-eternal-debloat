@@ -103,7 +103,7 @@ public sealed class RegistryTweakService
                 if (backup.ValueExisted)
                 {
                     var restored = verifyKey!.GetValue(tweak.ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
-                    if (!Equals(restored, DecodeOriginalValue(backup)))
+                    if (!OriginalValuesEqual(restored, DecodeOriginalValue(backup)))
                         throw new InvalidOperationException("O valor restaurado não corresponde ao backup; o backup foi mantido.");
                 }
             }
@@ -160,6 +160,15 @@ public sealed class RegistryTweakService
             throw new InvalidOperationException("Valor DWORD precisa ser inteiro.");
         if (tweak.Kind == RegistryValueKind.String && tweak.Value is not string)
             throw new InvalidOperationException("Valor REG_SZ precisa ser texto.");
+    }
+
+    private static bool OriginalValuesEqual(object? left, object? right)
+    {
+        if (left is byte[] leftBytes && right is byte[] rightBytes)
+            return leftBytes.SequenceEqual(rightBytes);
+        if (left is string[] leftStrings && right is string[] rightStrings)
+            return leftStrings.SequenceEqual(rightStrings, StringComparer.Ordinal);
+        return Equals(left, right);
     }
 
     private static bool ValuesEqual(object? left, object? right, RegistryValueKind kind) =>
