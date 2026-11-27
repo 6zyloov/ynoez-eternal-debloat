@@ -301,7 +301,7 @@ public partial class MainWindow : Window
         var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var monitorButtons = new WrapPanel();
         var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
-        var stopMonitor = new Button { Content = "Parar monitor", Style = (Style)FindResource("SecondaryButton"), MinWidth = 120, IsEnabled = false };
+        var stopMonitor = new Button { Content = "Parar monitor", Style = (Style)FindResource("QuietButton"), MinWidth = 120, IsEnabled = false };
         startMonitor.Click += async (_, _) =>
         {
             if (_networkMonitorCts is not null) return;
