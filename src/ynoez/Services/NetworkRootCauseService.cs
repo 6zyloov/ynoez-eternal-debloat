@@ -27,14 +27,22 @@ public static class NetworkRootCauseService
         var ipv6SecondTcpFailure = sample.Ipv6SecondaryExternalTcpFailure60sPercent;
         var ipv6Tested = !string.Equals(sample.Ipv6ExternalStatus, "NOT_TESTED", StringComparison.OrdinalIgnoreCase);
         var ipv6GatewayHasLoss = ipv6GatewayAvailable && ipv6GatewayLoss >= LossThresholdPercent;
-        var ipv4Healthy = firstLoss < LossThresholdPercent && secondLoss < LossThresholdPercent &&
-            firstTcpFailure < LossThresholdPercent && secondTcpFailure < LossThresholdPercent;
+        var ipv4GatewayHasLoss = hasGateway && gatewayLoss >= LossThresholdPercent;
+        var ipv4TcpHealthy = firstTcpFailure < LossThresholdPercent && secondTcpFailure < LossThresholdPercent;
+
+        if (ipv6GatewayHasLoss && ipv4GatewayHasLoss)
+            return new NetworkRootCause("REDE LOCAL IPv4/IPv6",
+                "Há perda recorrente até os gateways IPv4 e IPv6. Investigue primeiro o adaptador, cabo/Wi-Fi, sinal e roteador; os testes públicos não isolam a causa enquanto ambos os gateways locais apresentam perda.");
+
+        if (ipv4GatewayHasLoss)
+            return new NetworkRootCause("REDE LOCAL",
+                "Há perda recorrente até o gateway IPv4. Investigue sinal Wi-Fi, cabo, adaptador ou roteador antes de atribuir a falha ao provedor. A análise IPv6 aparece separadamente nos dados do monitor.");
 
         if (ipv6GatewayHasLoss)
             return new NetworkRootCause("REDE LOCAL IPv6",
                 "Há perda recorrente até o gateway IPv6. Verifique RA/SLAAC, Wi-Fi/Ethernet, roteador e conectividade IPv6 local; os testes IPv4 são avaliados separadamente.");
 
-        if (ipv6Tested && ipv4Healthy &&
+        if (ipv6Tested && ipv4TcpHealthy &&
             ipv6FirstIcmpLoss >= LossThresholdPercent && ipv6SecondIcmpLoss >= LossThresholdPercent &&
             ipv6FirstTcpFailure >= LossThresholdPercent && ipv6SecondTcpFailure >= LossThresholdPercent)
         {
@@ -42,7 +50,7 @@ public static class NetworkRootCauseService
                 ? " Nenhum gateway IPv6 foi reportado pelo Windows nesta amostra."
                 : "";
             return new NetworkRootCause("IPv6 / SEM CONECTIVIDADE",
-                "IPv4 continua acessível, mas dois destinos IPv6 falham por ICMP e TCP. Isso sugere ausência de rota IPv6, IPv6 desativado/sem delegação ou filtragem no roteador/provedor; não indica queda geral da Internet." + noGatewayMessage);
+                "TCP/443 IPv4 continua acessível, mas dois destinos IPv6 falham por ICMP e TCP. Isso sugere ausência de rota IPv6, IPv6 desativado/sem delegação ou filtragem no roteador/provedor; não indica queda geral da Internet." + noGatewayMessage);
         }
 
         if (ipv6Tested &&
@@ -56,10 +64,6 @@ public static class NetworkRootCauseService
             ipv6FirstIcmpLoss < LossThresholdPercent && ipv6SecondIcmpLoss < LossThresholdPercent)
             return new NetworkRootCause("IPv6 TCP / SERVIÇO",
                 "ICMP IPv6 responde, mas TCP/443 falha em pelo menos um destino. Verifique filtragem TCP/443, firewall, proxy ou rota específica do destino.");
-
-        if (hasGateway && gatewayLoss >= LossThresholdPercent)
-            return new NetworkRootCause("REDE LOCAL",
-                "Há perda recorrente até o gateway. Investigue sinal Wi-Fi, cabo, adaptador, interferência ou roteador antes de atribuir a falha ao provedor.");
 
         if (dnsFailure >= LossThresholdPercent &&
             firstLoss < LossThresholdPercent && secondLoss < LossThresholdPercent &&
