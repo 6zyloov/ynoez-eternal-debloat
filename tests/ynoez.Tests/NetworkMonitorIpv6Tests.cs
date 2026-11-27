@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Xunit;
 using ynoez.Services;
 
@@ -151,6 +153,16 @@ public sealed class NetworkMonitorIpv6Tests
         Assert.Equal("fe80::1%12", lineColumns[28]);
         Assert.Equal("2606:4700:4700::1111", lineColumns[31]);
         Assert.Equal("2001:4860:4860::8888", lineColumns[36]);
+    }
+
+    [Fact]
+    public void CreateTcpClientForAddress_UsesTheDestinationAddressFamily()
+    {
+        using var ipv4 = NetworkMonitorService.CreateTcpClientForAddress(IPAddress.Parse("1.1.1.1"));
+        using var ipv6 = NetworkMonitorService.CreateTcpClientForAddress(IPAddress.Parse("2606:4700:4700::1111"));
+
+        Assert.Equal(AddressFamily.InterNetwork, ipv4.Client.AddressFamily);
+        Assert.Equal(AddressFamily.InterNetworkV6, ipv6.Client.AddressFamily);
     }
 
     [Fact]
