@@ -41,7 +41,7 @@ public static class AppxSystemInventoryService
         var isAdmin = IsAdministrator();
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
             {
                 UseShellExecute = true,

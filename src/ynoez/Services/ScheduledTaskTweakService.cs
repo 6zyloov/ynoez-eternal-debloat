@@ -225,7 +225,7 @@ public sealed class ScheduledTaskTweakService
 
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
             {
                 UseShellExecute = elevated,

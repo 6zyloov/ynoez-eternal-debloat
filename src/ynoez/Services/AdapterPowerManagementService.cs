@@ -209,7 +209,7 @@ public sealed class AdapterPowerManagementService
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
             {
                 UseShellExecute = false,
@@ -243,7 +243,7 @@ public sealed class AdapterPowerManagementService
 
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
             {
                 UseShellExecute = true,

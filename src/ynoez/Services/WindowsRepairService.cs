@@ -75,7 +75,7 @@ public static class WindowsRepairService
         var isAdministrator = IsAdministrator();
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encodedScript)
             {
                 UseShellExecute = true,

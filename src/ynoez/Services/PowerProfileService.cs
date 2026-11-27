@@ -548,7 +548,7 @@ public static class PowerProfileService
     {
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powercfg.exe", arguments)
+            StartInfo = new ProcessStartInfo(AppPaths.PowerCfgExecutable, arguments)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,

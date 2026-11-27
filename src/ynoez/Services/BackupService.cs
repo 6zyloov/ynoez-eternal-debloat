@@ -34,11 +34,11 @@ public static class BackupService
             await WriteTextAtomicallyAsync(Path.Combine(folder, "hardware.json"),
                 JsonSerializer.Serialize(hardware, JsonOptions));
 
-            var power = RunCommand("powercfg.exe", "/getactivescheme");
+            var power = RunCommand(AppPaths.PowerCfgExecutable, "/getactivescheme");
             await WriteTextAtomicallyAsync(Path.Combine(folder, "active-power-plan.txt"),
                 power.Output + Environment.NewLine + power.Error);
 
-            var network = RunCommand("ipconfig.exe", "/all");
+            var network = RunCommand(AppPaths.IpConfigExecutable, "/all");
             await WriteTextAtomicallyAsync(Path.Combine(folder, "network-ipconfig.txt"),
                 network.Output + Environment.NewLine + network.Error);
 
@@ -248,7 +248,7 @@ public static class BackupService
     {
         var script = "Checkpoint-Computer -Description 'ynoez restore point' -RestorePointType 'MODIFY_SETTINGS'";
         var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
-        var info = new ProcessStartInfo("powershell.exe")
+        var info = new ProcessStartInfo(AppPaths.PowerShellExecutable)
         {
             Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}",
             UseShellExecute = true,

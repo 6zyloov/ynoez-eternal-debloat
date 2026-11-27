@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     private const uint TrayNifIcon = 0x00000002;
     private const uint TrayNifTip = 0x00000004;
     private const int TrayCallbackMessage = 0x8000 + 41;
+    private static readonly int TaskbarCreatedMessage = unchecked((int)RegisterWindowMessage("TaskbarCreated"));
     private const int WmLeftButtonDoubleClick = 0x0203;
     private const int WmRightButtonUp = 0x0205;
 
@@ -78,6 +79,9 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", EntryPoint = "LoadIconW", CharSet = CharSet.Unicode)]
     private static extern IntPtr LoadSystemIcon(IntPtr instance, IntPtr iconName);
+
+    [DllImport("user32.dll", EntryPoint = "RegisterWindowMessageW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint RegisterWindowMessage(string message);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -2364,9 +2368,14 @@ public partial class MainWindow : Window
 
     private bool HasBackgroundWork() =>
         _networkMonitorCts is not null ||
+        _networkDiagnosticCts is not null ||
+        _appxInventoryCts is not null ||
+        _systemAppxInventoryCts is not null ||
+        _programInventoryCts is not null ||
         _autoProfileCts is not null ||
         _metricsCts is not null ||
         _benchmarkCts is not null ||
+        _integrityAuditCts is not null ||
         _windowsRepairCts is not null;
 
     private bool EnsureTrayIcon()
@@ -2438,6 +2447,18 @@ public partial class MainWindow : Window
 
     private IntPtr TrayWindowProc(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (message == TaskbarCreatedMessage)
+        {
+            if (_trayIconVisible)
+            {
+                _trayIconVisible = false;
+                if (!EnsureTrayIcon())
+                    AppLog.Write("O Explorer reiniciou e o ícone do ynoez não pôde ser registrado novamente.");
+            }
+            handled = true;
+            return IntPtr.Zero;
+        }
+
         if (message != TrayCallbackMessage || !_trayIconVisible)
             return IntPtr.Zero;
 

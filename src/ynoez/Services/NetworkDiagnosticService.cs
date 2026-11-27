@@ -123,7 +123,7 @@ public static class NetworkDiagnosticService
     {
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("tracert.exe")
+            StartInfo = new ProcessStartInfo(AppPaths.TraceRouteExecutable)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,

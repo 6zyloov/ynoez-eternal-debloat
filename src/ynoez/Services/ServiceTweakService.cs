@@ -206,7 +206,7 @@ public sealed class ServiceTweakService
     {
         var safeMode = mode switch
         {
-            "Auto" when delayed => "sc.exe config $n start= delayed-auto | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'sc.exe falhou' }; ",
+            "Auto" when delayed => "$sc=Join-Path $env:windir 'System32\sc.exe'; & $sc config $n start= delayed-auto | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'sc.exe falhou' }; ",
             "Auto" => "Set-Service -Name $n -StartupType Automatic; ",
             "Manual" => "Set-Service -Name $n -StartupType Manual; ",
             "Disabled" => "Set-Service -Name $n -StartupType Disabled; ",
@@ -229,7 +229,7 @@ public sealed class ServiceTweakService
 
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("powershell.exe",
+            StartInfo = new ProcessStartInfo(AppPaths.PowerShellExecutable,
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
             {
                 UseShellExecute = true,

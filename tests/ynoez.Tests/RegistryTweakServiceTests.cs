@@ -249,6 +249,21 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void WindowsToolPaths_ResolveToTrustedSystemDirectories()
+    {
+        var system = Path.GetFullPath(AppPaths.SystemDirectory);
+        var windowsPowerShell = Path.Combine(system, "WindowsPowerShell", "v1.0");
+
+        Assert.Equal(Path.Combine(windowsPowerShell, "powershell.exe"), Path.GetFullPath(AppPaths.PowerShellExecutable));
+        Assert.Equal(Path.Combine(system, "powercfg.exe"), Path.GetFullPath(AppPaths.PowerCfgExecutable));
+        Assert.Equal(Path.Combine(system, "ipconfig.exe"), Path.GetFullPath(AppPaths.IpConfigExecutable));
+        Assert.Equal(Path.Combine(system, "tracert.exe"), Path.GetFullPath(AppPaths.TraceRouteExecutable));
+        Assert.Equal(Path.Combine(system, "sc.exe"), Path.GetFullPath(AppPaths.ScExecutable));
+        Assert.All(new[] { AppPaths.PowerShellExecutable, AppPaths.PowerCfgExecutable, AppPaths.IpConfigExecutable,
+            AppPaths.TraceRouteExecutable, AppPaths.ScExecutable }, path => Assert.True(File.Exists(path), path));
+    }
+
+    [Fact]
     public void OptionalServiceCatalog_ExcludesProtectedWindowsAndAntiCheatServices()
     {
         var names = ServiceTweakService.GetCatalog().Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
