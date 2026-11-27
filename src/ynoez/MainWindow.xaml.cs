@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _networkMonitorCts;
     private CancellationTokenSource? _networkDiagnosticCts;
     private CancellationTokenSource? _appxInventoryCts;
+    private CancellationTokenSource? _programInventoryCts;
     private CancellationTokenSource? _autoProfileCts;
     private CancellationTokenSource? _metricsCts;
     private CancellationTokenSource? _benchmarkCts;
@@ -65,7 +66,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
+        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _programInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -946,6 +947,116 @@ public partial class MainWindow : Window
                     ShowPage("Debloat");
                 }, task.Definition.Risk.ToUpperInvariant()));
         }
+        var programsCard = MakeCard();
+        var programsPanel = new StackPanel { Margin = new Thickness(20) };
+        programsPanel.Children.Add(Heading("Programas Win32 instalados", 15));
+        programsPanel.Children.Add(Body("Inventário somente leitura das entradas de desinstalação do Registro HKLM/HKCU, nas visões 32 e 64 bits. O ynoez não executa UninstallString nem remove programas. Drivers, runtimes, atualizações e anti-cheats conhecidos são sinalizados como protegidos; revise manualmente antes de remover qualquer aplicativo."));
+        var programsStatus = Body("Programas ainda não consultados.");
+        var programsSearch = new TextBox
+        {
+            Height = 32, MinWidth = 230, Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft, Padding = new Thickness(8, 5, 8, 5),
+            Margin = new Thickness(0, 8, 0, 8), ToolTip = "Filtrar por nome, versão, editor ou classificação"
+        };
+        var programsGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserReorderColumns = true,
+            CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 280,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Programa", Binding = new Binding(nameof(InstalledProgramInfo.Name)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(InstalledProgramInfo.Version)), Width = new DataGridLength(85) });
+        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Editor", Binding = new Binding(nameof(InstalledProgramInfo.Publisher)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Escopo", Binding = new Binding(nameof(InstalledProgramInfo.Scope)), Width = new DataGridLength(85) });
+        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Arquitetura", Binding = new Binding(nameof(InstalledProgramInfo.Architecture)), Width = new DataGridLength(75) });
+        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Classificação", Binding = new Binding(nameof(InstalledProgramInfo.Classification)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        IReadOnlyList<InstalledProgramInfo> installedPrograms = Array.Empty<InstalledProgramInfo>();
+        var programButtons = new WrapPanel();
+        var loadPrograms = new Button { Content = "Analisar programas", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelPrograms = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportPrograms = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var openProgramsSettings = new Button { Content = "Abrir programas instalados", Style = (Style)FindResource("QuietButton") };
+        void ApplyProgramFilter()
+        {
+            var query = programsSearch.Text.Trim();
+            programsGrid.ItemsSource = string.IsNullOrWhiteSpace(query)
+                ? installedPrograms
+                : installedPrograms.Where(x =>
+                    x.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    x.Version.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    x.Publisher.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    x.Classification.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToArray();
+        }
+        programsSearch.TextChanged += (_, _) => ApplyProgramFilter();
+        loadPrograms.Click += async (_, _) =>
+        {
+            if (_programInventoryCts is not null) return;
+            _programInventoryCts = new CancellationTokenSource();
+            var token = _programInventoryCts.Token;
+            loadPrograms.IsEnabled = false;
+            cancelPrograms.IsEnabled = true;
+            exportPrograms.IsEnabled = false;
+            programsStatus.Text = "Consultando entradas HKLM/HKCU 32/64 bits…";
+            try
+            {
+                installedPrograms = await Task.Run(() =>
+                    InstalledProgramInventoryService.GetInstalledPrograms(token), token);
+                ApplyProgramFilter();
+                var protectedCount = installedPrograms.Count(x => x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
+                programsStatus.Text = installedPrograms.Count + " entradas encontradas • " + protectedCount +
+                    " sinalizadas como componentes/atualizações/drivers/runtimes/anti-cheats • somente leitura.";
+                exportPrograms.IsEnabled = installedPrograms.Count > 0;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                programsStatus.Text = "Inventário cancelado.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário Win32 falhou: " + ex);
+                programsStatus.Text = "Não foi possível consultar programas: " + ex.Message;
+            }
+            finally
+            {
+                _programInventoryCts?.Dispose();
+                _programInventoryCts = null;
+                loadPrograms.IsEnabled = true;
+                cancelPrograms.IsEnabled = false;
+            }
+        };
+        cancelPrograms.Click += (_, _) => _programInventoryCts?.Cancel();
+        exportPrograms.Click += (_, _) =>
+        {
+            if (installedPrograms.Count == 0) return;
+            var path = InstalledProgramInventoryService.ExportCsv(installedPrograms);
+            programsStatus.Text = "CSV completo salvo em: " + path;
+        };
+        openProgramsSettings.Click += async (_, _) =>
+            await OpenTargetAsync("ms-settings:appsfeatures");
+        programButtons.Children.Add(loadPrograms);
+        programButtons.Children.Add(cancelPrograms);
+        programButtons.Children.Add(exportPrograms);
+        programButtons.Children.Add(openProgramsSettings);
+        programsPanel.Children.Add(programsStatus);
+        programsPanel.Children.Add(programsSearch);
+        programsPanel.Children.Add(programsGrid);
+        programsPanel.Children.Add(programButtons);
+        programsPanel.Children.Add(NoteCard("Remoção protegida", "Nenhum comando de desinstalação é executado pelo ynoez. Use a tela oficial do Windows, confirme o nome e o editor do aplicativo e não remova drivers, runtimes, bibliotecas compartilhadas ou componentes que você não reconheça."));
+        programsCard.Child = programsPanel;
+        root.Children.Add(programsCard);
+
         var appxCard = MakeCard();
         var appxPanel = new StackPanel { Margin = new Thickness(20) };
         appxPanel.Children.Add(Heading("Inventário de aplicativos AppX", 15));

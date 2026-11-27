@@ -575,6 +575,31 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void InstalledProgramInventory_ProtectsDriversRuntimesUpdatesAndComponents()
+    {
+        Assert.StartsWith("Protegido", InstalledProgramInventoryService.Classify(
+            "Microsoft Visual C++ 2015-2022 Redistributable (x64)", "Microsoft Corporation", "", false, ""));
+        Assert.StartsWith("Protegido", InstalledProgramInventoryService.Classify(
+            "NVIDIA Graphics Driver", "NVIDIA Corporation", "", false, ""));
+        Assert.StartsWith("Protegido", InstalledProgramInventoryService.Classify(
+            "Security Update for Windows", "Microsoft", "Security Update", false, ""));
+        Assert.StartsWith("Protegido", InstalledProgramInventoryService.Classify(
+            "Optional Component", "Publisher", "", true, ""));
+        Assert.StartsWith("Protegido", InstalledProgramInventoryService.Classify(
+            "Add-on", "Publisher", "", false, "ParentSuite"));
+    }
+
+    [Fact]
+    public void InstalledProgramInventory_LeavesOrdinaryAppsReviewableAndEscapesCsvFormulas()
+    {
+        Assert.StartsWith("Aplicativo desktop", InstalledProgramInventoryService.Classify(
+            "Brave", "Brave Software Inc.", "", false, ""));
+        Assert.Equal("\"normal, value\"", InstalledProgramInventoryService.EscapeCsv("normal, value"));
+        Assert.Equal("\"'=HYPERLINK(1)\"", InstalledProgramInventoryService.EscapeCsv("=HYPERLINK(1)"));
+        Assert.Equal("\"' +SUM(1,2)\"", InstalledProgramInventoryService.EscapeCsv(" +SUM(1,2)"));
+    }
+
+    [Fact]
     public void AppxInventory_LabelsCoreWindowsPackagesAsProtected()
     {
         const string json = "[{\"Name\":\"Microsoft.WindowsStore\",\"PackageFullName\":\"Microsoft.WindowsStore_1.0_x64\",\"Version\":\"1.0.0.0\",\"Publisher\":\"CN=Microsoft\",\"Status\":\"Ok\",\"IsFramework\":false,\"IsResourcePackage\":false,\"NonRemovable\":false},{\"Name\":\"Example.Framework\",\"PackageFullName\":\"Example.Framework_1.0_x64\",\"Version\":\"1.0.0.0\",\"Publisher\":\"CN=Example\",\"Status\":\"Ok\",\"IsFramework\":true,\"IsResourcePackage\":false,\"NonRemovable\":false}]";
