@@ -249,6 +249,35 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void StartupFolderEntry_DisableAndRestoreMovesExactFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-startup-folder-" + Guid.NewGuid().ToString("N"));
+        var startup = Path.Combine(root, "Startup");
+        var state = Path.Combine(root, "State");
+        Directory.CreateDirectory(startup);
+        var startupFile = Path.Combine(startup, "ordinary-startup.cmd");
+        const string original = "@echo off\r\necho test\r\n";
+        File.WriteAllText(startupFile, original);
+        try
+        {
+            var manager = new StartupManagerService(state, startup);
+            var entry = Assert.Single(manager.GetActiveEntries().Where(x => x.FilePath == startupFile));
+            Assert.True(entry.CanDisable);
+            manager.Disable(entry);
+            Assert.False(File.Exists(startupFile));
+            var disabled = Assert.Single(manager.GetDisabledEntries());
+            Assert.True(disabled.IsFile);
+            manager.Restore(disabled);
+            Assert.Equal(original, File.ReadAllText(startupFile));
+            Assert.Empty(manager.GetDisabledEntries());
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void StartupEntry_DisableAndRestoreIsReversible()
     {
         const string runPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
