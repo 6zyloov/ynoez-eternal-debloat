@@ -788,7 +788,7 @@ public partial class MainWindow : Window
         autoPanel.Children.Add(Heading("Perfis automáticos", 15));
         autoPanel.Children.Add(Body("Jogo com atividade recente = Performance. Jogo ou processo protegido durante inatividade = AFK protegido: plano Equilibrado + bloqueio de suspensão, sem usar o plano Economia agressiva. Somente quando nenhum jogo/processo protegido estiver rodando e houver 15 minutos sem entrada o ynoez usa AFK / Economia. Não encerra processos; o plano original é salvo e restaurado ao parar."));
         autoPanel.Children.Add(Heading("Processos que devem permanecer protegidos", 13));
-        autoPanel.Children.Add(Body("Jogos conhecidos já são protegidos automaticamente. Adicione outros processos importantes (por exemplo, o executável do seu bot/automação) separados por ponto e vírgula. Use apenas o nome do processo, sem caminho ou argumentos; o sufixo .exe é opcional."));
+        autoPanel.Children.Add(Body("Jogos conhecidos já são protegidos automaticamente. Adicione outros processos importantes (por exemplo, o executável do seu bot/automação) separados por ponto e vírgula. Use apenas o nome simples do processo, sem espaços, caminho ou argumentos; o sufixo .exe é opcional."));
         var protectedInput = new TextBox
         {
             Text = string.Join("; ", AutoProfileService.GetProtectedProcessNames()),
