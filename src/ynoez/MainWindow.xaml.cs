@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _benchmarkCts;
     private CancellationTokenSource? _integrityAuditCts;
     private CancellationTokenSource? _windowsRepairCts;
+    private CancellationTokenSource? _memoryInventoryCts;
     private bool _allowClose;
     private bool _sessionEnding;
     private bool _trayIconVisible;
@@ -138,6 +139,7 @@ public partial class MainWindow : Window
             _benchmarkCts?.Cancel();
             _integrityAuditCts?.Cancel();
             _windowsRepairCts?.Cancel();
+            _memoryInventoryCts?.Cancel();
         };
     }
 
@@ -233,6 +235,120 @@ public partial class MainWindow : Window
         grid.Children.Add(InfoTile("Motherboard", _hardware.BoardProduct, "▦"));
         grid.Children.Add(InfoTile("Windows Version", _hardware.OperatingSystem + "\nBuild " + _hardware.WindowsBuild, "▣"));
         root.Children.Add(grid);
+
+        var memoryCard = MakeCard();
+        var memoryPanel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
+        memoryPanel.Children.Add(Heading("Módulos de memória RAM", 15));
+        memoryPanel.Children.Add(Body("Consulte os módulos que o firmware disponibiliza ao WMI: slot, capacidade, tipo DDR, velocidade reportada e configurada, formato físico, ECC e part number. A consulta é somente leitura e não altera XMP/DOCP, frequência, tensão ou BIOS."));
+        var memoryStatus = Body("Inventário de módulos ainda não consultado.");
+        var memoryNotice = Body("A consulta usa dados WMI/SMBIOS; não é uma leitura SPD completa e não determina com segurança o modo single/dual channel.");
+        memoryNotice.TextWrapping = TextWrapping.Wrap;
+        var memoryGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 210,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Slot", Binding = new Binding(nameof(MemoryModuleInfo.SlotDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Capacidade", Binding = new Binding(nameof(MemoryModuleInfo.CapacityDisplay)), Width = new DataGridLength(95) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Tipo", Binding = new Binding(nameof(MemoryModuleInfo.TypeDisplay)), Width = new DataGridLength(75) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Velocidade", Binding = new Binding(nameof(MemoryModuleInfo.SpeedDisplay)), Width = new DataGridLength(95) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Configurada", Binding = new Binding(nameof(MemoryModuleInfo.ConfiguredSpeedDisplay)), Width = new DataGridLength(105) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Formato", Binding = new Binding(nameof(MemoryModuleInfo.FormFactorDisplay)), Width = new DataGridLength(90) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "ECC", Binding = new Binding(nameof(MemoryModuleInfo.EccDisplay)), Width = new DataGridLength(85) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Fabricante", Binding = new Binding(nameof(MemoryModuleInfo.ManufacturerDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Part number", Binding = new Binding(nameof(MemoryModuleInfo.PartNumberDisplay)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+        var memoryButtons = new WrapPanel();
+        var inspectMemory = new Button { Content = "Consultar módulos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelMemory = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportMemory = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        MemoryModuleInventorySnapshot? memorySnapshot = null;
+        inspectMemory.Click += async (_, _) =>
+        {
+            if (_memoryInventoryCts is not null) return;
+            var cts = new CancellationTokenSource();
+            _memoryInventoryCts = cts;
+            inspectMemory.IsEnabled = false;
+            cancelMemory.IsEnabled = true;
+            exportMemory.IsEnabled = false;
+            memoryStatus.Text = "Consultando Win32_PhysicalMemory e o firmware…";
+            try
+            {
+                var snapshot = await MemoryModuleInventoryService.CaptureAsync(cts.Token);
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    memorySnapshot = snapshot;
+                    memoryGrid.ItemsSource = snapshot.Modules;
+                    memoryStatus.Text = snapshot.SlotSummary + " • capacidade total: " + snapshot.TotalCapacityDisplay +
+                        " • " + snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss");
+                    memoryNotice.Text = snapshot.Notice;
+                    exportMemory.IsEnabled = snapshot.Modules.Count > 0;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!Dispatcher.HasShutdownStarted) memoryStatus.Text = "Consulta cancelada. Nenhuma configuração foi alterada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário de módulos de memória falhou: " + ex);
+                if (!Dispatcher.HasShutdownStarted) memoryStatus.Text = "Não foi possível consultar a memória: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_memoryInventoryCts, cts)) _memoryInventoryCts = null;
+                cts.Dispose();
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    inspectMemory.IsEnabled = true;
+                    cancelMemory.IsEnabled = false;
+                }
+            }
+        };
+        cancelMemory.Click += (_, _) => _memoryInventoryCts?.Cancel();
+        exportMemory.Click += (_, _) =>
+        {
+            if (memorySnapshot is null) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar inventário de módulos de memória",
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = "ynoez-memoria-modulos.csv",
+                AddExtension = true,
+                DefaultExt = ".csv"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, MemoryModuleInventoryService.BuildCsv(memorySnapshot), new System.Text.UTF8Encoding(true));
+                memoryStatus.Text = "Inventário de memória exportado: " + dialog.FileName;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao exportar inventário de memória: " + ex);
+                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        memoryButtons.Children.Add(inspectMemory);
+        memoryButtons.Children.Add(cancelMemory);
+        memoryButtons.Children.Add(exportMemory);
+        memoryPanel.Children.Add(memoryStatus);
+        memoryPanel.Children.Add(memoryGrid);
+        memoryPanel.Children.Add(memoryNotice);
+        memoryPanel.Children.Add(memoryButtons);
+        memoryCard.Child = memoryPanel;
+        root.Children.Add(memoryCard);
 
         var info = MakeCard();
         var panel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
