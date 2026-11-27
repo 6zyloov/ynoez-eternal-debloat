@@ -12,7 +12,7 @@
     "League of Legends",
     "Overwatch",
     "Minecraft",
-    "javaw"
+    "Minecraft.Windows"
   ],
   "policy": {
     "neverTerminateProcesses": true,

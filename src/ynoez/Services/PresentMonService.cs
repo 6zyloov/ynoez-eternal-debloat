@@ -28,7 +28,7 @@ public static class PresentMonService
     private static readonly string[] DefaultTargets =
     {
         "RobloxPlayerBeta", "VALORANT-Win64-Shipping", "cs2", "FortniteClient-Win64-Shipping",
-        "r5apex", "GTA5", "League of Legends", "Overwatch", "Minecraft", "javaw"
+        "r5apex", "GTA5", "League of Legends", "Overwatch", "Minecraft", "Minecraft.Windows"
     };
 
     public static IReadOnlyList<CaptureTarget> GetRunningTargets()

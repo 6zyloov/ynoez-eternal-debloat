@@ -13,7 +13,7 @@ public static class AutoProfileService
     private static readonly string[] DefaultGames =
     {
         "RobloxPlayerBeta", "VALORANT-Win64-Shipping", "cs2", "FortniteClient-Win64-Shipping",
-        "r5apex", "GTA5", "League of Legends", "Overwatch", "Minecraft", "javaw"
+        "r5apex", "GTA5", "League of Legends", "Overwatch", "Minecraft", "Minecraft.Windows"
     };
 
     public static async Task RunAsync(Action<AutoProfileStatus>? onStatus, CancellationToken token)
