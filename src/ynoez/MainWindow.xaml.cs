@@ -768,7 +768,7 @@ public partial class MainWindow : Window
                 MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
                 return Task.CompletedTask;
             }
-            if (MessageBox.Show("Ativar economia de energia? Isso pode reduzir desempenho enquanto jogos ou scripts continuam rodando.", "Confirmar perfil AFK", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
+            if (MessageBox.Show("Ativar AFK / Economia manualmente? Este perfil pode reduzir o desempenho de jogos, bots e automações que continuarem abertos. Para deixar tarefas importantes em execução sem usar a economia agressiva, configure-as como processos protegidos e use Perfis automáticos.", "Confirmar perfil AFK", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
             MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Afk), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "ECONOMIA"));
