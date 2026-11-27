@@ -81,6 +81,13 @@ public static class WindowsScheduledTaskInventoryService
 
         var path = taskPath.Trim();
         var name = taskName.Trim();
+        if (OptionalTasks.Contains(NormalizeKey(path, name)))
+        {
+            return new ScheduledTaskSafetyClassification(
+                "Opcional avaliada", false, true,
+                "Tarefa presente na whitelist restrita de Debloat. Qualquer alteração fica separada, com confirmação, backup, verificação e restauração.");
+        }
+
         if (ProtectedPathPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) ||
             ProtectedNameTokens.Any(token =>
                 name.Contains(token, StringComparison.OrdinalIgnoreCase) ||
@@ -89,13 +96,6 @@ public static class WindowsScheduledTaskInventoryService
             return new ScheduledTaskSafetyClassification(
                 "Protegida pelo ynoez", true, false,
                 "Tarefa de manutenção, atualização, diagnóstico, rede, pesquisa ou anti-cheat. A Toolbox não oferece alterações.");
-        }
-
-        if (OptionalTasks.Contains(NormalizeKey(path, name)))
-        {
-            return new ScheduledTaskSafetyClassification(
-                "Opcional avaliada", false, true,
-                "Tarefa presente na whitelist restrita de Debloat. Qualquer alteração fica separada, com confirmação, backup, verificação e restauração.");
         }
 
         return new ScheduledTaskSafetyClassification(
