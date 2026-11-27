@@ -622,6 +622,7 @@ public partial class MainWindow : Window
                         " | TCP 443: " + sample.ExternalTcpStatus +
                         " | Perda ICMP 60s: " + sample.ExternalLoss60sPercent.ToString("0") + "%" +
                         " | Falha TCP 60s: " + sample.ExternalTcpFailure60sPercent.ToString("0") + "%" +
+                        " | Jitter gateway: " + (sample.GatewayJitter60sMilliseconds.HasValue ? sample.GatewayJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—") +
                         " | Jitter ICMP: " + (sample.ExternalJitter60sMilliseconds.HasValue ? sample.ExternalJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—") +
                         " | Jitter TCP: " + (sample.ExternalTcpJitter60sMilliseconds.HasValue ? sample.ExternalTcpJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—");
                 }, token);
@@ -733,12 +734,15 @@ public partial class MainWindow : Window
         };
         statsGrid.Columns.Add(new DataGridTextColumn { Header = "Interface", Binding = new Binding(nameof(NetworkAdapterStatistics.Name)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
         statsGrid.Columns.Add(new DataGridTextColumn { Header = "Status", Binding = new Binding(nameof(NetworkAdapterStatistics.Status)), Width = new DataGridLength(75) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Link", Binding = new Binding(nameof(NetworkAdapterStatistics.LinkSpeedBitsPerSecond), StringFormat="{}{0:N0} bps"), Width = new DataGridLength(100) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Recebido", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesReceived), StringFormat="{}{0:N0}"), Width = new DataGridLength(105) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Enviado", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesSent), StringFormat="{}{0:N0}"), Width = new DataGridLength(105) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveErrors)), Width = new DataGridLength(75) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendErrors)), Width = new DataGridLength(75) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Descartes RX/TX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveDiscards)), Width = new DataGridLength(100) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Link", Binding = new Binding(nameof(NetworkAdapterStatistics.LinkSpeedDisplay)), Width = new DataGridLength(85) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Recebido", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesReceivedDisplay)), Width = new DataGridLength(85) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Enviado", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesSentDisplay)), Width = new DataGridLength(85) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveErrors)), Width = new DataGridLength(70) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendErrors)), Width = new DataGridLength(70) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Descartes RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveDiscardsDisplay)), Width = new DataGridLength(85) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Descartes TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendDiscardsDisplay)), Width = new DataGridLength(85) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Problemas RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveProblemPercentDisplay)), Width = new DataGridLength(90) });
+        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Problemas TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendProblemPercentDisplay)), Width = new DataGridLength(90) });
         var refreshStats = new Button { Content = "Atualizar contadores", Style = (Style)FindResource("AccentButton"), HorizontalAlignment = HorizontalAlignment.Left };
         refreshStats.Click += async (_, _) =>
         {

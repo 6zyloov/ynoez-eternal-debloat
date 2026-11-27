@@ -9,6 +9,14 @@ public sealed record NetworkAdapterStatistics(
     long ReceiveErrors, long SendErrors, long ReceiveDiscards, long SendDiscards,
     DateTimeOffset CapturedAt)
 {
+    public string LinkSpeedDisplay => NetworkAdapterStatisticsService.FormatLinkSpeed(LinkSpeedBitsPerSecond);
+    public string BytesReceivedDisplay => NetworkAdapterStatisticsService.FormatBytes(BytesReceived);
+    public string BytesSentDisplay => NetworkAdapterStatisticsService.FormatBytes(BytesSent);
+    public string ReceiveDiscardsDisplay => ReceiveDiscards.ToString("N0", CultureInfo.CurrentCulture);
+    public string SendDiscardsDisplay => SendDiscards.ToString("N0", CultureInfo.CurrentCulture);
+    public string ReceiveProblemPercentDisplay => ReceiveProblemPercent.HasValue ? ReceiveProblemPercent.Value.ToString("0.00", CultureInfo.CurrentCulture) + "%" : "—";
+    public string SendProblemPercentDisplay => SendProblemPercent.HasValue ? SendProblemPercent.Value.ToString("0.00", CultureInfo.CurrentCulture) + "%" : "—";
+
     public double? ReceiveProblemPercent =>
         NetworkAdapterStatisticsService.CalculateProblemPercent(PacketsReceived, ReceiveErrors, ReceiveDiscards);
     public double? SendProblemPercent =>

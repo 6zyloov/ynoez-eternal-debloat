@@ -190,10 +190,10 @@ public sealed class RegistryTweakServiceTests
     {
         var samples = new[]
         {
-            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 20, "OK", 30, 0, 0, 0, null, null),
-            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 30, "TIMEOUT", null, 0, 0, 0, null, null),
-            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "TIMEOUT", null, "OK", 50, 0, 0, 0, null, null),
-            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 40, "OK", 70, 0, 0, 0, null, null)
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 20, "OK", 30, 0, 0, 0, null, null, null),
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 30, "TIMEOUT", null, 0, 0, 0, null, null, null),
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "TIMEOUT", null, "OK", 50, 0, 0, 0, null, null, null),
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "", "NO_GATEWAY", null, "OK", 40, "OK", 70, 0, 0, 0, null, null, null)
         };
 
         var summary = NetworkMonitorService.SummarizeWindow(samples);
@@ -201,6 +201,7 @@ public sealed class RegistryTweakServiceTests
         Assert.Equal(0, summary.GatewayLossPercent);
         Assert.Equal(25, summary.ExternalLossPercent);
         Assert.Equal(25, summary.ExternalTcpFailurePercent);
+        Assert.Null(summary.GatewayJitterMilliseconds);
         Assert.Equal(10, summary.ExternalJitterMilliseconds);
         Assert.Equal(20, summary.ExternalTcpJitterMilliseconds!.Value);
     }
@@ -255,13 +256,14 @@ public sealed class RegistryTweakServiceTests
         var now = DateTimeOffset.UtcNow;
         var samples = new[]
         {
-            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "OK", 20, "OK", 30, 0, 0, 0, null, null),
-            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "TIMEOUT", null, "TIMEOUT", null, 0, 0, 0, null, null),
-            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "OK", 170, "OK", 190, 0, 0, 0, null, null)
+            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "OK", 20, "OK", 30, 0, 0, 0, null, null, null),
+            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "TIMEOUT", null, "TIMEOUT", null, 0, 0, 0, null, null, null),
+            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "OK", 170, "OK", 190, 0, 0, 0, null, null, null)
         };
 
         var summary = NetworkMonitorService.SummarizeWindow(samples);
 
+        Assert.Null(summary.GatewayJitterMilliseconds);
         Assert.Null(summary.ExternalJitterMilliseconds);
         Assert.Null(summary.ExternalTcpJitterMilliseconds);
         Assert.Equal(33.333333, summary.ExternalLossPercent, 5);

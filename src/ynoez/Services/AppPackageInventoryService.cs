@@ -46,15 +46,15 @@ public static class AppPackageInventoryService
         };
 
         process.Start();
-        using var registration = token.Register(() =>
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(45));
+        using var registration = timeout.Token.Register(() =>
         {
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
             catch { }
         });
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(TimeSpan.FromSeconds(45));
         try
         {
             await process.WaitForExitAsync(timeout.Token);

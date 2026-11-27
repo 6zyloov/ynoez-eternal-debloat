@@ -11,11 +11,11 @@ public sealed record NetworkMonitorSample(
     DateTimeOffset Timestamp, string Gateway, string GatewayStatus, long? GatewayMilliseconds,
     string ExternalStatus, long? ExternalMilliseconds, string ExternalTcpStatus, long? ExternalTcpMilliseconds,
     double GatewayLoss60sPercent, double ExternalLoss60sPercent, double ExternalTcpFailure60sPercent,
-    double? ExternalJitter60sMilliseconds, double? ExternalTcpJitter60sMilliseconds);
+    double? GatewayJitter60sMilliseconds, double? ExternalJitter60sMilliseconds, double? ExternalTcpJitter60sMilliseconds);
 
 public sealed record NetworkWindowSummary(
     double GatewayLossPercent, double ExternalLossPercent, double ExternalTcpFailurePercent,
-    double? ExternalJitterMilliseconds, double? ExternalTcpJitterMilliseconds);
+    double? GatewayJitterMilliseconds, double? ExternalJitterMilliseconds, double? ExternalTcpJitterMilliseconds);
 
 public static class NetworkMonitorService
 {
@@ -65,6 +65,7 @@ public static class NetworkMonitorService
                     GatewayLoss60sPercent = summary.GatewayLossPercent,
                     ExternalLoss60sPercent = summary.ExternalLossPercent,
                     ExternalTcpFailure60sPercent = summary.ExternalTcpFailurePercent,
+                    GatewayJitter60sMilliseconds = summary.GatewayJitterMilliseconds,
                     ExternalJitter60sMilliseconds = summary.ExternalJitterMilliseconds,
                     ExternalTcpJitter60sMilliseconds = summary.ExternalTcpJitterMilliseconds
                 };
@@ -99,7 +100,7 @@ public static class NetworkMonitorService
 
     public static NetworkWindowSummary SummarizeWindow(IReadOnlyList<NetworkMonitorSample> samples)
     {
-        if (samples.Count == 0) return new NetworkWindowSummary(0, 0, 0, null, null);
+        if (samples.Count == 0) return new NetworkWindowSummary(0, 0, 0, null, null, null);
 
         var gatewaySamples = samples.Where(x => !string.Equals(x.GatewayStatus, "NO_GATEWAY", StringComparison.OrdinalIgnoreCase)).ToArray();
         var gatewayLoss = gatewaySamples.Length == 0 ? 0 :
@@ -107,6 +108,7 @@ public static class NetworkMonitorService
         var externalLoss = 100d * samples.Count(x => !x.ExternalMilliseconds.HasValue) / samples.Count;
         var tcpFailure = 100d * samples.Count(x => !x.ExternalTcpMilliseconds.HasValue) / samples.Count;
         return new NetworkWindowSummary(gatewayLoss, externalLoss, tcpFailure,
+            CalculateJitter(gatewaySamples.Select(x => x.GatewayMilliseconds)),
             CalculateJitter(samples.Select(x => x.ExternalMilliseconds)),
             CalculateJitter(samples.Select(x => x.ExternalTcpMilliseconds)));
     }
