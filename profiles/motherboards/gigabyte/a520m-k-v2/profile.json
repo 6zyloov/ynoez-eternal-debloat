@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "gigabyte-a520m-k-v2",
+  "vendor": "GIGABYTE",
+  "model": "A520M K V2",
+  "chipset": "AMD A520",
+  "socket": "AM4",
+  "formFactor": "Micro-ATX",
+  "status": "initial-profile",
+  "verifiedAt": "2026-11-27",
+  "revisionDetection": {
+    "requiredBeforeFirmwareRecommendations": true,
+    "supportedRevisions": ["1.0", "1.1", "1.2"],
+    "supportPages": {
+      "1.0": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/Support",
+      "1.1": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/Support",
+      "1.2": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support"
+    },
+    "unknownRevisionBehavior": "Do not recommend BIOS or firmware until the physical revision is confirmed."
+  },
+  "specifications": {
+    "cpuFamilies": ["AMD Ryzen 5000 Series", "AMD Ryzen 5000 G-Series", "AMD Ryzen 4000 G-Series", "AMD Ryzen 3000 Series", "AMD Ryzen 3000 G-Series"],
+    "memory": {"type": "DDR4", "slots": 2, "maxCapacityGB": 64, "dualChannel": true, "xmp": true},
+    "graphicsSlot": "1 x PCI Express 3.0 x16",
+    "storage": {"m2": "1 x M.2 Socket 3, M key, 2280, SATA and PCIe 3.0 x4/x2", "sataPorts": 4, "sataSpeed": "6 Gb/s"},
+    "network": {"controllerFamily": "Realtek GbE LAN", "linkRatesMbps": [10, 100, 1000]},
+    "audio": "Realtek Audio CODEC",
+    "fanAndSensors": {"feature": "Smart Fan 5", "capabilities": ["temperature-detection", "fan-speed-detection", "fan-speed-control"], "note": "Fan control support depends on the installed cooler and detected controller."}
+  },
+  "officialSoftware": [
+    {"id": "app-center", "displayName": "Central de aplicativos da placa", "officialName": "GIGABYTE APP Center", "purpose": "Portal para utilitários e drivers compatíveis.", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10", "installPolicy": "Check current availability for the exact revision and OS."},
+    {"id": "system-information-viewer", "displayName": "Monitoramento da placa", "officialName": "System Information Viewer", "purpose": "Informações do sistema e monitoramento conforme suporte do modelo.", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10", "installPolicy": "Optional; do not bundle proprietary installer."},
+    {"id": "smart-fan-5", "displayName": "Controle de ventoinhas", "officialName": "Smart Fan 5", "purpose": "Detecção de temperatura, velocidade e controle de ventoinhas.", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/sp", "installPolicy": "Read capabilities first; no undocumented fan-control interfaces."},
+    {"id": "easy-tune", "displayName": "Ajustes avançados da placa", "officialName": "EasyTune", "purpose": "Utilitário para ajustes de sistema/memória, clocks e voltagens.", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10", "risk": "advanced", "installPolicy": "Never apply automatic overclock, voltage or clock changes."},
+    {"id": "q-flash", "displayName": "Atualização de BIOS pela UEFI", "officialName": "Q-Flash", "purpose": "Utilitário de atualização de BIOS integrado.", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/Support", "risk": "high", "installPolicy": "Manual guided workflow only; verify exact revision and file; never flash automatically."},
+    {"id": "at-bios", "displayName": "Ferramenta de BIOS no Windows", "officialName": "@BIOS", "purpose": "Utilitário para backup e atualização de BIOS no Windows.", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10", "risk": "high", "installPolicy": "Reference only; no unattended firmware updates."},
+    {"id": "smart-backup", "displayName": "Backup da fabricante", "officialName": "Smart Backup", "purpose": "Aplicativo listado entre os recursos do APP Center para o modelo.", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10", "installPolicy": "Verify current feature availability before showing."}
+  ],
+  "driverSources": [
+    {"id": "amd-a520-chipset", "deviceClass": "chipset", "provider": "AMD", "url": "https://www.amd.com/pt/support/downloads/drivers.html/chipsets/am4/a520.html", "policy": "Check current package/release notes for detected Windows edition."},
+    {"id": "realtek-gbe-lan", "deviceClass": "network", "provider": "GIGABYTE / Realtek", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/Support", "policy": "Match detected hardware ID and Windows edition; keep rollback path."},
+    {"id": "realtek-audio", "deviceClass": "audio", "provider": "GIGABYTE / Realtek", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/Support", "policy": "Match detected device ID and Windows edition; do not remove audio services blindly."}
+  ],
+  "ynoezRecommendations": [
+    {"id": "board-identification", "name": "Identificação da placa", "risk": "safe", "mode": "read-only", "description": "Detectar fabricante, modelo, revisão SMBIOS, BIOS, CPU, memória e IDs PnP."},
+    {"id": "chipset-driver-audit", "name": "Verificar driver do chipset", "risk": "safe", "mode": "read-only-until-confirmed", "description": "Comparar driver instalado à fonte AMD e mostrar release notes antes de instalar."},
+    {"id": "realtek-lan-diagnostics", "name": "Diagnóstico da rede cabeada", "risk": "safe", "mode": "read-only", "description": "Identificar driver, velocidade negociada, erros, quedas, latência, jitter e perda de pacotes."},
+    {"id": "lan-power-policy", "name": "Energia do adaptador de rede", "risk": "advanced", "mode": "preview-and-confirm", "description": "Oferecer ajuste reversível só se evidências apontarem economia de energia como causa de instabilidade."},
+    {"id": "smart-fan-monitor", "name": "Monitoramento térmico", "risk": "safe", "mode": "read-only-unless-supported", "description": "Exibir sensores/rotações quando houver interface suportada; não inventar leituras."},
+    {"id": "memory-xmp-guidance", "name": "Verificação de XMP", "risk": "advanced", "mode": "read-only-with-guidance", "description": "Detectar módulos e velocidade; orientar XMP manualmente após checar compatibilidade e estabilidade."},
+    {"id": "bios-audit", "name": "Verificação de BIOS", "risk": "safe-for-read-only", "mode": "read-only", "description": "Ler versão e abrir página da revisão correta; atualização permanece manual."}
+  ],
+  "blockedActions": ["automatic-bios-flash", "automatic-voltage-change", "automatic-cpu-overclock", "automatic-memory-overclock", "disable-tpm", "disable-secure-boot", "disable-vbs-hvci", "disable-iommu", "disable-windows-defender", "disable-windows-update", "global-disable-ipv6"],
+  "sources": [
+    {"title": "GIGABYTE A520M K V2 Rev. 1.0 Support", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/Support"},
+    {"title": "GIGABYTE A520M K V2 Rev. 1.0 Specifications", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/sp"},
+    {"title": "GIGABYTE A520M K V2 Rev. 1.1 Specifications", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/sp"},
+    {"title": "GIGABYTE A520M K V2 Rev. 1.2 Support", "url": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support"},
+    {"title": "AMD A520 Chipset Drivers", "url": "https://www.amd.com/pt/support/downloads/drivers.html/chipsets/am4/a520.html"},
+    {"title": "GIGABYTE A520M K Series / K V2 Manual", "url": "https://download.gigabyte.com/FileList/Manual/mb_manual_a520m-k-series_e.pdf"}
+  ]
+}
