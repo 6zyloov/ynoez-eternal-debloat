@@ -33,18 +33,22 @@ public static class NetworkAdapterAdvancedDiagnosticsService
         PropertyNameCaseInsensitive = true
     };
 
-    private sealed record RawSnapshot(
-        DateTimeOffset CapturedAt,
-        List<RawProperty>? Properties,
-        List<string>? Errors);
+    private sealed class RawSnapshot
+    {
+        public DateTimeOffset CapturedAt { get; set; }
+        public List<RawProperty>? Properties { get; set; }
+        public List<string>? Errors { get; set; }
+    }
 
-    private sealed record RawProperty(
-        string? AdapterName,
-        string? AdapterDescription,
-        string? DisplayName,
-        string? DisplayValue,
-        string? RegistryKeyword,
-        string? RegistryValue);
+    private sealed class RawProperty
+    {
+        public string? AdapterName { get; set; }
+        public string? AdapterDescription { get; set; }
+        public string? DisplayName { get; set; }
+        public string? DisplayValue { get; set; }
+        public string? RegistryKeyword { get; set; }
+        public string? RegistryValue { get; set; }
+    }
 
     public static async Task<NetworkAdapterAdvancedDiagnosticsSnapshot> CaptureAsync(
         CancellationToken token = default)
@@ -127,13 +131,16 @@ public static class NetworkAdapterAdvancedDiagnosticsService
         var properties = (raw.Properties ?? new List<RawProperty>())
             .Where(x => x is not null &&
                 !string.IsNullOrWhiteSpace(x.AdapterName) &&
-                !string.IsNullOrWhiteSpace(x.DisplayName))
+                (!string.IsNullOrWhiteSpace(x.DisplayName) ||
+                 !string.IsNullOrWhiteSpace(x.RegistryKeyword)))
             .Select(x =>
             {
                 var adapter = x.AdapterName!.Trim();
-                var name = x.DisplayName!.Trim();
-                var value = (x.DisplayValue ?? "").Trim();
                 var keyword = (x.RegistryKeyword ?? "").Trim();
+                var name = string.IsNullOrWhiteSpace(x.DisplayName)
+                    ? keyword + " (sem nome visível)"
+                    : x.DisplayName.Trim();
+                var value = (x.DisplayValue ?? "").Trim();
                 var registryValue = (x.RegistryValue ?? "").Trim();
                 var recommendation = Classify(name, keyword, value);
                 return new NetworkAdapterAdvancedProperty(
@@ -285,6 +292,9 @@ $items = New-Object System.Collections.Generic.List[object]
 $errors = New-Object System.Collections.Generic.List[string]
 try {
     $adapters = @(Get-NetAdapter -Physical -ErrorAction Stop)
+    if ($adapters.Count -eq 0) {
+        $errors.Add('Nenhum adaptador físico foi encontrado.')
+    }
     foreach ($adapter in $adapters) {
         try {
             $properties = @(Get-NetAdapterAdvancedProperty -Name $adapter.Name -AllProperties -ErrorAction Stop)
