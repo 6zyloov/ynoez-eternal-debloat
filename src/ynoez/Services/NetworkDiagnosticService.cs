@@ -155,6 +155,7 @@ public static class NetworkDiagnosticService
     private static async Task<PingSummary> TestHostAsync(string host, int count, IProgress<string>? progress, CancellationToken token)
     {
         var samples = new List<double>();
+        var attempts = new List<long?>();
         using var ping = new Ping();
         for (var i = 0; i < count; i++)
         {
@@ -162,16 +163,40 @@ public static class NetworkDiagnosticService
             try
             {
                 var reply = await ping.SendPingAsync(IPAddress.Parse(host), TimeSpan.FromMilliseconds(1500), new byte[32], new PingOptions(), token);
-                if (reply.Status == IPStatus.Success) samples.Add(reply.RoundtripTime);
+                if (reply.Status == IPStatus.Success)
+                {
+                    samples.Add(reply.RoundtripTime);
+                    attempts.Add(reply.RoundtripTime);
+                }
+                else
+                    attempts.Add(null);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-            catch { }
+            catch { attempts.Add(null); }
             progress?.Report($"Testando {host}: {i + 1}/{count}");
         }
         var avg = samples.Count == 0 ? 0 : samples.Average();
-        var jitter = samples.Count < 2 ? 0 : samples.Zip(samples.Skip(1), (a, b) => Math.Abs(a - b)).Average();
+        var jitter = CalculateJitter(attempts);
         return new PingSummary(host, count, samples.Count, 100d * (count - samples.Count) / count, avg,
             samples.Count == 0 ? 0 : samples.Min(), samples.Count == 0 ? 0 : samples.Max(), jitter);
+    }
+
+    internal static double? CalculateJitter(IReadOnlyList<long?> attempts)
+    {
+        long? previous = null;
+        var differences = new List<double>();
+        foreach (var current in attempts)
+        {
+            if (!current.HasValue)
+            {
+                previous = null;
+                continue;
+            }
+            if (previous.HasValue)
+                differences.Add(Math.Abs((double)current.Value - previous.Value));
+            previous = current.Value;
+        }
+        return differences.Count == 0 ? null : differences.Average();
     }
 
     private static IPAddress? GetDefaultGateway()

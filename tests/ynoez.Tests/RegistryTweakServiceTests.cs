@@ -251,6 +251,14 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void NetworkDiagnosticJitter_DoesNotBridgeAcrossFailedPings()
+    {
+        Assert.Null(NetworkDiagnosticService.CalculateJitter(new long?[] { 20, null, 170 }));
+        Assert.Equal(15, NetworkDiagnosticService.CalculateJitter(new long?[] { 20, 30, 50 }));
+        Assert.Null(NetworkDiagnosticService.CalculateJitter(new long?[] { 20, null, 30, null }));
+    }
+
+    [Fact]
     public void NetworkJitter_DoesNotBridgeAcrossPacketLoss()
     {
         var now = DateTimeOffset.UtcNow;
