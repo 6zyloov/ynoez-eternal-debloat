@@ -611,6 +611,21 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void AppxInventory_CsvEscapesFormulaLikeFields()
+    {
+        var package = new AppxPackageInfo(
+            "=HYPERLINK(\"https://example.invalid\")", "Package", "+1.0", "@Publisher",
+            "Ok", false, false, false, false, "Review", "-InstallLocation");
+
+        var csv = AppPackageInventoryService.BuildCsv(new[] { package });
+
+        Assert.Contains("\"'=HYPERLINK", csv, StringComparison.Ordinal);
+        Assert.Contains("\"'+1.0\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"'@Publisher\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"'-InstallLocation\"", csv, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AppxInventory_ParsesSinglePackageObject()
     {
         var packages = AppPackageInventoryService.ParseJson("{\"Name\":\"Example.App\",\"PackageFullName\":\"Example.App_1.0_x64\",\"Version\":\"1.0.0.0\"}");

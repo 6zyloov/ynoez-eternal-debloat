@@ -3,9 +3,9 @@ setlocal
 cd /d "%~dp0"
 where dotnet >nul 2>nul
 if errorlevel 1 (
-  echo [ERRO] .NET 8 SDK nao encontrado.
-  echo Instale o SDK .NET 8 e execute este arquivo novamente.
-  echo https://dotnet.microsoft.com/download/dotnet/8.0
+  echo [ERRO] .NET 10 SDK nao encontrado.
+  echo Instale o SDK .NET 10 LTS e execute este arquivo novamente.
+  echo https://dotnet.microsoft.com/download/dotnet/10.0
   pause
   exit /b 1
 )

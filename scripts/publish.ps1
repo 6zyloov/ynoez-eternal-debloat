@@ -10,7 +10,12 @@ $Project = Join-Path $ProjectRoot 'src\ynoez\ynoez.csproj'
 $Output = Join-Path $ProjectRoot 'dist'
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    throw 'O .NET 8 SDK não foi encontrado. Instale o SDK 8.0 e execute novamente.'
+    throw 'O .NET 10 SDK LTS não foi encontrado. Instale o SDK 10.0 e execute novamente.'
+}
+
+$SdkVersion = (& dotnet --version).Trim()
+if ($LASTEXITCODE -ne 0 -or $SdkVersion -notmatch '^10\.') {
+    throw "O ynoez agora requer o SDK .NET 10 LTS; SDK detectado: $SdkVersion"
 }
 
 if (Test-Path $Output) { Remove-Item $Output -Recurse -Force }
@@ -21,4 +26,4 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish falhou com código $LASTEXITCOD
 
 $Exe = Join-Path $Output 'ynoez.exe'
 if (-not (Test-Path $Exe)) { throw 'O processo de publicação terminou sem produzir ynoez.exe.' }
-Write-Host "Publicado: $Exe" -ForegroundColor Green
+Write-Host "Publicado com SDK .NET $SdkVersion: $Exe" -ForegroundColor Green

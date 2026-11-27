@@ -110,6 +110,13 @@ public static class AppPackageInventoryService
         Directory.CreateDirectory(AppPaths.Logs);
         var path = Path.Combine(AppPaths.Logs,
             "appx-inventory-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N")[..8] + ".csv");
+        File.WriteAllText(path, BuildCsv(packages), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        AppLog.Write("Inventário AppX exportado: " + path + " (" + packages.Count + " pacotes).");
+        return path;
+    }
+
+    internal static string BuildCsv(IReadOnlyList<AppxPackageInfo> packages)
+    {
         var lines = new List<string>
         {
             "Name,PackageFullName,Version,Publisher,Status,IsFramework,IsResourcePackage,IsBundle,NonRemovable,Classification,InstallLocation"
@@ -117,9 +124,7 @@ public static class AppPackageInventoryService
         lines.AddRange(packages.Select(x => string.Join(",",
             Csv(x.Name), Csv(x.PackageFullName), Csv(x.Version), Csv(x.Publisher), Csv(x.Status),
             x.IsFramework, x.IsResourcePackage, x.IsBundle, x.NonRemovable, Csv(x.Classification), Csv(x.InstallLocation))));
-        File.WriteAllLines(path, lines, new UTF8Encoding(true));
-        AppLog.Write("Inventário AppX exportado: " + path + " (" + packages.Count + " pacotes).");
-        return path;
+        return string.Join(Environment.NewLine, lines) + Environment.NewLine;
     }
 
     private static bool IsProtected(string name) =>
@@ -138,5 +143,12 @@ public static class AppPackageInventoryService
         (value.ValueKind == JsonValueKind.True ||
          (value.ValueKind == JsonValueKind.String && bool.TryParse(value.GetString(), out var parsed) && parsed));
 
-    private static string Csv(string value) => "\"" + (value ?? "").Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+    private static string Csv(string? value)
+    {
+        value ??= string.Empty;
+        var first = value.FirstOrDefault(c => !char.IsWhiteSpace(c));
+        if (first is '=' or '+' or '-' or '@' or '\\t' or '\\r')
+            value = "'" + value;
+        return "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+    }
 }
