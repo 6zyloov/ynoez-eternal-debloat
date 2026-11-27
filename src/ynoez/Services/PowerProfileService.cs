@@ -19,16 +19,45 @@ public sealed record PowerProfileResolution(PowerProfileMode RequestedMode, Powe
 
 public static class PowerProfileService
 {
-    private const uint EsContinuous = 0x80000000;
-    private const uint EsSystemRequired = 0x00000001;
+    private const uint PowerRequestContextSimpleString = 0x00000001;
+    private static readonly object PowerRequestSync = new();
+    private static IntPtr _systemSleepRequest = IntPtr.Zero;
     private static readonly string BaseBackupPath = Path.Combine(AppPaths.Data, "power-profile-base.json");
     private static readonly string StatePath = Path.Combine(AppPaths.Data, "power-profile-state.json");
     private static readonly string SessionPath = Path.Combine(AppPaths.Data, "auto-profile-session.json");
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly Regex GuidPattern = new(@"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$", RegexOptions.Compiled);
 
+    private enum PowerRequestType
+    {
+        DisplayRequired = 0,
+        SystemRequired = 1,
+        AwayModeRequired = 2,
+        ExecutionRequired = 3
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PowerRequestContext
+    {
+        public uint Version;
+        public uint Flags;
+        public IntPtr SimpleReasonString;
+    }
+
+    [DllImport("powrprof.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr PowerCreateRequest(ref PowerRequestContext context);
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PowerSetRequest(IntPtr requestHandle, PowerRequestType requestType);
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PowerClearRequest(IntPtr requestHandle, PowerRequestType requestType);
+
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern uint SetThreadExecutionState(uint esFlags);
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
 
     public static bool HasInterruptedAutomaticSession => File.Exists(SessionPath);
     public static bool CanRestoreOriginal() => File.Exists(BaseBackupPath);
@@ -311,23 +340,67 @@ public static class PowerProfileService
     private static string? NormalizeGuid(string? value) =>
         Guid.TryParse(value, out var parsed) ? parsed.ToString() : null;
 
-    public static void ClearExecutionRequirement() => SetExecutionRequirement(PowerProfileMode.Balanced);
+    public static void ClearExecutionRequirement() => TryClearExecutionRequirement();
 
     private static void SetExecutionRequirement(PowerProfileMode mode)
     {
-        var flags = mode == PowerProfileMode.Afk ? EsContinuous | EsSystemRequired : EsContinuous;
-        if (SetThreadExecutionState(flags) == 0)
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Não foi possível atualizar a política de suspensão do Windows.");
+        if (mode != PowerProfileMode.Afk)
+        {
+            TryClearExecutionRequirement();
+            return;
+        }
+
+        lock (PowerRequestSync)
+        {
+            if (_systemSleepRequest == IntPtr.Zero)
+            {
+                var reason = Marshal.StringToHGlobalUni("ynoez AFK: manter jogos, scripts e downloads ativos");
+                try
+                {
+                    var context = new PowerRequestContext
+                    {
+                        Version = 0,
+                        Flags = PowerRequestContextSimpleString,
+                        SimpleReasonString = reason
+                    };
+                    _systemSleepRequest = PowerCreateRequest(ref context);
+                }
+                finally { Marshal.FreeHGlobal(reason); }
+
+                if (_systemSleepRequest == IntPtr.Zero || _systemSleepRequest == new IntPtr(-1))
+                {
+                    _systemSleepRequest = IntPtr.Zero;
+                    throw new Win32Exception(Marshal.GetLastWin32Error(),
+                        "O Windows não permitiu criar uma solicitação persistente para manter o sistema ativo.");
+                }
+            }
+
+            if (!PowerSetRequest(_systemSleepRequest, PowerRequestType.SystemRequired))
+            {
+                var error = Marshal.GetLastWin32Error();
+                CloseHandle(_systemSleepRequest);
+                _systemSleepRequest = IntPtr.Zero;
+                throw new Win32Exception(error, "O Windows não permitiu bloquear a suspensão automática durante o perfil AFK.");
+            }
+        }
     }
 
     private static void TryClearExecutionRequirement()
     {
-        try
+        lock (PowerRequestSync)
         {
-            if (SetThreadExecutionState(EsContinuous) == 0)
-                AppLog.Write("O Windows não confirmou a liberação do bloqueio temporário de suspensão.");
+            if (_systemSleepRequest == IntPtr.Zero) return;
+            var handle = _systemSleepRequest;
+            _systemSleepRequest = IntPtr.Zero;
+
+            if (!PowerClearRequest(handle, PowerRequestType.SystemRequired))
+                AppLog.Write("O Windows não confirmou a liberação explícita da solicitação AFK: " +
+                    new Win32Exception(Marshal.GetLastWin32Error()).Message);
+
+            if (!CloseHandle(handle))
+                AppLog.Write("O Windows não confirmou o fechamento do identificador de energia: " +
+                    new Win32Exception(Marshal.GetLastWin32Error()).Message);
         }
-        catch (Exception ex) { AppLog.Write("Falha ao liberar bloqueio de suspensão: " + ex.Message); }
     }
 
     private static string ValidateSessionExportPath(string path)
