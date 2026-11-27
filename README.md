@@ -12,18 +12,22 @@ Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual tom
 
 ## Estado do aplicativo — 0.3.0 (em desenvolvimento)
 
-- **Home:** inventário de CPU, GPU, RAM, Windows, placa-mãe e BIOS; auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers do Windows Search, impressão, Store, Windows Update, Vanguard e FACEIT; verificação manual de atualização estável via GitHub, sem download nem instalação automática.
+- **Home:** inventário de CPU, GPU, RAM total, Windows, placa-mãe e BIOS; consulta sob demanda dos módulos RAM reportados por WMI/SMBIOS (posição, capacidade, DDR, velocidades, formato, ECC e part number), sem afirmar single/dual channel nem ler SPD diretamente. Mantém auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI e Search/impressão/Store/Update/Vanguard/FACEIT; verificação manual de atualização estável sem download automático.
 - **Monitor:** CPU/RAM em tempo real; GPU 3D via NVIDIA SMI ou contadores do Windows; temperatura/VRAM/potência quando o driver NVIDIA oferece esses dados.
 - **Benchmark:** PresentMon 2.6.0 oficial, baixado somente quando solicitado e validado por SHA-256. Captura de 30–180 segundos, FPS médio, 1% low calculado pelo inverso do P99 de frametime, frametime médio e contagem de frames lentos. CSV salvo em `Logs\`. A captura pode solicitar UAC.
-- **Tweaks:** perfis Performance/Equilibrado/AFK; fallback explícito para Equilibrado quando um plano opcional não existe; bloqueio da suspensão automática no AFK; sessão automática com backup/restauração e recuperação após encerramento inesperado; 11 ajustes HKCU com detecção, consentimento, verificação e reversão.
+- **Tweaks:** perfis Performance/Equilibrado/AFK e AFK protegido. Jogos conhecidos e processos extras escolhidos pelo usuário usam Equilibrado + bloqueio de suspensão quando o usuário está AFK; a economia agressiva só entra sem cargas protegidas. A lista é salva em Data; se sua configuração estiver corrompida, o modo automático falha com segurança para AFK protegido. Nenhum processo é encerrado; sessão de energia exportada/restaurada; 11 ajustes HKCU reversíveis.
 - **Execução em segundo plano:** fechar a janela com uma operação longa ativa oculta o ynoez na bandeja do sistema em vez de encerrar o monitor de rede, o perfil automático, o benchmark ou a manutenção do Windows; duplo clique no ícone reabre a janela e o menu da bandeja permite encerrar explicitamente.
-- **Network:** inventário somente leitura de interfaces, drivers, endereços, gateways, DNS e MTU; diagnóstico cancelável de gateway, dois destinos públicos, ICMP, TCP/443, DNS IPv4/IPv6 e tracert; monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, Cloudflare e Google, DNS, janela móvel real de 60 segundos, perda/jitter por protocolo e hipótese de causa, com CSV; contadores RX/TX e consulta/ajuste reversível de energia em adaptadores compatíveis.
+- **Network:** inventário somente leitura de interfaces, drivers, endereços, gateways, DNS e MTU; diagnóstico cancelável ICMP/TCP/DNS IPv4/IPv6/tracert; monitoramento contínuo a cada 5 segundos de gateways IPv4/IPv6, Cloudflare e Google por ICMP/TCP/443 nas duas famílias, DNS com contagem A/AAAA e janela móvel de 60 segundos com perda/jitter separados por família/protocolo. Distingue ausência/filtragem IPv6, rede local, DNS, ICMP e TCP; exporta CSV completo. Contadores RX/TX e energia de NIC reversível.
 - **Debloat:** limpeza seletiva de Temp e caches Brave/Discord, preservando perfis e credenciais; inventários de programas Win32 (HKLM/HKCU 32/64 bits) e AppX/MSIX somente leitura para usuário atual, todos os perfis e pacotes provisionados, com busca e exportação CSV; gerenciador de inicialização HKCU + arquivos da pasta pessoal com backup e reversão (HKLM e pasta Startup compartilhada somente leitura); whitelist de seis serviços opcionais e seis tarefas agendadas opcionais com backup, verificação e restauração.
-- **Motherboard:** identificação da placa e revisão, perfil A520M K V2 com fontes oficiais por revisão.
-- **Toolbox:** pesquisa de recursos/configurações Windows e consulta de serviços protegidos.
+- **Motherboard:** perfil GIGABYTE A520M K V2; revisão SMBIOS aparece só como indício e links de BIOS específicos exigem confirmação manual da serigrafia no PCB. Inventário sob demanda de dispositivos PnP de rede/áudio/sistema com hardware IDs e metadados do driver assinado (provedor, versão, data e INF), sem instalação automática.
+- **Toolbox:** pesquisa de configurações e atalhos Windows; inventário sob demanda somente leitura de serviços Win32 e tarefas agendadas com busca, classificação de componentes protegidos/whitelist opcional, estado, horários/descrições e CSV. Tarefas desconhecidas e serviços não avaliados permanecem somente leitura; alterações continuam nas whitelists reversíveis de Debloat.
 - **Reparo do Windows:** DISM CheckHealth/ScanHealth/RestoreHealth e SFC VerifyOnly/Scannow em comandos allowlisted; verificações separadas de reparos, confirmação explícita, UAC, timeout/cancelamento, logs individuais e sem reinicialização automática.
 - **Backup, Restore e Logs:** central de recuperação para Registro, plano base, sessão AFK interrompida, serviços, adaptadores, tarefas e inicialização; snapshots locais com nomes únicos, manifesto SHA-256 e descarte de snapshots incompletos; ponto de restauração opcional.
 - **Interface:** Poppins incorporada ao executável (Regular, Medium, SemiBold e Bold) com licença SIL Open Font License.
+
+
+
+A versão do app e do instalador vem de um único campo `<Version>` em `src/ynoez/ynoez.csproj`. O builder gera um script Inno Setup temporário com valores literais e verifica os metadados PE antes do upload; releases estáveis ainda dependem de tag `vX.Y.Z` correspondente.
 
 ## Segurança e limites
 
@@ -37,7 +41,7 @@ O projeto não automatiza flash de BIOS, overclock, tensão, PBO, BCD/HPET/timer
 
 ## Build e testes
 
-O GitHub Actions compila em Windows x64, executa testes de Registro em HKCU isolado, inicialização temporária, resolução de planos de energia, manifesto SHA-256 dos snapshots, estatísticas da janela de rede, parser CSV do PresentMon e whitelists de serviços/tarefas antes de publicar o executável autocontido e instalador.
+O GitHub Actions compila em Windows x64, executa testes de Registro, perfis AFK/protegidos, inventários de serviços/tarefas, SMBIOS/RAM, revisão física de placa, PnP/drivers, monitor de rede IPv4/IPv6, PresentMon e whitelists. Também publica executável autocontido e instalador, valida metadados PE, dry-run de release e SHA-256.
 
 A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, PresentMon com jogos reais, energia de NIC, hardware físico e compatibilidade com Vanguard/FACEIT numa máquina real.
 
