@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "id": "gigabyte-a520m-k-v2",
+  "manufacturer": "GIGABYTE",
+  "product": "A520M K V2",
+  "chipset": "AMD A520",
+  "socket": "AM4",
+  "memory": {
+    "type": "DDR4",
+    "slots": 2,
+    "mode": "Dual channel"
+  },
+  "storage": [
+    "M.2 PCIe Gen3 x4",
+    "M.2 SATA mode"
+  ],
+  "network": {
+    "type": "Gigabit Ethernet",
+    "vendor": "Confirm controller hardware ID before selecting a LAN driver",
+    "supportNotes": "The official revision-specific support pages list Realtek LAN packages. Driver version and OS support must be checked on the matching revision."
+  },
+  "audio": {
+    "type": "8-channel HD Audio",
+    "vendor": "Confirm controller hardware ID before selecting an audio driver"
+  },
+  "features": [
+    "Smart Fan 5",
+    "Hybrid fan headers and fan stop",
+    "GIGABYTE APP Center",
+    "Q-Flash",
+    "AMD Ryzen 3000/4000G/5000/5000G CPU families subject to the revision-specific CPU support list"
+  ],
+  "revisions": [
+    {
+      "pcbRevision": "1.0",
+      "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support",
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support#support-dl-bios"
+    },
+    {
+      "pcbRevision": "1.1",
+      "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/support",
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-11/support#support-dl-bios"
+    },
+    {
+      "pcbRevision": "1.2",
+      "support": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support",
+      "bios": "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support#support-dl-bios"
+    }
+  ],
+  "vendorUtilities": [
+    {
+      "name": "GIGABYTE APP Center",
+      "role": "Vendor utility hub",
+      "policy": "Offer the official support link; never silently install bundled components."
+    },
+    {
+      "name": "EasyTune",
+      "role": "Windows tuning utility",
+      "policy": "Informational only. It can expose clock/voltage tuning. No automatic overclocking or voltage changes."
+    },
+    {
+      "name": "System Information Viewer / Smart Fan 5",
+      "role": "Sensor and fan monitoring/control",
+      "policy": "Only show when compatible software/hardware is detected. Do not apply fan curves until headers and sensors are mapped."
+    },
+    {
+      "name": "Q-Flash / @BIOS",
+      "role": "Firmware update utility",
+      "policy": "Manual vendor workflow only. No automated firmware download, flashing, reboot or downgrade."
+    }
+  ],
+  "safeChecks": [
+    "Read SMBIOS manufacturer/product, BIOS vendor/version/date, CPU and chipset.",
+    "Read network and audio PnP hardware IDs before recommending drivers.",
+    "Show current driver versions and compare only against the official page for the confirmed PCB revision and Windows version.",
+    "Inspect adapter power-management settings without changing them automatically.",
+    "Monitor available temperature sensors and fan readings without changing fan curves."
+  ],
+  "blockedAutomaticActions": [
+    "BIOS flash, BIOS downgrade or firmware-region writing",
+    "CPU overclock, PBO, voltage, SoC voltage, load-line or memory timing changes",
+    "TPM, Secure Boot, SVM, IOMMU, DMA remapping, VBS or HVCI disabling",
+    "Bulk changes to chipset, LAN, audio, storage or USB drivers",
+    "Disabling Windows Update, Defender, firewall, Store licensing, printing or Search"
+  ],
+  "revisionDetection": {
+    "preferred": "User-confirmed PCB revision printed on the motherboard",
+    "secondary": "SMBIOS Win32_BaseBoard.Version, if it exactly matches 1.0, 1.1 or 1.2",
+    "fallback": "Generic product support page; do not guess a BIOS revision"
+  },
+  "sources": [
+    "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10",
+    "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/sp",
+    "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-10/support",
+    "https://www.gigabyte.com/Motherboard/A520M-K-V2-rev-11/support",
+    "https://www.gigabyte.com/br/Motherboard/A520M-K-V2-rev-12/support"
+  ],
+  "notes": [
+    "The manufacturer provides separate support pages for revisions 1.0, 1.1 and 1.2.",
+    "The actual physical revision must be verified before BIOS selection.",
+    "Specifications and driver availability can change; refresh official support data before shipping a recommendation."
+  ]
+}
