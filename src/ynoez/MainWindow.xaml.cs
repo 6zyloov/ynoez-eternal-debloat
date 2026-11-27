@@ -869,7 +869,12 @@ public partial class MainWindow : Window
             var details = service.Definition.Description +
                 "\nEstado: " + service.State + " | Inicialização: " + service.StartMode +
                 (service.DelayedAutoStart ? " (atrasada)" : "");
-            if (service.DisabledByYnoez)
+            if (service.DisabledByYnoez && !service.Available)
+            {
+                root.Children.Add(NoteCard(service.Definition.DisplayName + " — backup preservado",
+                    details + "\nO serviço não pode ser consultado neste momento. O ynoez mantém o backup e não tentará uma alteração sem confirmar que o serviço existe."));
+            }
+            else if (service.DisabledByYnoez)
             {
                 root.Children.Add(ActionCard(service.Definition.DisplayName, details,
                     "Restaurar serviço", async () =>
