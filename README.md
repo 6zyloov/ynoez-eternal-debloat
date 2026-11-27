@@ -20,7 +20,7 @@ Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual tom
 - **Debloat:** limpeza seletiva de Temp e caches Brave/Discord, preservando perfis e credenciais; inventários de programas Win32 (HKLM/HKCU 32/64 bits) e AppX/MSIX somente leitura para usuário atual, todos os perfis e pacotes provisionados, com busca e exportação CSV; gerenciador de inicialização HKCU + arquivos da pasta pessoal com backup e reversão (HKLM e pasta Startup compartilhada somente leitura); whitelist de seis serviços opcionais e seis tarefas agendadas opcionais com backup, verificação e restauração.
 - **Motherboard:** identificação da placa e revisão, perfil A520M K V2 com fontes oficiais por revisão.
 - **Toolbox:** pesquisa de recursos/configurações Windows e consulta de serviços protegidos.
-- **Backup, Restore e Logs:** central de recuperação para Registro, plano base, sessão AFK interrompida, serviços, adaptadores, tarefas e inicialização; snapshots locais com nomes únicos, manifesto SHA-256 e descarte de snapshots incompletos; ponto de restauração opcional.
+- **Reparo do Windows:** DISM CheckHealth/ScanHealth/RestoreHealth e SFC VerifyOnly/Scannow em comandos allowlisted; verificações separadas de reparos, confirmação explícita, UAC, timeout/cancelamento, logs individuais e sem reinicialização automática.\n- **Backup, Restore e Logs:** central de recuperação para Registro, plano base, sessão AFK interrompida, serviços, adaptadores, tarefas e inicialização; snapshots locais com nomes únicos, manifesto SHA-256 e descarte de snapshots incompletos; ponto de restauração opcional.
 - **Interface:** Poppins incorporada ao executável (Regular, Medium, SemiBold e Bold) com licença SIL Open Font License.
 
 ## Segurança e limites

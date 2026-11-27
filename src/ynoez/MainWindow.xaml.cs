@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _metricsCts;
     private CancellationTokenSource? _benchmarkCts;
     private CancellationTokenSource? _integrityAuditCts;
+    private CancellationTokenSource? _windowsRepairCts;
 
     private sealed record ToolboxEntry(string Name, string Description, string[] Keywords, string Target, string Kind = "Configuração", string? ServiceName = null);
 
@@ -68,7 +69,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _systemAppxInventoryCts?.Cancel(); _programInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); _integrityAuditCts?.Cancel(); };
+        Closed += (_, _) => { _appxInventoryCts?.Cancel(); _systemAppxInventoryCts?.Cancel(); _programInventoryCts?.Cancel(); _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); _integrityAuditCts?.Cancel(); _windowsRepairCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -1692,6 +1693,81 @@ public partial class MainWindow : Window
     {
         var root = PageContainer();
         root.Children.Add(PageIntro("Restore", "Central de recuperação do ynoez. Cada backup permanece separado e só é consumido depois da verificação da restauração."));
+
+        root.Children.Add(Heading("Diagnóstico e reparo do Windows", 15));
+        root.Children.Add(Body("O DISM verifica/repara o repositório de componentes e o SFC verifica/repara arquivos protegidos do Windows. As verificações são somente leitura; os dois reparos exigem confirmação e UAC. As operações podem levar bastante tempo. O ynoez salva o resultado em Logs e nunca reinicia o computador automaticamente."));
+        var repairCard = MakeCard();
+        var repairPanel = new StackPanel { Margin = new Thickness(20) };
+        var repairStatus = Body("Nenhuma verificação executada.");
+        var repairButtons = new WrapPanel();
+        var repairCancel = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        var repairActions = WindowsRepairService.GetActions();
+        var actionButtons = new List<Button>();
+        foreach (var actionInfo in repairActions)
+        {
+            var button = new Button
+            {
+                Content = actionInfo.Name,
+                Style = actionInfo.IsRepair ? (Style)FindResource("AccentButton") : (Style)FindResource("QuietButton"),
+                Margin = new Thickness(0, 0, 8, 8),
+                Padding = new Thickness(10, 7, 10, 7),
+                ToolTip = actionInfo.Description
+            };
+            button.Click += async (_, _) =>
+            {
+                if (_windowsRepairCts is not null) return;
+                if (actionInfo.IsRepair && MessageBox.Show(
+                    actionInfo.Description + "\n\nO Windows poderá usar o Windows Update e pode precisar reiniciar depois. O ynoez não fará reinicialização automática. Continuar?",
+                    "Confirmar reparo do Windows", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+
+                _windowsRepairCts = new CancellationTokenSource();
+                var token = _windowsRepairCts.Token;
+                foreach (var item in actionButtons) item.IsEnabled = false;
+                repairCancel.IsEnabled = true;
+                repairStatus.Text = actionInfo.Name + " — solicitando elevação UAC…";
+                var progress = new Progress<string>(message => repairStatus.Text = message);
+                try
+                {
+                    var result = await WindowsRepairService.RunAsync(actionInfo.Action, progress, token);
+                    repairStatus.Text = (result.Succeeded ? "Concluído" : "Finalizado com erro") +
+                        " • código " + result.ExitCode + "\nInício: " + result.StartedAt.ToLocalTime().ToString("HH:mm:ss") +
+                        " • Fim: " + result.FinishedAt.ToLocalTime().ToString("HH:mm:ss") +
+                        "\nLog: " + result.LogPath + "\n\n" + result.OutputTail;
+                    MessageBox.Show(
+                        (result.Succeeded ? "Operação concluída." : "O comando terminou com erro.") +
+                        "\nCódigo: " + result.ExitCode + "\nLog: " + result.LogPath,
+                        "ynoez — manutenção do Windows",
+                        MessageBoxButton.OK,
+                        result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    repairStatus.Text = "Operação cancelada. O log parcial, quando existente, foi preservado.";
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Write("Manutenção do Windows falhou: " + ex);
+                    repairStatus.Text = "Falha: " + ex.Message;
+                }
+                finally
+                {
+                    _windowsRepairCts?.Dispose();
+                    _windowsRepairCts = null;
+                    foreach (var item in actionButtons) item.IsEnabled = true;
+                    repairCancel.IsEnabled = false;
+                }
+            };
+            actionButtons.Add(button);
+            repairButtons.Children.Add(button);
+        }
+        repairCancel.Click += (_, _) => _windowsRepairCts?.Cancel();
+        repairPanel.Children.Add(repairButtons);
+        repairPanel.Children.Add(repairCancel);
+        repairPanel.Children.Add(repairStatus);
+        repairPanel.Children.Add(NoteCard("Antes do reparo", "SFC e DISM são ferramentas oficiais do Windows, mas um reparo pode consumir dados e tempo. Salve o trabalho, mantenha o computador ligado e não feche a janela de manutenção durante a execução. Para falhas de hardware, o reparo de arquivos não substitui diagnóstico físico."));
+        repairCard.Child = repairPanel;
+        root.Children.Add(repairCard);
 
         root.Children.Add(ActionCard("Restauração do Sistema", "Abre o utilitário nativo do Windows para escolher um ponto de restauração disponível.", "Abrir Restauração", () => OpenTargetAsync("rstrui.exe"), "WINDOWS"));
         root.Children.Add(Heading("Planos de energia", 15));
