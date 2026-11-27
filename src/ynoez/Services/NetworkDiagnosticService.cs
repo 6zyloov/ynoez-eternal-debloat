@@ -67,9 +67,10 @@ public static class NetworkDiagnosticService
             token.ThrowIfCancellationRequested();
             try
             {
-                var reply = await ping.SendPingAsync(host, 1500);
+                var reply = await ping.SendPingAsync(host, 1500, new byte[32], new PingOptions(), token);
                 if (reply.Status == IPStatus.Success) samples.Add(reply.RoundtripTime);
             }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch { }
             progress?.Report($"Testando {host}: {i + 1}/{count}");
         }

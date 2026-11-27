@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private HardwareSnapshot _hardware = new();
     private string _currentPage = "Home";
     private bool _isBusy;
+    private CancellationTokenSource? _networkMonitorCts;
 
     private sealed record ToolboxEntry(string Name, string Description, string[] Keywords, string Target, string Kind = "Configuração", string? ServiceName = null);
 
@@ -58,6 +59,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
+        Closed += (_, _) => _networkMonitorCts?.Cancel();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -291,6 +293,54 @@ public partial class MainWindow : Window
         panel.Children.Add(run);
         resultCard.Child = panel;
         root.Children.Add(resultCard);
+
+        var monitorCard = MakeCard();
+        var monitorPanel = new StackPanel { Margin = new Thickness(20) };
+        monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
+        monitorPanel.Children.Add(Body("Registra a cada 5 segundos a latência e o estado do gateway e de 1.1.1.1. Ideal para sessões longas ou períodos AFK. O CSV fica em C:\\ynoez\\Logs; o monitor não altera a rede."));
+        var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
+        var monitorButtons = new WrapPanel();
+        var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
+        var stopMonitor = new Button { Content = "Parar monitor", Style = (Style)FindResource("SecondaryButton"), MinWidth = 120, IsEnabled = false };
+        startMonitor.Click += async (_, _) =>
+        {
+            if (_networkMonitorCts is not null) return;
+            _networkMonitorCts = new CancellationTokenSource();
+            var token = _networkMonitorCts.Token;
+            startMonitor.IsEnabled = false;
+            stopMonitor.IsEnabled = true;
+            monitorStatus.Text = "Monitorando gateway e 1.1.1.1…";
+            try
+            {
+                var logFile = await NetworkMonitorService.RunAsync(TimeSpan.FromSeconds(5), sample =>
+                {
+                    monitorStatus.Text = sample.Timestamp.ToString("HH:mm:ss") +
+                        " | Gateway: " + sample.GatewayStatus + (sample.GatewayMilliseconds.HasValue ? " " + sample.GatewayMilliseconds + " ms" : "") +
+                        " | Internet: " + sample.ExternalStatus + (sample.ExternalMilliseconds.HasValue ? " " + sample.ExternalMilliseconds + " ms" : "");
+                }, token);
+                monitorStatus.Text = "Monitor encerrado. CSV salvo em: " + logFile;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Monitoramento de rede falhou: " + ex);
+                monitorStatus.Text = "Falha no monitoramento: " + ex.Message;
+            }
+            finally
+            {
+                _networkMonitorCts?.Dispose();
+                _networkMonitorCts = null;
+                startMonitor.IsEnabled = true;
+                stopMonitor.IsEnabled = false;
+            }
+        };
+        stopMonitor.Click += (_, _) => _networkMonitorCts?.Cancel();
+        monitorButtons.Children.Add(startMonitor);
+        monitorButtons.Children.Add(stopMonitor);
+        monitorPanel.Children.Add(monitorStatus);
+        monitorPanel.Children.Add(monitorButtons);
+        monitorCard.Child = monitorPanel;
+        root.Children.Add(monitorCard);
+
         root.Children.Add(NoteCard("Como interpretar", "Perda também no gateway sugere um problema dentro da rede local (Wi-Fi, cabo, adaptador ou roteador). Perda somente no destino externo pode estar na rota ou no provedor. Um teste curto não prova sozinho a causa de desconexões intermitentes."));
         return root;
     }
