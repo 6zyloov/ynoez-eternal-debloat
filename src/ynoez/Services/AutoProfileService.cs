@@ -75,7 +75,7 @@ public static class AutoProfileService
 
             if (value.Length == 0) continue;
             if (value.Length > 128 ||
-                value.Any(char.IsControl) ||
+                value.Any(c => char.IsControl(c) || char.IsWhiteSpace(c)) ||
                 value.IndexOfAny(new[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', ';' }) >= 0)
                 throw new ArgumentException(
                     "Nome de processo inválido. Informe somente o nome do executável, sem caminho, argumentos ou curingas: " + raw,
