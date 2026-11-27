@@ -32,7 +32,7 @@ public sealed class WindowsRepairServiceTests
         Assert.DoesNotContain("$args=@", script);
         Assert.Contains("dism.exe", script);
         Assert.Contains("/RestoreHealth", script);
-        Assert.Contains("ynoez-''log.log", script);
+        Assert.Contains("ynoez-repair-''log.log", script);
     }
 
     [Fact]

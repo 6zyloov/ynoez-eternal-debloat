@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _integrityAuditCts;
     private CancellationTokenSource? _windowsRepairCts;
     private bool _allowClose;
+    private bool _sessionEnding;
     private bool _trayIconVisible;
     private HwndSource? _windowSource;
 
@@ -115,8 +116,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
+        Application.Current.SessionEnding += Application_SessionEnding;
         Closed += (_, _) =>
         {
+            Application.Current.SessionEnding -= Application_SessionEnding;
             RemoveTrayIcon();
             _windowSource?.RemoveHook(TrayWindowProc);
             _appxInventoryCts?.Cancel();
@@ -2333,7 +2336,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (!_allowClose && HasBackgroundWork())
+        if (!_allowClose && !_sessionEnding && !Environment.HasShutdownStarted && HasBackgroundWork())
         {
             if (!EnsureTrayIcon())
             {
@@ -2349,6 +2352,9 @@ public partial class MainWindow : Window
 
         RemoveTrayIcon();
     }
+
+    private void Application_SessionEnding(object? sender, SessionEndingCancelEventArgs e) =>
+        _sessionEnding = true;
 
     private bool HasBackgroundWork() =>
         _networkMonitorCts is not null ||
