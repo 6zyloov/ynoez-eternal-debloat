@@ -56,8 +56,8 @@ public sealed class AdapterPowerManagementService
     }
 
     public bool CanReducePowerSaving(AdapterPowerStatus adapter) =>
-        IsSupported(adapter.SelectiveSuspend) && adapter.SelectiveSuspend == "Enabled"
-        || IsSupported(adapter.DeviceSleepOnDisconnect) && adapter.DeviceSleepOnDisconnect == "Enabled";
+        string.Equals(adapter.SelectiveSuspend, "Enabled", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(adapter.DeviceSleepOnDisconnect, "Enabled", StringComparison.OrdinalIgnoreCase);
 
     public bool CanRestore(string adapterName) => File.Exists(GetBackupPath(adapterName));
 
@@ -75,9 +75,10 @@ public sealed class AdapterPowerManagementService
             adapter.DeviceSleepOnDisconnect, DateTimeOffset.UtcNow);
         WriteAtomic(backupPath, JsonSerializer.Serialize(backup, JsonOptions));
 
-        var script = BuildSetScript(adapter.Name,
-            string.Equals(adapter.SelectiveSuspend, "Enabled", StringComparison.OrdinalIgnoreCase) ? "Disabled" : adapter.SelectiveSuspend,
-            string.Equals(adapter.DeviceSleepOnDisconnect, "Enabled", StringComparison.OrdinalIgnoreCase) ? "Disabled" : adapter.DeviceSleepOnDisconnect);
+        var targetSelective = string.Equals(adapter.SelectiveSuspend, "Enabled", StringComparison.OrdinalIgnoreCase) ? "Disabled" : adapter.SelectiveSuspend;
+        var targetDeviceSleep = string.Equals(adapter.DeviceSleepOnDisconnect, "Enabled", StringComparison.OrdinalIgnoreCase) ? "Disabled" : adapter.DeviceSleepOnDisconnect;
+        var script = BuildSetScript(adapter.Name, targetSelective, targetDeviceSleep,
+            adapter.SelectiveSuspend, adapter.DeviceSleepOnDisconnect);
         try
         {
             RunElevated(script);
@@ -101,18 +102,28 @@ public sealed class AdapterPowerManagementService
         if (!string.Equals(backup.Name, adapterName, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("O nome do adaptador não corresponde ao backup.");
 
-        RunElevated(BuildSetScript(adapterName, backup.SelectiveSuspend, backup.DeviceSleepOnDisconnect));
+        var expectedSelective = IsSupported(backup.SelectiveSuspend) ? "Disabled" : backup.SelectiveSuspend;
+        var expectedDeviceSleep = IsSupported(backup.DeviceSleepOnDisconnect) ? "Disabled" : backup.DeviceSleepOnDisconnect;
+        RunElevated(BuildSetScript(adapterName, backup.SelectiveSuspend, backup.DeviceSleepOnDisconnect,
+            expectedSelective, expectedDeviceSleep));
 
         File.Delete(backupPath);
         AppLog.Write("Configuração de energia do adaptador restaurada: " + adapterName);
     }
 
-    private static string BuildSetScript(string name, string selectiveSuspend, string deviceSleep)
+    private static string BuildSetScript(string name, string selectiveSuspend, string deviceSleep,
+        string expectedSelective, string expectedDeviceSleep)
     {
         var n = EscapePowerShell(name);
         var s = EscapePowerShell(selectiveSuspend);
         var d = EscapePowerShell(deviceSleep);
-        return "$ErrorActionPreference='Stop'; $n='" + n + "'; $s='" + s + "'; $d='" + d + "'; try { " +
+        var expectedS = EscapePowerShell(expectedSelective);
+        var expectedD = EscapePowerShell(expectedDeviceSleep);
+        return "$ErrorActionPreference='Stop'; $n='" + n + "'; $s='" + s + "'; $d='" + d +
+            "'; $es='" + expectedS + "'; $ed='" + expectedD + "'; try { " +
+            "$before=Get-NetAdapterPowerManagement -Name $n -ErrorAction Stop; " +
+            "if ($es -in @('Enabled','Disabled') -and [string]$before.SelectiveSuspend -ne $es) { throw 'SelectiveSuspend mudou desde a leitura' }; " +
+            "if ($ed -in @('Enabled','Disabled') -and [string]$before.DeviceSleepOnDisconnect -ne $ed) { throw 'DeviceSleepOnDisconnect mudou desde a leitura' }; " +
             "$p=@{Name=$n;NoRestart=$true}; " +
             "if ($s -in @('Enabled','Disabled')) { $p.SelectiveSuspend=$s }; " +
             "if ($d -in @('Enabled','Disabled')) { $p.DeviceSleepOnDisconnect=$d }; " +
