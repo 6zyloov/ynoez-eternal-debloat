@@ -946,7 +946,7 @@ public partial class MainWindow : Window
         var monitorCard = MakeCard();
         var monitorPanel = new StackPanel { Margin = new Thickness(20) };
         monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
-        monitorPanel.Children.Add(Body("Registra a cada 5 segundos o gateway atual, dois destinos públicos (Cloudflare e Google), ICMP, TCP/443 e resolução DNS. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs."));
+        monitorPanel.Children.Add(Body("Registra a cada 5 segundos o gateway atual, dois destinos públicos (Cloudflare e Google), ICMP, TCP/443 e resolução DNS. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo."));
         var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var monitorButtons = new WrapPanel();
         var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
