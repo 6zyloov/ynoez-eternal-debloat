@@ -54,8 +54,8 @@ public sealed class ServiceTweakService
             var info = ReadService(definition.Name);
             if (info is null) continue;
             var backup = ReadBackup(definition.Name);
-            result.Add(new OptionalServiceStatus(definition, true, info.Value.State, info.Value.StartMode,
-                info.Value.Delayed, backup is not null, backup?.WasRunning ?? false));
+            result.Add(new OptionalServiceStatus(definition, true, info.State, info.StartMode,
+                info.Delayed, backup is not null, backup?.WasRunning ?? false));
         }
         return result;
     }
@@ -65,14 +65,14 @@ public sealed class ServiceTweakService
         Validate(definition.Name);
         var info = ReadService(definition.Name)
             ?? throw new InvalidOperationException("O serviço não está instalado nesta edição do Windows.");
-        if (string.Equals(info.Value.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(info.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("O serviço já está desativado.");
         var backupPath = GetBackupPath(definition.Name);
         if (File.Exists(backupPath))
             throw new InvalidOperationException("Já existe um backup deste serviço. Restaure-o antes de aplicar novamente.");
 
-        var backup = new OptionalServiceBackup(definition.Name, info.Value.StartMode, info.Value.Delayed,
-            string.Equals(info.Value.State, "Running", StringComparison.OrdinalIgnoreCase), DateTimeOffset.UtcNow);
+        var backup = new OptionalServiceBackup(definition.Name, info.StartMode, info.Delayed,
+            string.Equals(info.State, "Running", StringComparison.OrdinalIgnoreCase), DateTimeOffset.UtcNow);
         WriteAtomic(backupPath, JsonSerializer.Serialize(backup, JsonOptions));
 
         var restoreMode = BuildRestoreModeScript(definition.Name, backup.StartMode, backup.DelayedAutoStart);
