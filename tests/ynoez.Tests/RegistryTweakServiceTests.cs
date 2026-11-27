@@ -250,6 +250,25 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void NetworkJitter_DoesNotBridgeAcrossPacketLoss()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var samples = new[]
+        {
+            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "OK", 20, "OK", 30, 0, 0, 0, null, null),
+            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "TIMEOUT", null, "TIMEOUT", null, 0, 0, 0, null, null),
+            new NetworkMonitorSample(now, "", "NO_GATEWAY", null, "OK", 170, "OK", 190, 0, 0, 0, null, null)
+        };
+
+        var summary = NetworkMonitorService.SummarizeWindow(samples);
+
+        Assert.Null(summary.ExternalJitterMilliseconds);
+        Assert.Null(summary.ExternalTcpJitterMilliseconds);
+        Assert.Equal(33.333333, summary.ExternalLossPercent, 5);
+        Assert.Equal(33.333333, summary.ExternalTcpFailurePercent, 5);
+    }
+
+    [Fact]
     public void ScheduledTaskCatalog_ContainsOnlyExplicitOptionalTasks()
     {
         var catalog = ScheduledTaskTweakService.GetCatalog();

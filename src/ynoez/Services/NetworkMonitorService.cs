@@ -117,7 +117,12 @@ public static class NetworkMonitorService
         var differences = new List<double>();
         foreach (var value in values)
         {
-            if (!value.HasValue) continue;
+            if (!value.HasValue)
+            {
+                // A failed probe breaks adjacency; do not turn a multi-interval gap into "jitter".
+                previous = null;
+                continue;
+            }
             if (previous.HasValue) differences.Add(Math.Abs((double)value.Value - previous.Value));
             previous = value.Value;
         }
