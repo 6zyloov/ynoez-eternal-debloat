@@ -1,6 +1,6 @@
 # ynoez — Windows tuning, debloat seletivo e perfis de hardware
 
-Aplicativo nativo para Windows em C# / WPF (.NET 8). A linguagem visual toma como referência o Stix Free Utility (sidebar, cartões escuros, Poppins e destaque rosa), com implementação própria do ynoez.
+Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual toma como referência o Stix Free Utility (sidebar, cartões escuros, Poppins e destaque rosa), com implementação própria do ynoez.
 
 ## Aplicativo
 
@@ -50,7 +50,7 @@ A revisão física impressa no PCB deve ser confirmada antes de escolher BIOS; o
 
 ## Construir localmente
 
-Requer .NET 8 SDK no Windows:
+Requer .NET 10 SDK LTS no Windows:
 
 ```powershell
 .\build.bat

@@ -147,7 +147,7 @@ public static class AppPackageInventoryService
     {
         value ??= string.Empty;
         var first = value.FirstOrDefault(c => !char.IsWhiteSpace(c));
-        if (first is '=' or '+' or '-' or '@' or '\\t' or '\\r')
+        if (first is '=' or '+' or '-' or '@' || first == (char)9 || first == (char)13)
             value = "'" + value;
         return "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
     }

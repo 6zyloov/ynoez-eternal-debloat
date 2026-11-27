@@ -26,4 +26,4 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish falhou com código $LASTEXITCOD
 
 $Exe = Join-Path $Output 'ynoez.exe'
 if (-not (Test-Path $Exe)) { throw 'O processo de publicação terminou sem produzir ynoez.exe.' }
-Write-Host "Publicado com SDK .NET $SdkVersion: $Exe" -ForegroundColor Green
+Write-Host "Publicado com SDK .NET ${SdkVersion}: $Exe" -ForegroundColor Green

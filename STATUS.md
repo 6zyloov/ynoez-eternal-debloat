@@ -1,5 +1,7 @@
 # Desenvolvimento — ynoez 0.3.0
 
+- Base de build atualizada para .NET 10 LTS (`net10.0-windows`), usando `System.Management 10.0.15`.
+
 ## Implementado nesta linha
 - Motor transacional de Registro HKCU com whitelist, backup atômico, detecção, verificação e reversão.
 - Catálogo integrado com 11 ajustes opcionais de privacidade, interface e captura Game DVR, incluindo build mínimo do Windows.
