@@ -301,6 +301,29 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void PowerProfileBackupExportPath_RequiresUsableDirectPowFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-power-export-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var absent = Path.Combine(root, "missing.pow");
+            Assert.Equal(absent, Path.GetFullPath(absent));
+            Assert.Throws<InvalidDataException>(() =>
+                PowerProfileService.ValidatePowerSchemeExportPath(Path.Combine(root, "nested", "bad.pow"), root));
+
+            var linkLike = Path.Combine(root, "candidate.pow");
+            Directory.CreateDirectory(linkLike);
+            Assert.Throws<InvalidDataException>(() =>
+                PowerProfileService.ValidatePowerSchemeExportPath(linkLike, root));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void PowerProfileExportPath_OnlyAcceptsDirectPowFilesInsideBackupRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "ynoez-power-backups-" + Guid.NewGuid().ToString("N"));

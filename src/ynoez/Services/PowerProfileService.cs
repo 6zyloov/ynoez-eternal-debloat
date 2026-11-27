@@ -152,17 +152,73 @@ public static class PowerProfileService
                 ?? throw new InvalidDataException("Backup do plano base inválido; a alteração foi bloqueada.");
             if (!GuidPattern.IsMatch(existing.OriginalGuid))
                 throw new InvalidDataException("GUID no backup do plano base inválido; a alteração foi bloqueada.");
+
+            string? exportPath = null;
+            if (!string.IsNullOrWhiteSpace(existing.ExportPath))
+                exportPath = ValidatePowerSchemeExportPath(existing.ExportPath, AppPaths.Backups);
+
+            var exportIsUsable = exportPath is not null && File.Exists(exportPath) &&
+                new FileInfo(exportPath).Length > 0;
+            if (!exportIsUsable)
+            {
+                // Older builds may have only stored the GUID, or the original .pow may have been removed.
+                // Re-export the exact original plan while it is still installed; never proceed with a
+                // stale backup if neither the plan nor a usable export exists.
+                if (!IsPowerSchemeAvailable(existing.OriginalGuid))
+                    throw new InvalidDataException("O plano de energia original não está mais instalado e seu arquivo .pow não está disponível. A alteração foi bloqueada para não destruir a possibilidade de restauração.");
+
+                exportPath = ExportPowerSchemeBackup(existing.OriginalGuid, "power-profile-recovery-");
+                try
+                {
+                    WriteAtomic(BaseBackupPath, JsonSerializer.Serialize(
+                        existing with { ExportPath = exportPath }, JsonOptions));
+                }
+                catch
+                {
+                    try { File.Delete(exportPath); } catch { }
+                    throw;
+                }
+                AppLog.Write("Backup do plano original recuperado/exportado novamente: " + existing.OriginalGuid);
+            }
             return;
         }
 
         Directory.CreateDirectory(AppPaths.Backups);
+        var newExportPath = ExportPowerSchemeBackup(current, "power-profile-base-");
+        try
+        {
+            WriteAtomic(BaseBackupPath,
+                JsonSerializer.Serialize(new PowerProfileBackup(current, DateTimeOffset.UtcNow, newExportPath), JsonOptions));
+        }
+        catch
+        {
+            try { File.Delete(newExportPath); } catch { }
+            throw;
+        }
+    }
+
+    private static bool IsPowerSchemeAvailable(string guid)
+    {
+        if (!GuidPattern.IsMatch(guid)) return false;
+        var result = RunPowerCfg("/query " + guid);
+        return result.ExitCode == 0 && Regex.IsMatch(result.Output, Regex.Escape(guid), RegexOptions.IgnoreCase);
+    }
+
+    private static string ExportPowerSchemeBackup(string guid, string filePrefix)
+    {
+        if (!GuidPattern.IsMatch(guid))
+            throw new InvalidDataException("GUID de plano de energia inválido para exportação.");
+        Directory.CreateDirectory(AppPaths.Backups);
         var exportPath = Path.Combine(AppPaths.Backups,
-            "power-profile-base-" + current + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".pow");
-        var export = RunPowerCfg("/export " + Quote(exportPath) + " " + current);
-        if (export.ExitCode != 0 || !File.Exists(exportPath))
-            throw new InvalidOperationException("Não foi possível exportar o plano original antes da alteração. Nenhum perfil foi aplicado. " + export.Error);
-        WriteAtomic(BaseBackupPath,
-            JsonSerializer.Serialize(new PowerProfileBackup(current, DateTimeOffset.UtcNow, exportPath), JsonOptions));
+            filePrefix + guid + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") +
+            "-" + Guid.NewGuid().ToString("N")[..8] + ".pow");
+        var export = RunPowerCfg("/export " + Quote(exportPath) + " " + guid);
+        if (export.ExitCode != 0 || !File.Exists(exportPath) || new FileInfo(exportPath).Length == 0)
+        {
+            try { if (File.Exists(exportPath)) File.Delete(exportPath); } catch { }
+            throw new InvalidOperationException("Não foi possível exportar/verificar o plano de energia original. Nenhum perfil foi aplicado. " + export.Error);
+        }
+        return ValidatePowerSchemeExportPath(exportPath, AppPaths.Backups);
     }
 
     public static PowerProfileSession CaptureAutomaticSession()

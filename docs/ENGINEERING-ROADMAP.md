@@ -71,3 +71,8 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - Não chamar uma build de “final” por compilar.
 - Cada fase gera builds de teste, com changelog e limitações.
 - A versão estável só será marcada quando os critérios de aceite forem demonstrados em CI e em máquinas Windows reais.
+
+
+## Energia: integridade do backup base
+
+Antes de cada troca manual de plano, o serviço valida o GUID e o caminho do backup existente. Se uma versão antiga não tiver exportação .pow ou o arquivo tiver sido removido/vazio, o serviço só prossegue depois de confirmar que o plano original ainda está instalado e exportá-lo novamente para Backups. Se não houver plano nem exportação utilizável, a alteração é bloqueada.
