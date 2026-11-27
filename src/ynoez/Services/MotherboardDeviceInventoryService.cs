@@ -87,7 +87,7 @@ public static class MotherboardDeviceInventoryService
         try
         {
             return ManagementDateTimeConverter.ToDateTime(dmtfDate)
-                .ToString("dd/MM/yyyy", CultureInfo.CurrentCulture);
+                .ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
         }
         catch (Exception ex) when (ex is FormatException or ArgumentOutOfRangeException or ManagementException)
         {
@@ -95,13 +95,14 @@ public static class MotherboardDeviceInventoryService
         }
     }
 
-    public static string GetDeviceCategory(string? pnpClass) => pnpClass?.Trim() switch
-    {
-        "Net" => "Rede",
-        "MEDIA" => "Áudio",
-        "System" => "Sistema / chipset",
-        _ => "Outro"
-    };
+    public static string GetDeviceCategory(string? pnpClass) =>
+        (pnpClass ?? string.Empty).Trim().ToUpperInvariant() switch
+        {
+            "NET" => "Rede",
+            "MEDIA" => "Áudio",
+            "SYSTEM" => "Sistema / chipset",
+            _ => "Outro"
+        };
 
     public static string EscapeCsv(string? value)
     {
