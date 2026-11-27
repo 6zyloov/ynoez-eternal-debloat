@@ -14,18 +14,18 @@
 - Build autocontido win-x64 e script de instalação para C:\ynoez.
 
 ## Validação concluída
-- GitHub Actions Windows Server 2025 / .NET 8: compilação e publicação de ynoez 0.1.0 concluídas com sucesso no workflow run 46047088069.
-- O artefato inclui ynoez.exe x64 para Windows GUI. SHA-256 do ZIP do artifact conferido com o digest da API do GitHub.
-- XML, JSON, handlers XAML e léxico C# verificados localmente.
+- GitHub Actions Windows Server 2025 / .NET 8: builds 0.1.0 e 0.1.1 concluídos com sucesso (runs 46047088069 e 46047742654).
+- Artefato 0.1.1: ZIP de 67.427.944 bytes, SHA-256 `34a52bdae9f8f65fc8ab2e673fa25db8ef734f69789efbfa1ba0a3f535fa1408`, contém `ynoez.exe` x64 para Windows GUI.
+- Executável extraído: 161.822.880 bytes, PE32+ x86-64, subsystem Windows GUI.
+- XML, JSON, handlers XAML e léxico C# verificados; ZIPs de entrega aprovados no teste de integridade.
 
 ## Próximas etapas
-1. Compilar e publicar a 0.1.1 após a adição das informações de BIOS por revisão.
-2. Testar abertura, navegação, inventário WMI e ações seguras em um Windows real.
-3. Implementar modos Performance / Equilibrado / AFK com allowlist, processos protegidos e rollback.
-4. Adicionar monitoramento ao vivo e registro persistente de quedas da rede.
-5. Adicionar ações reversíveis à Toolbox somente após validar estado e rollback.
-6. Expandir o catálogo de placas por modelo e revisão com documentação oficial.
-7. Adicionar ícone e instalador final.
+1. Testar abertura, navegação, inventário WMI e ações seguras em um Windows real.
+2. Implementar modos Performance / Equilibrado / AFK com allowlist, processos protegidos e rollback.
+3. Adicionar monitoramento ao vivo e registro persistente de quedas da rede.
+4. Adicionar ações reversíveis à Toolbox somente após validar estado e rollback.
+5. Expandir catálogo de placas por modelo e revisão com documentação oficial.
+6. Adicionar ícone e instalador final.
 
 ## Limitações de validação
-A compilação em CI não substitui teste de execução no PC do proprietário. O executável ainda não foi aberto em uma sessão Windows interativa, nem testado com Vanguard/FACEIT ou a placa física. O ping mostra amostras; não prova a causa de uma desconexão intermitente nem evita quedas do roteador/provedor. Nenhum ganho de FPS foi medido.
+A compilação em CI não substitui teste de execução no PC do proprietário. O executável ainda não foi aberto numa sessão Windows interativa nem testado com Vanguard/FACEIT ou a placa física. O ping mostra amostras; não prova a causa de desconexões intermitentes nem evita quedas do roteador/provedor. Nenhum ganho de FPS foi medido.
