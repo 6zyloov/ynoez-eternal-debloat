@@ -18,6 +18,9 @@ O ynoez não será um agregador de scripts cegos. Cada função será reimplemen
 | Winhance | README, árvore de código e catálogo Apply/Detection/Revert | Separação entre catálogo, detecção, plano de aplicação, executor e recuperação; testes | Não copiar código sem revisão de licença e dependências |
 | AtlasOS | arquitetura e documentação de performance | Disciplina de documentação, medição e validação de alterações no sistema | Não adotar imagem Windows modificada ou remover componentes essenciais do sistema do usuário |
 | Sophia Script | README e estrutura PowerShell | Ajustes granulares, documentação de versões e políticas do Windows | Scripts em massa sem uma camada de detecção/reversão do ynoez |
+| Stix Free Tweaking Utility | TweaksControl.cs, DebloatControl.cs, NetworkControl.cs, BackupControl.cs, HomePage.cs, Form1.cs e changelog | Organização em Home/Backup/Tweaks/Network/Debloat, WMI para inventário, restore point e ferramentas por categoria | Repositório sem licença explícita: não copiar código, assets ou textos. Foram encontrados comandos que desativam UAC, VBS/HVCI, DMA remapping, Defender/Sense, Windows Update, Search, Spooler, TPM provisioning e recursos de rede; incompatíveis com a política ynoez |
+| HI+Optimizer V6 | Release notes V6 e README público | Categorias System Tweaks, Latency, CPU/GPU, Windows Cleanup/Repair e backup/recovery como referência de cobertura | Repositórios consultados sem licença explícita; não reutilizar código. Release notes não comprovam eficácia dos tweaks |
+| Oneclick V8.4 | README, changelog, Version.md e licença GPL-3.0 | Fluxos automatizados, ferramentas auxiliares e catálogo amplo para comparar cobertura | GPL-3.0 e execução automática; não incorporar ao núcleo MIT nem executar scripts/binários sem revisão |
 
 ## Evidências de implementação observadas
 
@@ -26,12 +29,15 @@ O ynoez não será um agregador de scripts cegos. Cada função será reimplemen
 - Zenith documenta adaptações por tipo de PC, execução em segundo plano, backup de valores originais, detecção de hardware e medição de FPS médio/1%/0,1% lows.
 - OptimizerDuck tem uma suíte de testes extensa para operações de reversão, modelos de serviços, tarefas agendadas, energia e estado da otimização.
 - Winhance separa detecção, plano, executor e recuperação. Essa separação é uma referência importante para não manter toda a lógica em code-behind.
+- A auditoria do código público Stix confirma a separação por telas e um restore point, mas também mostra operações globais e destrutivas: alteração de políticas de segurança, desativação de serviços críticos, remoção de AppX e escrita em dezenas de propriedades NIC sem identificar modelo/driver. O ynoez usa somente ideias de organização e reimplementações independentes; os comandos não são copiados.
+- O changelog público Stix registra a remoção de ThreadDpcEnable, ajuste de prioridade CSRSS e desativação de MMCSS em versões posteriores. Esses itens não entram no catálogo ynoez.
+- HI+Optimizer V6 destaca limpeza/reparo e tweaks de latência/CPU/GPU, mas a página de release não apresenta evidência reproduzível de ganhos por hardware; tratamos isso como mapa de categorias, não como validação.
 
 ## Licenças — regra obrigatória
 
 - MIT: WinUtil, Win11Debloat, Zenith e Sophia Script.
-- GPL-3.0: hellzerg Optimizer, optimizerDuck e AtlasOS.
-- A licença do Winhance deve ser confirmada no arquivo de licença vigente antes de qualquer reutilização.
+- GPL-3.0: hellzerg Optimizer, optimizerDuck, AtlasOS e Oneclick.
+- Sem licença explícita identificada nos repositórios consultados: Stix Free Tweaking Utility, HI+OPTIMIZER V6 (taqi89273/HI-PLUS-OPTIMIZER) e Winhance (confirmar novamente antes de qualquer reutilização).
 - O repositório ynoez permanece MIT por enquanto. Código MIT só pode ser incorporado com os avisos de copyright/licença exigidos. Código GPL não será copiado para o núcleo MIT sem uma decisão de relicenciamento compatível. Reimplementar uma ideia não autoriza copiar trechos expressivos, assets ou textos.
 - Nenhum executável fechado de tweak será distribuído só porque aparece em um pacote de terceiros. Binários externos precisam de origem, hash, assinatura, licença e justificativa verificáveis.
 
@@ -45,6 +51,10 @@ O ynoez não será um agregador de scripts cegos. Cada função será reimplemen
 - https://github.com/memstechtips/Winhance
 - https://github.com/Atlas-OS/Atlas
 - https://github.com/farag2/Sophia-Script-for-Windows
+- https://github.com/StixPcServices1/Stix-Free-Tweaking-Utility
+- https://github.com/soft-daisy/utility/releases
+- https://github.com/taqi89273/HI-PLUS-OPTIMIZER
+- https://github.com/QuakedK/Oneclick
 
 ## Conclusão
 
