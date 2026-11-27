@@ -54,7 +54,7 @@ $versionQuad = "$version.0"
 $resolvedVersion = $versionDirective.Groups[1].Value.Trim()
 Write-Host "VersionInfoVersion pré-processado: [$resolvedVersion]; esperado: [$versionQuad]"
 if ($resolvedVersion -ne $versionQuad) {
-    throw "VersionInfoVersion pré-processado ('$resolvedVersion') difere do projeto ('$versionQuad')."
+    throw "VersionInfoVersion pré-processado ('$($resolvedVersion)') difere do projeto ('$($versionQuad)')."
 }
 
 & $iscc $defineVersion $script
