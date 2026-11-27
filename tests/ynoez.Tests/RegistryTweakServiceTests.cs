@@ -698,6 +698,22 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void NetworkAdapterInventory_CsvEscapesFormulaLikeValues()
+    {
+        Assert.Equal("\"'=HYPERLINK(1)\"", NetworkAdapterInventoryService.EscapeCsv("=HYPERLINK(1)"));
+        Assert.Equal("\"'@driver\"", NetworkAdapterInventoryService.EscapeCsv("@driver"));
+        Assert.Equal("\"normal adapter\"", NetworkAdapterInventoryService.EscapeCsv("normal adapter"));
+    }
+
+    [Fact]
+    public void NetworkAdapterInventory_MtuDisplayHandlesUnavailableValues()
+    {
+        Assert.Equal("1500 / 1280", NetworkAdapterInventoryService.FormatMtu(1500, 1280));
+        Assert.Equal("— / 1280", NetworkAdapterInventoryService.FormatMtu(null, 1280));
+        Assert.Equal("— / —", NetworkAdapterInventoryService.FormatMtu(null, null));
+    }
+
+    [Fact]
     public void NetworkStatistics_CalculateErrorAndDiscardRatesSafely()
     {
         Assert.Equal(5.2631579, NetworkAdapterStatisticsService.CalculateProblemPercent(900, 20, 30)!.Value, 5);

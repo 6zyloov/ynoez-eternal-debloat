@@ -730,6 +730,70 @@ public partial class MainWindow : Window
         adapterCard.Child = adapterPanel;
         root.Children.Add(adapterCard);
 
+        var inventoryCard = MakeCard();
+        var inventoryPanel = new StackPanel { Margin = new Thickness(20) };
+        inventoryPanel.Children.Add(Heading("Inventário técnico dos adaptadores", 15));
+        inventoryPanel.Children.Add(Body("Consulta somente leitura das interfaces de rede, endereços, gateways, DNS, MTU, DHCP e informações do driver quando o Windows as fornece. Não altera propriedades, reinicia adaptadores ou substitui o diagnóstico do roteador/provedor."));
+        var inventoryStatus = Body("Inventário ainda não consultado.");
+        var inventoryGrid = new DataGrid
+        {
+            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
+            CanUserDeleteRows = false, CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"), AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft, Height = 270, Margin = new Thickness(0, 10, 0, 10)
+        };
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterInventory.Name)), Width = new DataGridLength(1.4, DataGridLengthUnitType.Star) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Tipo", Binding = new Binding(nameof(NetworkAdapterInventory.Type)), Width = new DataGridLength(85) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(NetworkAdapterInventory.Status)), Width = new DataGridLength(70) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Link", Binding = new Binding(nameof(NetworkAdapterInventory.LinkSpeedDisplay)), Width = new DataGridLength(85) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "IPv4/IPv6", Binding = new Binding(nameof(NetworkAdapterInventory.IpAddresses)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Gateway", Binding = new Binding(nameof(NetworkAdapterInventory.Gateways)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "DNS", Binding = new Binding(nameof(NetworkAdapterInventory.DnsServers)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "MTU v4/v6", Binding = new Binding(nameof(NetworkAdapterInventory.MtuDisplay)), Width = new DataGridLength(90) });
+        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Driver", Binding = new Binding(nameof(NetworkAdapterInventory.DriverVersion)), Width = new DataGridLength(100) });
+        var inventoryButtons = new WrapPanel();
+        var refreshInventory = new Button { Content = "Analisar interfaces", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var exportInventory = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        IReadOnlyList<NetworkAdapterInventory> inventory = Array.Empty<NetworkAdapterInventory>();
+        refreshInventory.Click += async (_, _) =>
+        {
+            refreshInventory.IsEnabled = false;
+            exportInventory.IsEnabled = false;
+            inventoryStatus.Text = "Consultando interfaces e drivers pelo Windows…";
+            try
+            {
+                inventory = await Task.Run(NetworkAdapterInventoryService.Capture);
+                inventoryGrid.ItemsSource = inventory;
+                inventoryStatus.Text = inventory.Count + " interfaces consultadas • " +
+                    inventory.Count(x => string.Equals(x.Status, "Up", StringComparison.OrdinalIgnoreCase)) +
+                    " ativas • leitura somente de propriedades.";
+                exportInventory.IsEnabled = inventory.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário técnico de rede falhou: " + ex);
+                inventoryStatus.Text = "Não foi possível consultar as interfaces: " + ex.Message;
+            }
+            finally { refreshInventory.IsEnabled = true; }
+        };
+        exportInventory.Click += (_, _) =>
+        {
+            if (inventory.Count == 0) return;
+            var path = NetworkAdapterInventoryService.ExportCsv(inventory);
+            inventoryStatus.Text = "Relatório CSV salvo em: " + path;
+        };
+        inventoryButtons.Children.Add(refreshInventory);
+        inventoryButtons.Children.Add(exportInventory);
+        inventoryPanel.Children.Add(inventoryStatus);
+        inventoryPanel.Children.Add(inventoryGrid);
+        inventoryPanel.Children.Add(inventoryButtons);
+        inventoryPanel.Children.Add(NoteCard("Leitura de MTU e driver", "MTU e versão de driver dependem do que o Windows/WMI expõe para cada interface. Adaptadores virtuais podem aparecer no inventário; não os desative por nome sem confirmar qual VPN, hipervisor ou software os utiliza."));
+        inventoryCard.Child = inventoryPanel;
+        root.Children.Add(inventoryCard);
+
         var statsCard = MakeCard();
         var statsPanel = new StackPanel { Margin = new Thickness(20) };
         statsPanel.Children.Add(Heading("Contadores dos adaptadores", 15));
