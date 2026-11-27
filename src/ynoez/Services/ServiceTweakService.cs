@@ -46,8 +46,6 @@ public sealed class ServiceTweakService
 
     public static IReadOnlyList<OptionalServiceDefinition> GetCatalog() => Catalog;
 
-    public static IReadOnlyList<OptionalServiceDefinition> GetCatalog() => Catalog;
-
     public bool CanRestore(string name)
     {
         Validate(name);

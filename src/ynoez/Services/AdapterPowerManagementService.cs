@@ -89,11 +89,12 @@ public sealed class AdapterPowerManagementService
         return result.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    private static bool IsKnownPowerSetting(string value) =>
-        value.Equals("Enabled", StringComparison.OrdinalIgnoreCase)
+    private static bool IsKnownPowerSetting(string? value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        (value.Equals("Enabled", StringComparison.OrdinalIgnoreCase)
         || value.Equals("Disabled", StringComparison.OrdinalIgnoreCase)
         || value.Equals("Unsupported", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("Unknown", StringComparison.OrdinalIgnoreCase);
+        || value.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
 
 
     public void ReducePowerSaving(AdapterPowerStatus adapter)
