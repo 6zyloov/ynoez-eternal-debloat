@@ -2,9 +2,6 @@
 #ifndef MyAppVersion
 #define MyAppVersion "0.3.0"
 #endif
-#ifndef MyAppVersionQuad
-#define MyAppVersionQuad "0.3.0.0"
-#endif
 #define MyAppPublisher "ynoez"
 #define MyAppURL "https://github.com/6zyloov/ynoez-eternal-debloat"
 
@@ -25,7 +22,7 @@ SetupLogging=yes
 Uninstallable=yes
 UninstallDisplayName=ynoez
 UninstallDisplayIcon={app}\ynoez.exe
-VersionInfoVersion={#MyAppVersionQuad}
+VersionInfoVersion={#MyAppVersion}.0
 VersionInfoProductName=ynoez
 VersionInfoCompany=ynoez
 ArchitecturesAllowed=x64compatible
