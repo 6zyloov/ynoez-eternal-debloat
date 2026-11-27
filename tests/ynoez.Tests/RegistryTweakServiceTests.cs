@@ -502,7 +502,7 @@ public sealed class RegistryTweakServiceTests
         var state = Path.Combine(root, "State");
         Directory.CreateDirectory(startup);
         var startupFile = Path.Combine(startup, "ordinary.cmd");
-        const string original = "@echo off\\r\\necho preserved";
+        const string original = "@echo off\r\necho preserved";
         File.WriteAllText(startupFile, original);
         var manifest = Path.Combine(state, "disabled-startup.json");
         try

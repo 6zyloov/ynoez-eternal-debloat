@@ -842,7 +842,7 @@ public partial class MainWindow : Window
                 {
                     root.Children.Add(ActionCard(entry.Name, entry.IsFile ? entry.OriginalFilePath ?? entry.Command : entry.Command, "Restaurar inicialização", () =>
                     {
-                        if (MessageBox.Show("Restaurar \\"" + entry.Name + "\\" à inicialização? O destino será verificado antes da recuperação.", "Confirmar restauração",
+                        if (MessageBox.Show("Restaurar \"" + entry.Name + "\" à inicialização? O destino será verificado antes da recuperação.", "Confirmar restauração",
                             MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                             return Task.CompletedTask;
                         startupManager.Restore(entry);
