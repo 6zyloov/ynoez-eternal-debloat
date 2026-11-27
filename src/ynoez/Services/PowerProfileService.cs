@@ -80,19 +80,25 @@ public static class PowerProfileService
             throw new InvalidDataException("GUID do plano original inválido.");
 
         var result = RunPowerCfg("/setactive " + backup.OriginalGuid);
-        if (result.ExitCode != 0 && !string.IsNullOrWhiteSpace(backup.ExportPath) && File.Exists(backup.ExportPath))
+        var active = "";
+        if (result.ExitCode == 0)
+        {
+            try { active = GetActiveSchemeGuid(); }
+            catch { active = ""; }
+        }
+
+        if (!string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(backup.ExportPath) && File.Exists(backup.ExportPath))
         {
             var import = RunPowerCfg("/import " + Quote(backup.ExportPath) + " " + backup.OriginalGuid);
             if (import.ExitCode != 0)
                 throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
             result = RunPowerCfg("/setactive " + backup.OriginalGuid);
+            if (result.ExitCode == 0) active = GetActiveSchemeGuid();
         }
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException("Falha ao restaurar o plano original: " + result.Error);
 
-        var active = GetActiveSchemeGuid();
-        if (!string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("A verificação da restauração do plano falhou; o backup foi mantido.");
+        if (result.ExitCode != 0 || !string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Falha ao restaurar/verificar o plano original: " + result.Error);
 
         File.Delete(BaseBackupPath);
         if (File.Exists(StatePath)) File.Delete(StatePath);
