@@ -27,7 +27,7 @@ if ($parsedVersion.Revision -ne -1) {
 $versionQuad = "$version.0"
 
 $isccCandidates = @(
-    (Join-Path $env:ProgramFiles(x86) "Inno Setup 6\ISCC.exe"),
+    (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
     (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe")
 )
 $iscc = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
