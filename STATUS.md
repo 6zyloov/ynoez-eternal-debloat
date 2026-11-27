@@ -10,21 +10,23 @@
 - Inventário Win32: leitura de entradas HKLM/HKCU em registros 32/64 bits, filtro por nome/editor/classificação, exportação CSV com neutralização de fórmula; não executa UninstallString nem remove aplicativos.
 - Inventário AppX/MSIX atual por usuário e inventário administrativo de todos os perfis + pacotes provisionados, com classificação de componentes centrais, UAC explícito e exportação CSV; nenhum pacote é removido.
 - Gerenciador de inicialização: inventário HKCU/HKLM 32/64 bits e pastas Startup pessoal/compartilhada; entradas HKCU não protegidas e arquivos pessoais podem ser desativados com backup/reversão; HKLM e Startup compartilhada somente leitura.
-- Catálogo de seis serviços opcionais: DiagTrack, dmwappushservice, MapsBroker, Fax, RetailDemo e WMPNetworkSvc. Backup do modo de inicialização, tratamento de delayed-auto, confirmação, UAC, tentativa de parada sem forçar dependências e restauração verificada.
+- Catálogo de seis serviços opcionais: DiagTrack, dmwappushservice, MapsBroker, Fax, RetailDemo e WMPNetworkSvc. Backup do modo de inicialização, delayed-auto, confirmação, UAC, tentativa de parada sem forçar dependências e restauração verificada.
+- Toolbox com inventário sob demanda somente leitura de todos os serviços Win32 e tarefas agendadas: nome/caminho/estado, inicialização/PID ou autor/descrição/última-próxima execução/resultado, filtros, classificação de componentes protegidos e whitelist opcional, detalhes e CSV. Não modifica serviços ou tarefas.
 - Perfis manuais Performance, Equilibrado e AFK, com backup do plano original.
-- Perfil automático por jogo conhecido e inatividade do teclado/mouse: Performance durante jogos com entrada ativa, Equilibrado no uso comum e AFK após 15 minutos sem entrada. Não encerra processos. Exporta o plano original e restaura ao parar; tenta recuperar sessões interrompidas na próxima inicialização. AFK bloqueia suspensão automática enquanto o app está aberto, sem impedir que a tela apague.
-- Monitor ao vivo de CPU/RAM via APIs nativas e GPU 3D via NVIDIA SMI ou WMI GPU Engine. Temperatura/VRAM/potência dependem do suporte NVIDIA; não instala drivers de sensor.
+- Perfis automáticos por jogo conhecido, processos protegidos configuráveis e inatividade: jogo com entrada recente = Performance; jogo/processo protegido durante inatividade = AFK protegido (Equilibrado + bloqueio de suspensão); sem carga protegida após 15 minutos = AFK Economia. Configuração inválida bloqueia a economia agressiva. Nenhum processo é encerrado; plano original exportado/restaurado e sessão interrompida recuperável.
+- Monitor ao vivo de CPU/RAM via APIs nativas e GPU 3D via NVIDIA SMI ou WMI GPU Engine. Home também consulta módulos RAM por WMI/SMBIOS (posição, capacidade, DDR, velocidade reportada/configurada, formato, ECC reportado, fabricante e part number) e exporta CSV. Não é leitura SPD e não infere single/dual channel. Temperatura/VRAM/potência dependem do suporte do driver.
 - Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV + resumo JSON, FPS médio, 1% low (inverso do P99), 0,1% low (inverso do P99,9), frametime médio, p99/p99,9 e frames lentos. Sessões A/B com três rodadas em cada fase, mediana, dispersão e JSON persistente. A série não controla a cena, mapa, temperatura ou processos do PC.
 - Verificador manual de atualização: consulta somente quando solicitado o endpoint de release estável oficial do GitHub, valida tag/URL/repositório e apenas abre a página oficial quando há versão mais nova; não baixa nem instala automaticamente. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
 - Diagnóstico de rede: ICMP, TCP/443, DNS IPv4/IPv6 e tracert.
-- Monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, ICMP/TCP para Cloudflare e Google, resolução DNS, janela móvel real de 60 segundos e hipótese de causa, com exportação CSV.
+- Monitoramento contínuo a cada 5 segundos com gateway IPv4/IPv6, Cloudflare e Google em ICMP/TCP/443 nas duas famílias, resolução DNS A/AAAA e janela móvel real de 60 segundos. Perda/jitter separados por família/protocolo; classifica rede local IPv4/IPv6, IPv6 indisponível/filtrado, DNS, ICMP e TCP; CSV completo.
 - Inventário de adaptadores físicos e virtuais com endereços, DNS, gateways, MTU e versão de driver quando o WMI informa; exportação CSV, somente leitura. Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
 - Central Restore consolida recuperação de Registro, plano base/AFK interrompido, serviços opcionais, adaptadores de rede, tarefas, inicialização e snapshots. Backups órfãos ou corrompidos permanecem preservados.
-- Testes Windows de transações de Registro, tipos originais, backups corrompidos, inicialização HKCU e pasta Startup temporária, fallback de energia, manifesto SHA-256 de snapshots, métricas da janela de rede, parser PresentMon e whitelists de serviços/tarefas.
+- Testes Windows de transações/reversão, AFK protegido e configuração inválida, inventários de serviços/tarefas, classificação de hardware SMBIOS/RAM, confirmação física de revisão, PnP/drivers, monitoramento IPv4/IPv6/DNS e CSV seguro, PresentMon e whitelists.
 - Auditoria de integridade somente leitura para Defender/Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update e estados conhecidos de serviços/drivers Vanguard/FACEIT; não declara compatibilidade por conta própria.
 - Tratamento global de exceções não tratadas: registra stack trace em Logs, fecha a aplicação de forma controlada e tenta restaurar sessão de energia pendente.
 - CI Windows executa testes antes de publicar o executável autocontido.
 - Auditoria somente leitura de Defender/Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers relacionados a Search, impressão, Store, Windows Update, Vanguard e FACEIT; valores não fornecidos pelo Windows aparecem como indisponíveis. Distingue serviço ausente de serviço parado e não afirma compatibilidade anti-cheat.
+- Versão do app e instalador têm fonte única em `<Version>` no csproj. O builder gera `.iss` temporário com valores literais, confere FileVersion/ProductName PE e publica nome dinâmico por versão.
 - Verificador manual de atualização consulta somente quando solicitado a release estável do repositório GitHub, valida tag/URL e abre a página oficial; não baixa nem instala silenciosamente.
 - Pipeline separada de release por tag vX.Y.Z, com teste Windows, instalador Inno Setup, pacote portátil e manifesto SHA-256.
 
@@ -32,6 +34,7 @@
 - Shell WPF com referência visual Stix, Home, Monitor, Backup, Tweaks, Network, Debloat, Motherboard, Toolbox, Restore e Logs.
 - Inventário WMI, snapshot local, ponto de restauração opcional e limpeza seletiva Temp/Brave/Discord, preservando perfis e credenciais.
 - Perfil GIGABYTE A520M K V2 e política de componentes protegidos.
+- Central da A520M K V2 trata SMBIOS como indício; BIOS por revisão só após confirmação manual da serigrafia no PCB. Inventário PnP de rede/áudio/sistema expõe IDs de hardware e provedor/versão/data/INF reportados, sem atualizar drivers.
 
 ## Limites conhecidos
 - Entradas de inicialização de máquina são somente leitura; serviços opcionais são uma whitelist curta, não há desativação em massa.
