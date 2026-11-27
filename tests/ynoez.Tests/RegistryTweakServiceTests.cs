@@ -821,6 +821,7 @@ public sealed class RegistryTweakServiceTests
         Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0?download=1"));
         Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0/extra"));
         Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0/"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com//6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0"));
     }
 
     [Fact]

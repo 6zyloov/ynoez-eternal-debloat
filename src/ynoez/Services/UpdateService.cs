@@ -106,11 +106,12 @@ public static class UpdateService
             !string.Equals(segments[0], "6zyloov", StringComparison.Ordinal) ||
             !string.Equals(segments[1], "ynoez-eternal-debloat", StringComparison.Ordinal) ||
             !string.Equals(segments[2], "releases", StringComparison.Ordinal) ||
-            !string.Equals(segments[3], "tag", StringComparison.Ordinal))
-            throw new InvalidDataException("A URL não aponta para uma tag de release do repositório oficial.");
+            !string.Equals(segments[3], "tag", StringComparison.Ordinal) ||
+            !string.Equals(uri.AbsolutePath, "/" + string.Join("/", segments), StringComparison.Ordinal))
+            throw new InvalidDataException("A URL não aponta para uma tag de release canônica do repositório oficial.");
 
         var tag = Uri.UnescapeDataString(segments[4]);
-        if (!System.Text.RegularExpressions.Regex.IsMatch(tag, @"^v?[0-9]+\.[0-9]+\.[0-9]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant) ||
+        if (!System.Text.RegularExpressions.Regex.IsMatch(tag, @"^[vV]?[0-9]+\.[0-9]+\.[0-9]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant) ||
             (expectedTag is not null && !string.Equals(tag, expectedTag, StringComparison.Ordinal)))
             throw new InvalidDataException("A URL não corresponde a uma tag estável e exata do ynoez.");
         return uri;
