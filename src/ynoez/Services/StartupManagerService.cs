@@ -76,8 +76,15 @@ public sealed class StartupManagerService
     {
         if (!entry.CanDisable || entry.Scope != "Usuário atual" || entry.KeyPath != UserRunPath)
             throw new InvalidOperationException("Somente entradas não protegidas de inicialização do usuário atual podem ser desativadas.");
-        if (string.IsNullOrWhiteSpace(entry.Name))
-            throw new InvalidOperationException("Nome de entrada inválido.");
+        if (string.IsNullOrWhiteSpace(entry.Name) || entry.Id != MakeId(UserRunPath, entry.Name))
+            throw new InvalidOperationException("Identidade da entrada de inicialização inválida.");
+
+        using (var currentKey = Registry.CurrentUser.OpenSubKey(UserRunPath, writable: false))
+        {
+            var currentCommand = currentKey?.GetValue(entry.Name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+            if (currentCommand is null || !string.Equals(Convert.ToString(currentCommand), entry.Command, StringComparison.Ordinal))
+                throw new InvalidOperationException("A entrada mudou desde a leitura. Atualize a página antes de tentar desativá-la.");
+        }
 
         var tweak = MakeTweak(entry.Name, entry.Command, entry.Id);
         _registry.RemoveValue(tweak);
