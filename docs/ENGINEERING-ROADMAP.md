@@ -21,7 +21,7 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Adicionar verificação de integridade/assinatura de artefatos e SBOM.
 
 ## Fase 2 — Observabilidade e inventário
-- [ ] Inventário detalhado CPU, GPU, RAM/slots/SPD quando permitido, placa/revisão, BIOS, PCIe, monitores, discos, drivers, áudio e NIC.
+- [~] CPU/GPU/RAM total, módulos RAM por WMI/SMBIOS, placa/BIOS e inventário PnP de rede/áudio/sistema com hardware IDs e drivers assinados. Leitura SPD direta, topologia de canais, monitores, discos e inventário completo de drivers ainda pendentes.
 - [x] Monitoramento inicial CPU/RAM via APIs Windows e GPU 3D via NVIDIA SMI/WMI com indicação de fonte; sensores de temperatura por fabricante ainda pendentes.
 - [ ] Health check com problemas reais priorizados (ex.: memória em single channel, XMP/DOCP, refresh rate, driver ausente, plano de energia, temperaturas).
 - [ ] Exportar relatório local para suporte e baseline.
@@ -51,7 +51,7 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Diagnóstico de desconexões de madrugada/AFK sem alegar que o app controla quedas do ISP/roteador.
 
 ## Fase 6 — Central de hardware
-- [ ] Banco por fabricante/modelo/revisão física, com fontes oficiais, BIOS, drivers e utilitários.
+- [~] Base inicial GIGABYTE A520M K V2 com fontes oficiais por revisão e links de BIOS liberados somente após confirmação manual da revisão física do PCB; expandir catálogo e validação por fabricante/modelo.
 - [ ] Primeira placa: GIGABYTE A520M K V2; revisão do PCB precisa ser confirmada.
 - [ ] Identificar CPU instalada e suporte mínimo de BIOS; exibir aviso de risco antes de qualquer recomendação de firmware.
 - [ ] Integração com APP Center, EasyTune, SIV/Smart Fan 5 e Q-Flash apenas como links/ações oficiais e com detecção de instalação.
