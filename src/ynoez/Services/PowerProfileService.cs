@@ -22,6 +22,7 @@ public static class PowerProfileService
     private const uint PowerRequestContextSimpleString = 0x00000001;
     private static readonly object PowerRequestSync = new();
     private static IntPtr _systemSleepRequest = IntPtr.Zero;
+    private static bool _systemSleepRequestActive;
     private static readonly string BaseBackupPath = Path.Combine(AppPaths.Data, "power-profile-base.json");
     private static readonly string StatePath = Path.Combine(AppPaths.Data, "power-profile-state.json");
     private static readonly string SessionPath = Path.Combine(AppPaths.Data, "auto-profile-session.json");
@@ -375,13 +376,16 @@ public static class PowerProfileService
                 }
             }
 
+            if (_systemSleepRequestActive) return;
             if (!PowerSetRequest(_systemSleepRequest, PowerRequestType.SystemRequired))
             {
                 var error = Marshal.GetLastWin32Error();
                 CloseHandle(_systemSleepRequest);
                 _systemSleepRequest = IntPtr.Zero;
+                _systemSleepRequestActive = false;
                 throw new Win32Exception(error, "O Windows não permitiu bloquear a suspensão automática durante o perfil AFK.");
             }
+            _systemSleepRequestActive = true;
         }
     }
 
@@ -391,9 +395,11 @@ public static class PowerProfileService
         {
             if (_systemSleepRequest == IntPtr.Zero) return;
             var handle = _systemSleepRequest;
+            var wasActive = _systemSleepRequestActive;
             _systemSleepRequest = IntPtr.Zero;
+            _systemSleepRequestActive = false;
 
-            if (!PowerClearRequest(handle, PowerRequestType.SystemRequired))
+            if (wasActive && !PowerClearRequest(handle, PowerRequestType.SystemRequired))
                 AppLog.Write("O Windows não confirmou a liberação explícita da solicitação AFK: " +
                     new Win32Exception(Marshal.GetLastWin32Error()).Message);
 
