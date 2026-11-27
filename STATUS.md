@@ -10,7 +10,7 @@
 - Monitor ao vivo de CPU/RAM via APIs nativas e GPU 3D via NVIDIA SMI ou WMI GPU Engine. Temperatura/VRAM/potência dependem do suporte NVIDIA; não instala drivers de sensor.
 - Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV, FPS médio, 1% low (inverso do P99 frametime), frametime médio e frames lentos. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
 - Diagnóstico de rede: ICMP, TCP/443, DNS IPv4/IPv6 e tracert.
-- Monitoramento contínuo a cada 5 segundos com janela móvel de perda/jitter, ICMP gateway/1.1.1.1, TCP 1.1.1.1:443 e CSV.
+- Monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, ICMP/TCP para Cloudflare e Google, resolução DNS, janela móvel real de 60 segundos e hipótese de causa, com exportação CSV.
 - Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
 - Central Restore consolida recuperação de Registro, plano base/AFK interrompido, serviços opcionais, adaptadores de rede, tarefas, inicialização e snapshots. Backups órfãos ou corrompidos permanecem preservados.
 - Testes Windows de transações de Registro, tipos originais, backups corrompidos, inicialização HKCU e pasta Startup temporária, fallback de energia, manifesto SHA-256 de snapshots, métricas da janela de rede, parser PresentMon e whitelists de serviços/tarefas.

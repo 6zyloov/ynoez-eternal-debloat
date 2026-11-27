@@ -471,6 +471,50 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void NetworkWindow_TracksSecondaryDestinationAndDnsFailures()
+    {
+        var samples = new[]
+        {
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "192.168.1.1", "OK", 1,
+                "OK", 15, "OK", 20, 0, 0, 0, null, null, null,
+                "TIMEOUT", null, "TIMEOUT", null, "TIMEOUT", null),
+            new NetworkMonitorSample(DateTimeOffset.UtcNow, "192.168.1.1", "OK", 1,
+                "OK", 16, "OK", 21, 0, 0, 0, null, null, null,
+                "OK", 18, "OK", 22, "OK", 8)
+        };
+
+        var summary = NetworkMonitorService.SummarizeWindow(samples);
+
+        Assert.Equal(50, summary.SecondaryExternalLossPercent);
+        Assert.Equal(50, summary.SecondaryExternalTcpFailurePercent);
+        Assert.Equal(50, summary.DnsFailurePercent);
+    }
+
+    [Fact]
+    public void NetworkRootCause_SeparatesLocalDnsAndUpstreamPatterns()
+    {
+        var local = MakeNetworkSample(gatewayLoss: 25);
+        Assert.Equal("REDE LOCAL", NetworkRootCauseService.Analyze(local).Category);
+
+        var dns = MakeNetworkSample(dnsFailure: 50);
+        Assert.Equal("DNS", NetworkRootCauseService.Analyze(dns).Category);
+
+        var upstream = MakeNetworkSample(firstLoss: 50, secondLoss: 50, firstTcp: 50, secondTcp: 50);
+        Assert.Equal("ROTA / PROVEDOR", NetworkRootCauseService.Analyze(upstream).Category);
+
+        var icmpFiltered = MakeNetworkSample(firstLoss: 50, secondLoss: 50);
+        Assert.Equal("ICMP / FILTRAGEM", NetworkRootCauseService.Analyze(icmpFiltered).Category);
+    }
+
+    private static NetworkMonitorSample MakeNetworkSample(
+        double gatewayLoss = 0, double firstLoss = 0, double secondLoss = 0,
+        double firstTcp = 0, double secondTcp = 0, double dnsFailure = 0) =>
+        new(DateTimeOffset.UtcNow, "192.168.1.1", "OK", 1, "OK", 15, "OK", 20,
+            gatewayLoss, firstLoss, firstTcp, 0, 0, 0,
+            "OK", 15, "OK", 20, "OK", 5,
+            secondLoss, secondTcp, dnsFailure);
+
+    [Fact]
     public void NetworkJitter_DoesNotBridgeAcrossPacketLoss()
     {
         var now = DateTimeOffset.UtcNow;

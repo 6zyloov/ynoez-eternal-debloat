@@ -11,11 +11,18 @@ public sealed record NetworkMonitorSample(
     DateTimeOffset Timestamp, string Gateway, string GatewayStatus, long? GatewayMilliseconds,
     string ExternalStatus, long? ExternalMilliseconds, string ExternalTcpStatus, long? ExternalTcpMilliseconds,
     double GatewayLoss60sPercent, double ExternalLoss60sPercent, double ExternalTcpFailure60sPercent,
-    double? GatewayJitter60sMilliseconds, double? ExternalJitter60sMilliseconds, double? ExternalTcpJitter60sMilliseconds);
+    double? GatewayJitter60sMilliseconds, double? ExternalJitter60sMilliseconds, double? ExternalTcpJitter60sMilliseconds,
+    string SecondaryExternalStatus = "NOT_TESTED", long? SecondaryExternalMilliseconds = null,
+    string SecondaryExternalTcpStatus = "NOT_TESTED", long? SecondaryExternalTcpMilliseconds = null,
+    string DnsStatus = "NOT_TESTED", double? DnsMilliseconds = null,
+    double SecondaryExternalLoss60sPercent = 0, double SecondaryExternalTcpFailure60sPercent = 0,
+    double DnsFailure60sPercent = 0);
 
 public sealed record NetworkWindowSummary(
     double GatewayLossPercent, double ExternalLossPercent, double ExternalTcpFailurePercent,
-    double? GatewayJitterMilliseconds, double? ExternalJitterMilliseconds, double? ExternalTcpJitterMilliseconds);
+    double? GatewayJitterMilliseconds, double? ExternalJitterMilliseconds, double? ExternalTcpJitterMilliseconds,
+    double SecondaryExternalLossPercent = 0, double SecondaryExternalTcpFailurePercent = 0,
+    double DnsFailurePercent = 0);
 
 public static class NetworkMonitorService
 {
@@ -27,11 +34,9 @@ public static class NetworkMonitorService
         Directory.CreateDirectory(AppPaths.Logs);
         var file = Path.Combine(AppPaths.Logs, "network-monitor-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") +
             "-" + Guid.NewGuid().ToString("N")[..8] + ".csv");
-        var gatewayAddress = GetDefaultGateway()?.ToString() ?? string.Empty;
-
         await using var stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
-        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external,external_status,external_ms,external_tcp_status,external_tcp_ms,gateway_loss_60s_pct,external_loss_60s_pct,external_tcp_failure_60s_pct,gateway_jitter_60s_ms,external_jitter_60s_ms,external_tcp_jitter_60s_ms");
+        await writer.WriteLineAsync("timestamp,gateway,gateway_status,gateway_ms,external_1,external_1_icmp_status,external_1_icmp_ms,external_1_tcp_status,external_1_tcp_ms,external_2,external_2_icmp_status,external_2_icmp_ms,external_2_tcp_status,external_2_tcp_ms,dns_host,dns_status,dns_ms,gateway_loss_60s_pct,external_1_loss_60s_pct,external_1_tcp_failure_60s_pct,external_2_loss_60s_pct,external_2_tcp_failure_60s_pct,dns_failure_60s_pct,gateway_jitter_60s_ms,external_1_jitter_60s_ms,external_1_tcp_jitter_60s_ms");
         await writer.FlushAsync();
         AppLog.Write("Monitoramento contínuo de rede iniciado: " + file);
         var window = new Queue<(long Tick, NetworkMonitorSample Sample)>();
@@ -42,17 +47,25 @@ public static class NetworkMonitorService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var started = DateTimeOffset.UtcNow;
+                // Re-read the route each cycle so interface changes do not pin this monitor to an old gateway.
+                var gatewayAddress = GetDefaultGateway()?.ToString() ?? string.Empty;
                 var gatewayTask = string.IsNullOrWhiteSpace(gatewayAddress)
                     ? Task.FromResult(new ProbeResult("NO_GATEWAY", null))
                     : ProbeAsync(gatewayAddress, cancellationToken);
                 var externalTask = ProbeAsync("1.1.1.1", cancellationToken);
                 var tcpTask = ProbeTcpAsync("1.1.1.1", 443, cancellationToken);
-                await Task.WhenAll(gatewayTask, externalTask, tcpTask);
+                var secondaryExternalTask = ProbeAsync("8.8.8.8", cancellationToken);
+                var secondaryTcpTask = ProbeTcpAsync("8.8.8.8", 443, cancellationToken);
+                var dnsTask = ProbeDnsAsync("cloudflare.com", cancellationToken);
+                await Task.WhenAll(gatewayTask, externalTask, tcpTask, secondaryExternalTask, secondaryTcpTask, dnsTask);
 
                 var raw = new NetworkMonitorSample(DateTimeOffset.Now, gatewayAddress,
                     gatewayTask.Result.Status, gatewayTask.Result.Milliseconds,
                     externalTask.Result.Status, externalTask.Result.Milliseconds,
-                    tcpTask.Result.Status, tcpTask.Result.Milliseconds, 0, 0, 0, null, null, null);
+                    tcpTask.Result.Status, tcpTask.Result.Milliseconds, 0, 0, 0, null, null, null,
+                    secondaryExternalTask.Result.Status, secondaryExternalTask.Result.Milliseconds,
+                    secondaryTcpTask.Result.Status, secondaryTcpTask.Result.Milliseconds,
+                    dnsTask.Result.Status, dnsTask.Result.Milliseconds);
                 var tick = System.Diagnostics.Stopwatch.GetTimestamp();
                 window.Enqueue((tick, raw));
                 while (window.Count > 0 &&
@@ -65,6 +78,9 @@ public static class NetworkMonitorService
                     GatewayLoss60sPercent = summary.GatewayLossPercent,
                     ExternalLoss60sPercent = summary.ExternalLossPercent,
                     ExternalTcpFailure60sPercent = summary.ExternalTcpFailurePercent,
+                    SecondaryExternalLoss60sPercent = summary.SecondaryExternalLossPercent,
+                    SecondaryExternalTcpFailure60sPercent = summary.SecondaryExternalTcpFailurePercent,
+                    DnsFailure60sPercent = summary.DnsFailurePercent,
                     GatewayJitter60sMilliseconds = summary.GatewayJitterMilliseconds,
                     ExternalJitter60sMilliseconds = summary.ExternalJitterMilliseconds,
                     ExternalTcpJitter60sMilliseconds = summary.ExternalTcpJitterMilliseconds
@@ -78,9 +94,18 @@ public static class NetworkMonitorService
                     sample.ExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                     Csv(sample.ExternalTcpStatus),
                     sample.ExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    "8.8.8.8", Csv(sample.SecondaryExternalStatus),
+                    sample.SecondaryExternalMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    Csv(sample.SecondaryExternalTcpStatus),
+                    sample.SecondaryExternalTcpMilliseconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    "cloudflare.com", Csv(sample.DnsStatus),
+                    sample.DnsMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
                     sample.GatewayLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
                     sample.ExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
                     sample.ExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+                    sample.SecondaryExternalLoss60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+                    sample.SecondaryExternalTcpFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
+                    sample.DnsFailure60sPercent.ToString("0.0", CultureInfo.InvariantCulture),
                     sample.GatewayJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
                     sample.ExternalJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty,
                     sample.ExternalTcpJitter60sMilliseconds?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty));
@@ -108,10 +133,20 @@ public static class NetworkMonitorService
             100d * gatewaySamples.Count(x => !x.GatewayMilliseconds.HasValue) / gatewaySamples.Length;
         var externalLoss = 100d * samples.Count(x => !x.ExternalMilliseconds.HasValue) / samples.Count;
         var tcpFailure = 100d * samples.Count(x => !x.ExternalTcpMilliseconds.HasValue) / samples.Count;
+        var secondarySamples = samples.Where(x => !string.Equals(x.SecondaryExternalStatus, "NOT_TESTED", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var secondaryTcpSamples = samples.Where(x => !string.Equals(x.SecondaryExternalTcpStatus, "NOT_TESTED", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var dnsSamples = samples.Where(x => !string.Equals(x.DnsStatus, "NOT_TESTED", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var secondaryLoss = secondarySamples.Length == 0 ? 0 :
+            100d * secondarySamples.Count(x => !x.SecondaryExternalMilliseconds.HasValue) / secondarySamples.Length;
+        var secondaryTcpFailure = secondaryTcpSamples.Length == 0 ? 0 :
+            100d * secondaryTcpSamples.Count(x => !x.SecondaryExternalTcpMilliseconds.HasValue) / secondaryTcpSamples.Length;
+        var dnsFailure = dnsSamples.Length == 0 ? 0 :
+            100d * dnsSamples.Count(x => !string.Equals(x.DnsStatus, "OK", StringComparison.OrdinalIgnoreCase)) / dnsSamples.Length;
         return new NetworkWindowSummary(gatewayLoss, externalLoss, tcpFailure,
             CalculateJitter(gatewaySamples.Select(x => x.GatewayMilliseconds)),
             CalculateJitter(samples.Select(x => x.ExternalMilliseconds)),
-            CalculateJitter(samples.Select(x => x.ExternalTcpMilliseconds)));
+            CalculateJitter(samples.Select(x => x.ExternalTcpMilliseconds)),
+            secondaryLoss, secondaryTcpFailure, dnsFailure);
     }
 
     private static double? CalculateJitter(IEnumerable<long?> values)
@@ -171,6 +206,32 @@ public static class NetworkMonitorService
         catch (Exception ex) { return new ProbeResult(ex.GetType().Name, null); }
     }
 
+    private static async Task<DnsProbeResult> ProbeDnsAsync(string host, CancellationToken token)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            var addresses = await Dns.GetHostAddressesAsync(host, timeout.Token);
+            timer.Stop();
+            return addresses.Length > 0
+                ? new DnsProbeResult("OK", timer.Elapsed.TotalMilliseconds)
+                : new DnsProbeResult("EMPTY", timer.Elapsed.TotalMilliseconds);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException)
+        {
+            timer.Stop();
+            return new DnsProbeResult("TIMEOUT", null);
+        }
+        catch (Exception ex)
+        {
+            timer.Stop();
+            return new DnsProbeResult(ex.GetType().Name, null);
+        }
+    }
+
     private static IPAddress? GetDefaultGateway()
     {
         foreach (var nic in NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up))
@@ -188,4 +249,5 @@ public static class NetworkMonitorService
 
     private static string Csv(string value) => value.Replace(",", " ", StringComparison.Ordinal);
     private sealed record ProbeResult(string Status, long? Milliseconds);
+    private sealed record DnsProbeResult(string Status, double? Milliseconds);
 }

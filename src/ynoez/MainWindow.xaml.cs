@@ -606,7 +606,7 @@ public partial class MainWindow : Window
         var monitorCard = MakeCard();
         var monitorPanel = new StackPanel { Margin = new Thickness(20) };
         monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
-        monitorPanel.Children.Add(Body("Registra a cada 5 segundos gateway, ICMP e TCP/443. A janela estatística usa exatamente os últimos 60 segundos, com perda e jitter separados por protocolo — útil para distinguir ICMP filtrado de perda real de conectividade. O CSV fica em C:\\ynoez\\Logs; nenhuma configuração é alterada."));
+        monitorPanel.Children.Add(Body("Registra a cada 5 segundos o gateway atual, dois destinos públicos (Cloudflare e Google), ICMP, TCP/443 e resolução DNS. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs."));
         var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var monitorButtons = new WrapPanel();
         var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
@@ -618,20 +618,28 @@ public partial class MainWindow : Window
             var token = _networkMonitorCts.Token;
             startMonitor.IsEnabled = false;
             stopMonitor.IsEnabled = true;
-            monitorStatus.Text = "Monitorando gateway e 1.1.1.1…";
+            monitorStatus.Text = "Monitorando gateway, Cloudflare, Google e DNS…";
             try
             {
                 var logFile = await NetworkMonitorService.RunAsync(TimeSpan.FromSeconds(5), sample =>
                 {
+                    var assessment = NetworkRootCauseService.Analyze(sample);
                     monitorStatus.Text = sample.Timestamp.ToString("HH:mm:ss") +
-                        " | Gateway: " + sample.GatewayStatus + (sample.GatewayMilliseconds.HasValue ? " " + sample.GatewayMilliseconds + " ms" : "") +
-                        " | Internet ICMP: " + sample.ExternalStatus + (sample.ExternalMilliseconds.HasValue ? " " + sample.ExternalMilliseconds + " ms" : "") +
-                        " | TCP 443: " + sample.ExternalTcpStatus +
-                        " | Perda ICMP 60s: " + sample.ExternalLoss60sPercent.ToString("0") + "%" +
-                        " | Falha TCP 60s: " + sample.ExternalTcpFailure60sPercent.ToString("0") + "%" +
-                        " | Jitter gateway: " + (sample.GatewayJitter60sMilliseconds.HasValue ? sample.GatewayJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—") +
-                        " | Jitter ICMP: " + (sample.ExternalJitter60sMilliseconds.HasValue ? sample.ExternalJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—") +
-                        " | Jitter TCP: " + (sample.ExternalTcpJitter60sMilliseconds.HasValue ? sample.ExternalTcpJitter60sMilliseconds.Value.ToString("0.0") + " ms" : "—");
+                        " | Gateway " + (string.IsNullOrWhiteSpace(sample.Gateway) ? "—" : sample.Gateway) +
+                        ": " + sample.GatewayStatus + (sample.GatewayMilliseconds.HasValue ? " " + sample.GatewayMilliseconds + " ms" : "") +
+                        " | 1.1.1.1 ICMP/TCP: " + sample.ExternalStatus + "/" + sample.ExternalTcpStatus +
+                        " | 8.8.8.8 ICMP/TCP: " + sample.SecondaryExternalStatus + "/" + sample.SecondaryExternalTcpStatus +
+                        " | DNS: " + sample.DnsStatus + (sample.DnsMilliseconds.HasValue ? " " + sample.DnsMilliseconds.Value.ToString("0.0") + " ms" : "") +
+                        " | Perda 60s GW/CF/Google: " + sample.GatewayLoss60sPercent.ToString("0") + "/" +
+                            sample.ExternalLoss60sPercent.ToString("0") + "/" + sample.SecondaryExternalLoss60sPercent.ToString("0") + "%" +
+                        " | Falha TCP CF/Google: " + sample.ExternalTcpFailure60sPercent.ToString("0") + "/" +
+                            sample.SecondaryExternalTcpFailure60sPercent.ToString("0") + "%" +
+                        " | Falha DNS: " + sample.DnsFailure60sPercent.ToString("0") + "%" +
+                        " | Jitter GW/ICMP/TCP: " +
+                            (sample.GatewayJitter60sMilliseconds.HasValue ? sample.GatewayJitter60sMilliseconds.Value.ToString("0.0") : "—") + "/" +
+                            (sample.ExternalJitter60sMilliseconds.HasValue ? sample.ExternalJitter60sMilliseconds.Value.ToString("0.0") : "—") + "/" +
+                            (sample.ExternalTcpJitter60sMilliseconds.HasValue ? sample.ExternalTcpJitter60sMilliseconds.Value.ToString("0.0") : "—") + " ms" +
+                        "\n" + assessment.Category + ": " + assessment.Assessment;
                 }, token);
                 monitorStatus.Text = "Monitor encerrado. CSV salvo em: " + logFile;
             }
