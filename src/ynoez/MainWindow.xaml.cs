@@ -1634,11 +1634,11 @@ public partial class MainWindow : Window
     {
         var root = PageContainer();
         var profile = MotherboardProfileService.Find(_hardware);
-        var revision = profile is null ? null : MotherboardProfileService.GetRevision(profile, _hardware.BoardVersion);
+        var revisionHint = profile is null ? null : MotherboardProfileService.GetFirmwareRevisionHint(profile, _hardware.BoardVersion);
         var recognized = profile is not null;
         var title = recognized ? $"{profile!.Manufacturer} {profile!.Product}" : "Central da placa-mãe";
         var desc = recognized
-            ? $"Perfil específico identificado. Revisão: {(revision?.Revision ?? "não identificada pelo firmware")}. Firmware e drivers só serão recomendados após confirmar a revisão física."
+            ? $"Perfil específico identificado. Indício SMBIOS: {(revisionHint?.Revision ?? "não informado")}. Esse valor não seleciona BIOS; confirme manualmente a revisão impressa no PCB."
             : "Modelo detectado: " + _hardware.BoardManufacturer + " " + _hardware.BoardProduct + ". Nenhum perfil de fabricante será forçado sem identificação confiável.";
         root.Children.Add(PageIntro(title, desc));
 
@@ -1658,25 +1658,92 @@ public partial class MainWindow : Window
 
         if (profile is not null)
         {
-            root.Children.Add(ActionCard("Página oficial de suporte", "Drivers, BIOS e utilitários da fabricante. Quando a revisão não é detectada, a página genérica permite escolher a revisão correta manualmente.", "Abrir suporte", () => OpenTargetAsync(revision?.Support ?? "https://www.gigabyte.com/br/Motherboard/A520M-K-V2"), "GIGABYTE"));
+            root.Children.Add(ActionCard("Página oficial de suporte", "Abre a página genérica do modelo. Ela não pré-seleciona uma revisão e permite consultar documentação sem assumir qual PCB você possui.", "Abrir suporte genérico", () => OpenTargetAsync("https://www.gigabyte.com/br/Motherboard/A520M-K-V2"), "GIGABYTE"));
             if (!string.IsNullOrWhiteSpace(profile.ManualUrl))
-                root.Children.Add(ActionCard("Manual da placa-mãe", "Documentação oficial da série A520M K. Confirme o sufixo V2 e a revisão física antes de seguir instruções de firmware ou conectores.", "Abrir manual", () => OpenTargetAsync(profile.ManualUrl), "DOCUMENTAÇÃO"));
-            if (revision is not null)
+                root.Children.Add(ActionCard("Manual da placa-mãe", "Documentação oficial da série A520M K. Confirme o sufixo V2 e conectores físicos antes de seguir instruções de firmware.", "Abrir manual", () => OpenTargetAsync(profile.ManualUrl), "DOCUMENTAÇÃO"));
+
+            var revisionConfirmCard = MakeCard();
+            var revisionConfirmPanel = new StackPanel { Margin = new Thickness(20) };
+            revisionConfirmPanel.Children.Add(Heading("Confirmação manual da revisão do PCB", 15));
+            revisionConfirmPanel.Children.Add(Body("Leia a revisão impressa diretamente na placa-mãe (serigrafia no PCB). Não use a versão SMBIOS, a versão da BIOS, a caixa ou uma página de compra como confirmação. Até você confirmar, nenhum link de BIOS específico por revisão será exibido."));
+            revisionConfirmPanel.Children.Add(KeyValue("Indício reportado pelo SMBIOS (não é confirmação)", revisionHint?.Revision ?? "Não informado"));
+            var revisionPicker = new ComboBox
             {
+                Height = 38,
+                MinWidth = 180,
+                Padding = new Thickness(8, 5, 8, 5),
+                Background = BrushFrom("#171717"),
+                Foreground = PrimaryBrush,
+                BorderBrush = BorderBrushSoft,
+                BorderThickness = new Thickness(1),
+                ItemsSource = profile.RevisionLinks,
+                DisplayMemberPath = nameof(MotherboardRevisionLink.Revision),
+                SelectedIndex = -1,
+                ToolTip = "Escolha somente a revisão que você leu na serigrafia impressa no PCB"
+            };
+            var revisionConfirmStatus = Body("Nenhuma revisão física foi confirmada. Os links de BIOS específicos permanecem ocultos.");
+            revisionConfirmStatus.TextWrapping = TextWrapping.Wrap;
+            var confirmRevisionButton = new Button
+            {
+                Content = "Confirmar revisão física",
+                Style = (Style)FindResource("AccentButton"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                IsEnabled = false,
+                Margin = new Thickness(0, 8, 0, 10)
+            };
+            var revisionDetailsPanel = new StackPanel();
+            revisionPicker.SelectionChanged += (_, _) =>
+            {
+                revisionDetailsPanel.Children.Clear();
+                confirmRevisionButton.IsEnabled = revisionPicker.SelectedItem is MotherboardRevisionLink;
+                revisionConfirmStatus.Text = revisionPicker.SelectedItem is MotherboardRevisionLink selected
+                    ? "Selecionada " + selected.Revision + ", mas ainda não confirmada. Confira a mesma identificação impressa no PCB."
+                    : "Nenhuma revisão física foi confirmada. Os links de BIOS específicos permanecem ocultos.";
+            };
+            confirmRevisionButton.Click += (_, _) =>
+            {
+                var selected = revisionPicker.SelectedItem as MotherboardRevisionLink;
+                var confirmed = MotherboardProfileService.GetConfirmedPhysicalRevision(profile, selected?.Revision);
+                if (confirmed is null)
+                {
+                    revisionConfirmStatus.Text = "A revisão escolhida não corresponde a uma opção cadastrada. Nenhum link de BIOS foi liberado.";
+                    revisionDetailsPanel.Children.Clear();
+                    return;
+                }
+
+                revisionConfirmStatus.Text = "Revisão " + confirmed.Revision +
+                    " confirmada manualmente com base na serigrafia do PCB. Confira novamente o modelo completo antes de qualquer procedimento.";
+                revisionDetailsPanel.Children.Clear();
+
                 var biosCard = MakeCard();
-                var biosPanel = new StackPanel { Margin = new Thickness(20) };
-                biosPanel.Children.Add(Heading("Última BIOS listada pela Gigabyte", 15));
-                biosPanel.Children.Add(KeyValue("Revisão", revision.Revision));
-                biosPanel.Children.Add(KeyValue("Versão listada", revision.LatestBiosVersion));
-                biosPanel.Children.Add(KeyValue("Data de publicação", revision.LatestBiosReleaseDate));
-                foreach (var note in revision.LatestBiosNotes) biosPanel.Children.Add(Bullet(note));
-                biosPanel.Children.Add(Body("Consulta verificada em " + revision.BiosCheckedAt + ". Isto não significa que a atualização seja obrigatória: compare com a BIOS instalada, CPU suportada e notas oficiais antes de decidir."));
+                var biosPanel = new StackPanel { Margin = new Thickness(16) };
+                biosPanel.Children.Add(Heading("BIOS específica — revisão " + confirmed.Revision, 14));
+                biosPanel.Children.Add(KeyValue("Versão mais recente listada no perfil", confirmed.LatestBiosVersion));
+                biosPanel.Children.Add(KeyValue("Data de publicação", confirmed.LatestBiosReleaseDate));
+                foreach (var note in confirmed.LatestBiosNotes) biosPanel.Children.Add(Bullet(note));
+                biosPanel.Children.Add(Body("Consulta verificada em " + confirmed.BiosCheckedAt +
+                    ". Isto não significa que a atualização seja obrigatória. Compare a BIOS instalada, CPU suportada e notas oficiais; o ynoez não grava firmware."));
                 biosCard.Child = biosPanel;
-                root.Children.Add(biosCard);
-                root.Children.Add(ActionCard("Página de BIOS da revisão " + revision.Revision, "Consulta oficial apenas. A atualização de firmware continua manual, depende da revisão física e não é executada pelo ynoez.", "Abrir página de BIOS", () => OpenTargetAsync(revision.Bios), "SOMENTE CONSULTA"));
-            }
-            else
-                root.Children.Add(NoteCard("Revisão física obrigatória", "A página do modelo oferece revisões 1.0, 1.1 e 1.2. A versão SMBIOS não foi suficiente para escolher uma delas; confira a serigrafia impressa na própria placa antes de abrir ou instalar BIOS."));
+                revisionDetailsPanel.Children.Add(biosCard);
+                revisionDetailsPanel.Children.Add(ActionCard(
+                    "Página oficial de BIOS — revisão " + confirmed.Revision,
+                    "Link liberado somente após confirmação manual da revisão física. A atualização continua manual.",
+                    "Abrir página de BIOS",
+                    () => OpenTargetAsync(confirmed.Bios),
+                    "SOMENTE CONSULTA"));
+                revisionDetailsPanel.Children.Add(ActionCard(
+                    "Suporte oficial — revisão " + confirmed.Revision,
+                    "Drivers e utilitários da revisão confirmada. Verifique versão do Windows e IDs dos dispositivos antes de instalar.",
+                    "Abrir suporte da revisão",
+                    () => OpenTargetAsync(confirmed.Support),
+                    "SOMENTE CONSULTA"));
+            };
+            revisionConfirmPanel.Children.Add(revisionPicker);
+            revisionConfirmPanel.Children.Add(confirmRevisionButton);
+            revisionConfirmPanel.Children.Add(revisionConfirmStatus);
+            revisionConfirmPanel.Children.Add(revisionDetailsPanel);
+            revisionConfirmCard.Child = revisionConfirmPanel;
+            root.Children.Add(revisionConfirmCard);
 
             var specs = MakeCard();
             var specsPanel = new StackPanel { Margin = new Thickness(20) };
