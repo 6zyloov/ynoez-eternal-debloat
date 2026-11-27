@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private string _currentPage = "Home";
     private bool _isBusy;
     private CancellationTokenSource? _networkMonitorCts;
+    private CancellationTokenSource? _autoProfileCts;
 
     private sealed record ToolboxEntry(string Name, string Description, string[] Keywords, string Target, string Kind = "Configuração", string? ServiceName = null);
 
@@ -59,7 +60,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => _networkMonitorCts?.Cancel();
+        Closed += (_, _) => { _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -190,18 +191,81 @@ public partial class MainWindow : Window
     {
         var root = PageContainer();
         root.Children.Add(PageIntro("Tweaks", "Ajustes de acesso controlado. Nada é aplicado automaticamente ao abrir o aplicativo."));
-        root.Children.Add(ActionCard("Plano de energia Alto desempenho", "Salva o GUID do plano atual e só então solicita ao Windows o plano Alto desempenho. O resultado pode aumentar consumo e temperatura.", "Ativar Alto desempenho", async () =>
+        root.Children.Add(ActionCard("Performance", "Ativa Alto desempenho para reduzir economia agressiva de energia. Pode elevar consumo, temperatura e ruído.", "Ativar Performance", () =>
         {
-            if (MessageBox.Show("Ativar o plano Alto desempenho? O plano atual será salvo e poderá ser restaurado pelo ynoez.", "Confirmar ajuste", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            var message = BackupService.SetHighPerformancePlan();
-            MessageBox.Show(message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-        }, "REVERSÍVEL"));
-        root.Children.Add(ActionCard("Restaurar plano de energia anterior", "Reaplica o GUID salvo antes da última alteração de plano feita pelo ynoez.", "Restaurar plano", () =>
+            if (MessageBox.Show("Ativar o perfil Performance? O plano original será salvo para restauração.", "Confirmar perfil", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
+            MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Performance), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+            return Task.CompletedTask;
+        }, "JOGOS"));
+        root.Children.Add(ActionCard("Equilibrado", "Usa o plano equilibrado do Windows para tarefas comuns, sem encerrar processos ou alterar serviços.", "Ativar Equilibrado", () =>
         {
-            var message = BackupService.RestorePreviousPowerScheme();
-            MessageBox.Show(message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (MessageBox.Show("Ativar o perfil Equilibrado?", "Confirmar perfil", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return Task.CompletedTask;
+            MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Balanced), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+            return Task.CompletedTask;
+        }, "PADRÃO"));
+        root.Children.Add(ActionCard("AFK / Economia", "Ativa o plano de economia de energia. Roblox, XT, downloads, Discord e outros processos continuam abertos; o ynoez não mata processos.", "Ativar AFK", () =>
+        {
+            if (MessageBox.Show("Ativar economia de energia? Isso pode reduzir desempenho enquanto jogos ou scripts continuam rodando.", "Confirmar perfil AFK", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
+            MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Afk), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+            return Task.CompletedTask;
+        }, "ECONOMIA"));
+        root.Children.Add(ActionCard("Restaurar plano original", "Restaura o GUID do plano que estava ativo antes do primeiro perfil ynoez e verifica o resultado.", "Restaurar original", () =>
+        {
+            MessageBox.Show(PowerProfileService.RestoreOriginal(), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "RESTAURAÇÃO"));
+
+        var autoCard = MakeCard();
+        var autoPanel = new StackPanel { Margin = new Thickness(20) };
+        autoPanel.Children.Add(Heading("Perfis automáticos", 15));
+        autoPanel.Children.Add(Body("Verifica jogos conhecidos e o tempo sem entrada do teclado/mouse. Jogo com usuário ativo = Performance; uso comum = Equilibrado; 15 minutos sem entrada = AFK. Nenhum processo é encerrado. O perfil automático funciona enquanto o ynoez estiver aberto."));
+        var autoStatus = new TextBlock { Text = "Automação desligada.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
+        var autoButtons = new WrapPanel();
+        var startAuto = new Button { Content = "Ativar automático", Style = (Style)FindResource("AccentButton"), MinWidth = 140, Margin = new Thickness(0, 0, 8, 0) };
+        var stopAuto = new Button { Content = "Parar", Style = (Style)FindResource("QuietButton"), MinWidth = 90, IsEnabled = false };
+        startAuto.Click += async (_, _) =>
+        {
+            if (_autoProfileCts is not null) return;
+            if (MessageBox.Show("Permitir que o ynoez alterne os planos de energia automaticamente conforme jogo e inatividade? Nenhum processo será encerrado.", "Ativar perfis automáticos", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+            _autoProfileCts = new CancellationTokenSource();
+            var token = _autoProfileCts.Token;
+            startAuto.IsEnabled = false;
+            stopAuto.IsEnabled = true;
+            autoStatus.Text = "Automação ativa.";
+            try
+            {
+                await AutoProfileService.RunAsync(status =>
+                {
+                    if (!Dispatcher.HasShutdownStarted)
+                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + status.Mode + " | Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") +
+                            " min" + (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : ""));
+                }, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                autoStatus.Text = "Automação parada. O último plano selecionado permanece ativo.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Perfis automáticos falharam: " + ex);
+                autoStatus.Text = "Falha na automação: " + ex.Message;
+            }
+            finally
+            {
+                _autoProfileCts?.Dispose();
+                _autoProfileCts = null;
+                startAuto.IsEnabled = true;
+                stopAuto.IsEnabled = false;
+            }
+        };
+        stopAuto.Click += (_, _) => _autoProfileCts?.Cancel();
+        autoButtons.Children.Add(startAuto);
+        autoButtons.Children.Add(stopAuto);
+        autoPanel.Children.Add(autoStatus);
+        autoPanel.Children.Add(autoButtons);
+        autoCard.Child = autoPanel;
+        root.Children.Add(autoCard);
         root.Children.Add(ActionCard("Modo de Jogo do Windows", "Abre a configuração oficial. O ynoez não remove Xbox, Game Bar, capturas ou overlays.", "Abrir configuração", () => OpenTargetAsync("ms-settings:gaming-gamemode"), "SEM ALTERAÇÃO"));
         root.Children.Add(ActionCard("Energia do adaptador de rede", "Abre o painel de energia do Windows. O comportamento de economia do adaptador será avaliado no diagnóstico, sem forçar valores desconhecidos.", "Abrir energia", () => OpenTargetAsync("ms-settings:powersleep"), "SEM ALTERAÇÃO"));
         root.Children.Add(ActionCard("Windows Update e Segurança", "Atalhos oficiais para revisar atualizações e as proteções que devem continuar disponíveis para os anti-cheats.", "Abrir Windows Update", () => OpenTargetAsync("ms-settings:windowsupdate"), "PROTEGIDO"));
