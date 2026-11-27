@@ -37,6 +37,10 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _benchmarkCts;
     private CancellationTokenSource? _integrityAuditCts;
     private CancellationTokenSource? _windowsRepairCts;
+    private CancellationTokenSource? _memoryInventoryCts;
+    private CancellationTokenSource? _motherboardDeviceInventoryCts;
+    private CancellationTokenSource? _serviceInventoryCts;
+    private CancellationTokenSource? _scheduledTaskInventoryCts;
     private bool _allowClose;
     private bool _sessionEnding;
     private bool _trayIconVisible;
@@ -138,6 +142,10 @@ public partial class MainWindow : Window
             _benchmarkCts?.Cancel();
             _integrityAuditCts?.Cancel();
             _windowsRepairCts?.Cancel();
+            _memoryInventoryCts?.Cancel();
+            _motherboardDeviceInventoryCts?.Cancel();
+            _serviceInventoryCts?.Cancel();
+            _scheduledTaskInventoryCts?.Cancel();
         };
     }
 
@@ -233,6 +241,120 @@ public partial class MainWindow : Window
         grid.Children.Add(InfoTile("Motherboard", _hardware.BoardProduct, "▦"));
         grid.Children.Add(InfoTile("Windows Version", _hardware.OperatingSystem + "\nBuild " + _hardware.WindowsBuild, "▣"));
         root.Children.Add(grid);
+
+        var memoryCard = MakeCard();
+        var memoryPanel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
+        memoryPanel.Children.Add(Heading("Módulos de memória RAM", 15));
+        memoryPanel.Children.Add(Body("Consulte os módulos que o firmware disponibiliza ao WMI: slot, capacidade, tipo DDR, velocidade reportada e configurada, formato físico, ECC e part number. A consulta é somente leitura e não altera XMP/DOCP, frequência, tensão ou BIOS."));
+        var memoryStatus = Body("Inventário de módulos ainda não consultado.");
+        var memoryNotice = Body("A consulta usa dados WMI/SMBIOS; não é uma leitura SPD completa e não determina com segurança o modo single/dual channel.");
+        memoryNotice.TextWrapping = TextWrapping.Wrap;
+        var memoryGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 210,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Slot", Binding = new Binding(nameof(MemoryModuleInfo.SlotDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Capacidade", Binding = new Binding(nameof(MemoryModuleInfo.CapacityDisplay)), Width = new DataGridLength(95) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Tipo", Binding = new Binding(nameof(MemoryModuleInfo.TypeDisplay)), Width = new DataGridLength(75) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Velocidade", Binding = new Binding(nameof(MemoryModuleInfo.SpeedDisplay)), Width = new DataGridLength(95) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Configurada", Binding = new Binding(nameof(MemoryModuleInfo.ConfiguredSpeedDisplay)), Width = new DataGridLength(105) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Formato", Binding = new Binding(nameof(MemoryModuleInfo.FormFactorDisplay)), Width = new DataGridLength(90) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "ECC", Binding = new Binding(nameof(MemoryModuleInfo.EccDisplay)), Width = new DataGridLength(85) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Fabricante", Binding = new Binding(nameof(MemoryModuleInfo.ManufacturerDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Part number", Binding = new Binding(nameof(MemoryModuleInfo.PartNumberDisplay)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+        var memoryButtons = new WrapPanel();
+        var inspectMemory = new Button { Content = "Consultar módulos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelMemory = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportMemory = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        MemoryModuleInventorySnapshot? memorySnapshot = null;
+        inspectMemory.Click += async (_, _) =>
+        {
+            if (_memoryInventoryCts is not null) return;
+            var cts = new CancellationTokenSource();
+            _memoryInventoryCts = cts;
+            inspectMemory.IsEnabled = false;
+            cancelMemory.IsEnabled = true;
+            exportMemory.IsEnabled = false;
+            memoryStatus.Text = "Consultando Win32_PhysicalMemory e o firmware…";
+            try
+            {
+                var snapshot = await MemoryModuleInventoryService.CaptureAsync(cts.Token);
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    memorySnapshot = snapshot;
+                    memoryGrid.ItemsSource = snapshot.Modules;
+                    memoryStatus.Text = snapshot.SlotSummary + " • capacidade total: " + snapshot.TotalCapacityDisplay +
+                        " • " + snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss");
+                    memoryNotice.Text = snapshot.Notice;
+                    exportMemory.IsEnabled = snapshot.Modules.Count > 0;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!Dispatcher.HasShutdownStarted) memoryStatus.Text = "Consulta cancelada. Nenhuma configuração foi alterada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário de módulos de memória falhou: " + ex);
+                if (!Dispatcher.HasShutdownStarted) memoryStatus.Text = "Não foi possível consultar a memória: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_memoryInventoryCts, cts)) _memoryInventoryCts = null;
+                cts.Dispose();
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    inspectMemory.IsEnabled = true;
+                    cancelMemory.IsEnabled = false;
+                }
+            }
+        };
+        cancelMemory.Click += (_, _) => _memoryInventoryCts?.Cancel();
+        exportMemory.Click += (_, _) =>
+        {
+            if (memorySnapshot is null) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar inventário de módulos de memória",
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = "ynoez-memoria-modulos.csv",
+                AddExtension = true,
+                DefaultExt = ".csv"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, MemoryModuleInventoryService.BuildCsv(memorySnapshot), new System.Text.UTF8Encoding(true));
+                memoryStatus.Text = "Inventário de memória exportado: " + dialog.FileName;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao exportar inventário de memória: " + ex);
+                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        memoryButtons.Children.Add(inspectMemory);
+        memoryButtons.Children.Add(cancelMemory);
+        memoryButtons.Children.Add(exportMemory);
+        memoryPanel.Children.Add(memoryStatus);
+        memoryPanel.Children.Add(memoryGrid);
+        memoryPanel.Children.Add(memoryNotice);
+        memoryPanel.Children.Add(memoryButtons);
+        memoryCard.Child = memoryPanel;
+        root.Children.Add(memoryCard);
 
         var info = MakeCard();
         var panel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
@@ -768,7 +890,7 @@ public partial class MainWindow : Window
                 MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
                 return Task.CompletedTask;
             }
-            if (MessageBox.Show("Ativar economia de energia? Isso pode reduzir desempenho enquanto jogos ou scripts continuam rodando.", "Confirmar perfil AFK", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
+            if (MessageBox.Show("Ativar AFK / Economia manualmente? Este perfil pode reduzir o desempenho de jogos, bots e automações que continuarem abertos. Para deixar tarefas importantes em execução sem usar a economia agressiva, configure-as como processos protegidos e use Perfis automáticos.", "Confirmar perfil AFK", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
             MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Afk), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "ECONOMIA"));
@@ -786,8 +908,47 @@ public partial class MainWindow : Window
         var autoCard = MakeCard();
         var autoPanel = new StackPanel { Margin = new Thickness(20) };
         autoPanel.Children.Add(Heading("Perfis automáticos", 15));
-        autoPanel.Children.Add(Body("Verifica jogos conhecidos e inatividade. Jogo ativo = Performance; uso comum = Equilibrado; 15 minutos sem entrada = AFK. No AFK, o ynoez bloqueia a suspensão automática para manter XT e downloads em execução, mas permite apagar a tela. O plano anterior é salvo e restaurado ao parar; se o app fechar inesperadamente, tenta restaurá-lo na próxima abertura. Não impede suspensão manual, tampa fechada ou perda de energia."));
+        autoPanel.Children.Add(Body("Jogo com atividade recente = Performance. Jogo ou processo protegido durante inatividade = AFK protegido: plano Equilibrado + bloqueio de suspensão, sem usar o plano Economia agressiva. Somente quando nenhum jogo/processo protegido estiver rodando e houver 15 minutos sem entrada o ynoez usa AFK / Economia. Não encerra processos; o plano original é salvo e restaurado ao parar."));
+        autoPanel.Children.Add(Heading("Processos que devem permanecer protegidos", 13));
+        autoPanel.Children.Add(Body("Jogos conhecidos já são protegidos automaticamente. Adicione outros processos importantes (por exemplo, o executável do seu bot/automação) separados por ponto e vírgula. Use apenas o nome simples do processo, sem espaços, caminho ou argumentos; o sufixo .exe é opcional."));
+        var protectedInput = new TextBox
+        {
+            Text = string.Join("; ", AutoProfileService.GetProtectedProcessNames()),
+            MinHeight = 36,
+            Padding = new Thickness(10, 8, 10, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 4, 0, 8)
+        };
         var autoStatus = new TextBlock { Text = "Automação desligada.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
+        var saveProtected = new Button
+        {
+            Content = "Salvar processos protegidos",
+            Style = (Style)FindResource("QuietButton"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        saveProtected.Click += (_, _) =>
+        {
+            try
+            {
+                var names = AutoProfileService.SaveProtectedProcessNames(
+                    protectedInput.Text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                autoStatus.Text = names.Count == 0
+                    ? "Nenhum processo extra cadastrado. Jogos conhecidos continuam protegidos."
+                    : "Processos protegidos salvos: " + string.Join(", ", names) +
+                      ". A lista será carregada na próxima ativação da automação.";
+            }
+            catch (Exception ex)
+            {
+                autoStatus.Text = "Não foi possível salvar a lista: " + ex.Message;
+            }
+        };
+        autoPanel.Children.Add(protectedInput);
+        autoPanel.Children.Add(saveProtected);
+        autoPanel.Children.Add(autoStatus);
         var autoButtons = new WrapPanel();
         var startAuto = new Button { Content = "Ativar automático", Style = (Style)FindResource("AccentButton"), MinWidth = 140, Margin = new Thickness(0, 0, 8, 0) };
         var stopAuto = new Button { Content = "Parar", Style = (Style)FindResource("QuietButton"), MinWidth = 90, IsEnabled = false };
@@ -806,10 +967,11 @@ public partial class MainWindow : Window
                 await AutoProfileService.RunAsync(status =>
                 {
                     if (!Dispatcher.HasShutdownStarted)
-                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + status.Mode +
-                            (status.UsedFallback ? " (plano efetivo: " + status.AppliedMode + ")" : "") +
+                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + AutoProfileService.GetModeDisplayName(status.Mode) +
+                            (status.UsedFallback ? " (plano efetivo: " + AutoProfileService.GetModeDisplayName(status.AppliedMode) + ")" : "") +
                             " | Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") + " min" +
-                            (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : ""));
+                            (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : "") +
+                            (status.ActiveProtectedProcess.Length > 0 ? " | Processo protegido: " + status.ActiveProtectedProcess : ""));
                 }, token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -956,7 +1118,7 @@ public partial class MainWindow : Window
         var monitorCard = MakeCard();
         var monitorPanel = new StackPanel { Margin = new Thickness(20) };
         monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
-        monitorPanel.Children.Add(Body("Registra a cada 5 segundos o gateway atual, dois destinos públicos (Cloudflare e Google), ICMP, TCP/443 e resolução DNS. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo. A coleta pausa enquanto o Windows estiver em suspensão/hibernação ou o computador estiver desligado."));
+        monitorPanel.Children.Add(Body("Registra a cada 5 segundos os gateways IPv4/IPv6 quando reportados, dois destinos públicos (Cloudflare e Google) por ICMP e TCP/443 em IPv4 e IPv6, além de resolução DNS e contagem de respostas A/AAAA. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo. A coleta pausa enquanto o Windows estiver em suspensão/hibernação ou o computador estiver desligado."));
         var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
         var monitorButtons = new WrapPanel();
         var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
@@ -968,7 +1130,7 @@ public partial class MainWindow : Window
             var token = _networkMonitorCts.Token;
             startMonitor.IsEnabled = false;
             stopMonitor.IsEnabled = true;
-            monitorStatus.Text = "Monitorando gateway, Cloudflare, Google e DNS…";
+            monitorStatus.Text = "Monitorando gateways IPv4/IPv6, Cloudflare, Google e DNS…";
             try
             {
                 var logFile = await NetworkMonitorService.RunAsync(TimeSpan.FromSeconds(5), sample =>
@@ -980,6 +1142,15 @@ public partial class MainWindow : Window
                         " | 1.1.1.1 ICMP/TCP: " + sample.ExternalStatus + "/" + sample.ExternalTcpStatus +
                         " | 8.8.8.8 ICMP/TCP: " + sample.SecondaryExternalStatus + "/" + sample.SecondaryExternalTcpStatus +
                         " | DNS: " + sample.DnsStatus + (sample.DnsMilliseconds.HasValue ? " " + sample.DnsMilliseconds.Value.ToString("0.0") + " ms" : "") +
+                        " | Respostas DNS A/AAAA: " + sample.DnsIpv4AddressCount + "/" + sample.DnsIpv6AddressCount +
+                        " | IPv6 GW: " + (string.IsNullOrWhiteSpace(sample.Ipv6Gateway) ? "—" : sample.Ipv6Gateway) +
+                        " " + sample.Ipv6GatewayStatus +
+                        " | IPv6 CF ICMP/TCP: " + sample.Ipv6ExternalStatus + "/" + sample.Ipv6ExternalTcpStatus +
+                        " | IPv6 Google ICMP/TCP: " + sample.Ipv6SecondaryExternalStatus + "/" + sample.Ipv6SecondaryExternalTcpStatus +
+                        " | Perda 60s IPv6 GW/CF/Google: " + sample.Ipv6GatewayLoss60sPercent.ToString("0") + "/" +
+                            sample.Ipv6ExternalLoss60sPercent.ToString("0") + "/" + sample.Ipv6SecondaryExternalLoss60sPercent.ToString("0") + "%" +
+                        " | Falha TCP IPv6 CF/Google: " + sample.Ipv6ExternalTcpFailure60sPercent.ToString("0") + "/" +
+                            sample.Ipv6SecondaryExternalTcpFailure60sPercent.ToString("0") + "%" +
                         " | Perda 60s GW/CF/Google: " + sample.GatewayLoss60sPercent.ToString("0") + "/" +
                             sample.ExternalLoss60sPercent.ToString("0") + "/" + sample.SecondaryExternalLoss60sPercent.ToString("0") + "%" +
                         " | Falha TCP CF/Google: " + sample.ExternalTcpFailure60sPercent.ToString("0") + "/" +
@@ -1138,6 +1309,88 @@ public partial class MainWindow : Window
         inventoryPanel.Children.Add(NoteCard("Leitura de MTU e driver", "MTU e versão de driver dependem do que o Windows/WMI expõe para cada interface. Adaptadores virtuais podem aparecer no inventário; não os desative por nome sem confirmar qual VPN, hipervisor ou software os utiliza."));
         inventoryCard.Child = inventoryPanel;
         root.Children.Add(inventoryCard);
+
+        var advancedCard = MakeCard();
+        var advancedPanel = new StackPanel { Margin = new Thickness(20) };
+        advancedPanel.Children.Add(Heading("Propriedades avançadas do driver (somente leitura)", 15));
+        advancedPanel.Children.Add(Body("Consulta os parâmetros que o driver realmente expõe para adaptadores físicos, como EEE, Interrupt Moderation, RSS, LSO, Checksum Offload, Flow Control, Speed & Duplex e buffers. Não altera valores, não reinicia a placa e não solicita UAC."));
+        var advancedStatus = Body("Propriedades avançadas ainda não consultadas.");
+        var advancedGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 330,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.AdapterName)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Propriedade", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.DisplayName)), Width = new DataGridLength(1.25, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Valor atual", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.DisplayValue)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Categoria", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Category)), Width = new DataGridLength(0.9, DataGridLengthUnitType.Star) });
+        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Avaliação", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Assessment)), Width = new DataGridLength(1.25, DataGridLengthUnitType.Star) });
+        var guidanceStyle = new Style(typeof(TextBlock));
+        guidanceStyle.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap));
+        guidanceStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+        advancedGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Orientação",
+            Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Guidance)),
+            ElementStyle = guidanceStyle,
+            Width = new DataGridLength(2.4, DataGridLengthUnitType.Star)
+        });
+        var advancedButtons = new WrapPanel();
+        var refreshAdvanced = new Button { Content = "Analisar propriedades", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var exportAdvanced = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        NetworkAdapterAdvancedDiagnosticsSnapshot? advancedSnapshot = null;
+        refreshAdvanced.Click += async (_, _) =>
+        {
+            refreshAdvanced.IsEnabled = false;
+            exportAdvanced.IsEnabled = false;
+            advancedStatus.Text = "Lendo propriedades publicadas pelos drivers…";
+            try
+            {
+                advancedSnapshot = await NetworkAdapterAdvancedDiagnosticsService.CaptureAsync();
+                advancedGrid.ItemsSource = advancedSnapshot.Properties;
+                advancedStatus.Text = advancedSnapshot.Properties.Count + " propriedades lidas às " +
+                    advancedSnapshot.CapturedAt.ToLocalTime().ToString("HH:mm:ss") +
+                    " • consulta somente leitura.";
+                if (advancedSnapshot.Errors.Count > 0)
+                    advancedStatus.Text += " • " + advancedSnapshot.Errors.Count + " aviso(s): " +
+                        string.Join(" | ", advancedSnapshot.Errors.Take(2));
+                exportAdvanced.IsEnabled = advancedSnapshot.Properties.Count > 0;
+                if (advancedSnapshot.Properties.Count == 0 && advancedSnapshot.Errors.Count == 0)
+                    advancedStatus.Text += " O driver não publicou propriedades avançadas para os adaptadores físicos detectados.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Auditoria de propriedades avançadas de rede falhou: " + ex);
+                advancedStatus.Text = "Não foi possível consultar os drivers: " + ex.Message;
+            }
+            finally { refreshAdvanced.IsEnabled = true; }
+        };
+        exportAdvanced.Click += (_, _) =>
+        {
+            if (advancedSnapshot is null || advancedSnapshot.Properties.Count == 0) return;
+            var path = NetworkAdapterAdvancedDiagnosticsService.ExportCsv(advancedSnapshot);
+            advancedStatus.Text = "Relatório CSV salvo em: " + path;
+        };
+        advancedButtons.Children.Add(refreshAdvanced);
+        advancedButtons.Children.Add(exportAdvanced);
+        advancedPanel.Children.Add(advancedStatus);
+        advancedPanel.Children.Add(advancedGrid);
+        advancedPanel.Children.Add(advancedButtons);
+        advancedPanel.Children.Add(NoteCard("Não existe tweak universal de rede", "EEE e Interrupt Moderation podem mudar consumo, CPU e latência; RSS e offloads normalmente devem seguir o suporte do driver; Speed & Duplex costuma ficar em negociação automática. Essas são orientações condicionais, não comandos de otimização. O ynoez não muda nenhum desses valores e não promete corrigir quedas causadas pelo roteador ou provedor."));
+        advancedCard.Child = advancedPanel;
+        root.Children.Add(advancedCard);
 
         var statsCard = MakeCard();
         var statsPanel = new StackPanel { Margin = new Thickness(20) };
@@ -1634,11 +1887,11 @@ public partial class MainWindow : Window
     {
         var root = PageContainer();
         var profile = MotherboardProfileService.Find(_hardware);
-        var revision = profile is null ? null : MotherboardProfileService.GetRevision(profile, _hardware.BoardVersion);
+        var revisionHint = profile is null ? null : MotherboardProfileService.GetFirmwareRevisionHint(profile, _hardware.BoardVersion);
         var recognized = profile is not null;
         var title = recognized ? $"{profile!.Manufacturer} {profile!.Product}" : "Central da placa-mãe";
         var desc = recognized
-            ? $"Perfil específico identificado. Revisão: {(revision?.Revision ?? "não identificada pelo firmware")}. Firmware e drivers só serão recomendados após confirmar a revisão física."
+            ? $"Perfil específico identificado. Indício SMBIOS: {(revisionHint?.Revision ?? "não informado")}. Esse valor não seleciona BIOS; confirme manualmente a revisão impressa no PCB."
             : "Modelo detectado: " + _hardware.BoardManufacturer + " " + _hardware.BoardProduct + ". Nenhum perfil de fabricante será forçado sem identificação confiável.";
         root.Children.Add(PageIntro(title, desc));
 
@@ -1658,25 +1911,226 @@ public partial class MainWindow : Window
 
         if (profile is not null)
         {
-            root.Children.Add(ActionCard("Página oficial de suporte", "Drivers, BIOS e utilitários da fabricante. Quando a revisão não é detectada, a página genérica permite escolher a revisão correta manualmente.", "Abrir suporte", () => OpenTargetAsync(revision?.Support ?? "https://www.gigabyte.com/br/Motherboard/A520M-K-V2"), "GIGABYTE"));
+            root.Children.Add(ActionCard("Página oficial de suporte", "Abre a página genérica do modelo. Ela não pré-seleciona uma revisão e permite consultar documentação sem assumir qual PCB você possui.", "Abrir suporte genérico", () => OpenTargetAsync("https://www.gigabyte.com/br/Motherboard/A520M-K-V2"), "GIGABYTE"));
             if (!string.IsNullOrWhiteSpace(profile.ManualUrl))
-                root.Children.Add(ActionCard("Manual da placa-mãe", "Documentação oficial da série A520M K. Confirme o sufixo V2 e a revisão física antes de seguir instruções de firmware ou conectores.", "Abrir manual", () => OpenTargetAsync(profile.ManualUrl), "DOCUMENTAÇÃO"));
-            if (revision is not null)
+                root.Children.Add(ActionCard("Manual da placa-mãe", "Documentação oficial da série A520M K. Confirme o sufixo V2 e conectores físicos antes de seguir instruções de firmware.", "Abrir manual", () => OpenTargetAsync(profile.ManualUrl), "DOCUMENTAÇÃO"));
+
+            var revisionConfirmCard = MakeCard();
+            var revisionConfirmPanel = new StackPanel { Margin = new Thickness(20) };
+            revisionConfirmPanel.Children.Add(Heading("Confirmação manual da revisão do PCB", 15));
+            revisionConfirmPanel.Children.Add(Body("Leia a revisão impressa diretamente na placa-mãe (serigrafia no PCB). Não use a versão SMBIOS, a versão da BIOS, a caixa ou uma página de compra como confirmação. Até você confirmar, nenhum link de BIOS específico por revisão será exibido."));
+            revisionConfirmPanel.Children.Add(KeyValue("Indício reportado pelo SMBIOS (não é confirmação)", revisionHint?.Revision ?? "Não informado"));
+            var revisionPicker = new ComboBox
             {
+                Height = 38,
+                MinWidth = 180,
+                Padding = new Thickness(8, 5, 8, 5),
+                Background = BrushFrom("#171717"),
+                Foreground = PrimaryBrush,
+                BorderBrush = BorderBrushSoft,
+                BorderThickness = new Thickness(1),
+                ItemsSource = profile.RevisionLinks,
+                DisplayMemberPath = nameof(MotherboardRevisionLink.Revision),
+                SelectedIndex = -1,
+                ToolTip = "Escolha somente a revisão que você leu na serigrafia impressa no PCB"
+            };
+            var revisionConfirmStatus = Body("Nenhuma revisão física foi confirmada. Os links de BIOS específicos permanecem ocultos.");
+            revisionConfirmStatus.TextWrapping = TextWrapping.Wrap;
+            var confirmRevisionButton = new Button
+            {
+                Content = "Confirmar revisão física",
+                Style = (Style)FindResource("AccentButton"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                IsEnabled = false,
+                Margin = new Thickness(0, 8, 0, 10)
+            };
+            var revisionDetailsPanel = new StackPanel();
+            revisionPicker.SelectionChanged += (_, _) =>
+            {
+                revisionDetailsPanel.Children.Clear();
+                confirmRevisionButton.IsEnabled = revisionPicker.SelectedItem is MotherboardRevisionLink;
+                revisionConfirmStatus.Text = revisionPicker.SelectedItem is MotherboardRevisionLink selected
+                    ? "Selecionada " + selected.Revision + ", mas ainda não confirmada. Confira a mesma identificação impressa no PCB."
+                    : "Nenhuma revisão física foi confirmada. Os links de BIOS específicos permanecem ocultos.";
+            };
+            confirmRevisionButton.Click += (_, _) =>
+            {
+                var selected = revisionPicker.SelectedItem as MotherboardRevisionLink;
+                var confirmed = MotherboardProfileService.GetConfirmedPhysicalRevision(profile, selected?.Revision);
+                if (confirmed is null)
+                {
+                    revisionConfirmStatus.Text = "A revisão escolhida não corresponde a uma opção cadastrada. Nenhum link de BIOS foi liberado.";
+                    revisionDetailsPanel.Children.Clear();
+                    return;
+                }
+
+                revisionConfirmStatus.Text = "Revisão " + confirmed.Revision +
+                    " confirmada manualmente com base na serigrafia do PCB. Confira novamente o modelo completo antes de qualquer procedimento.";
+                revisionDetailsPanel.Children.Clear();
+
                 var biosCard = MakeCard();
-                var biosPanel = new StackPanel { Margin = new Thickness(20) };
-                biosPanel.Children.Add(Heading("Última BIOS listada pela Gigabyte", 15));
-                biosPanel.Children.Add(KeyValue("Revisão", revision.Revision));
-                biosPanel.Children.Add(KeyValue("Versão listada", revision.LatestBiosVersion));
-                biosPanel.Children.Add(KeyValue("Data de publicação", revision.LatestBiosReleaseDate));
-                foreach (var note in revision.LatestBiosNotes) biosPanel.Children.Add(Bullet(note));
-                biosPanel.Children.Add(Body("Consulta verificada em " + revision.BiosCheckedAt + ". Isto não significa que a atualização seja obrigatória: compare com a BIOS instalada, CPU suportada e notas oficiais antes de decidir."));
+                var biosPanel = new StackPanel { Margin = new Thickness(16) };
+                biosPanel.Children.Add(Heading("BIOS específica — revisão " + confirmed.Revision, 14));
+                biosPanel.Children.Add(KeyValue("Versão mais recente listada no perfil", confirmed.LatestBiosVersion));
+                biosPanel.Children.Add(KeyValue("Data de publicação", confirmed.LatestBiosReleaseDate));
+                foreach (var note in confirmed.LatestBiosNotes) biosPanel.Children.Add(Bullet(note));
+                biosPanel.Children.Add(Body("Consulta verificada em " + confirmed.BiosCheckedAt +
+                    ". Isto não significa que a atualização seja obrigatória. Compare a BIOS instalada, CPU suportada e notas oficiais; o ynoez não grava firmware."));
                 biosCard.Child = biosPanel;
-                root.Children.Add(biosCard);
-                root.Children.Add(ActionCard("Página de BIOS da revisão " + revision.Revision, "Consulta oficial apenas. A atualização de firmware continua manual, depende da revisão física e não é executada pelo ynoez.", "Abrir página de BIOS", () => OpenTargetAsync(revision.Bios), "SOMENTE CONSULTA"));
-            }
-            else
-                root.Children.Add(NoteCard("Revisão física obrigatória", "A página do modelo oferece revisões 1.0, 1.1 e 1.2. A versão SMBIOS não foi suficiente para escolher uma delas; confira a serigrafia impressa na própria placa antes de abrir ou instalar BIOS."));
+                revisionDetailsPanel.Children.Add(biosCard);
+                revisionDetailsPanel.Children.Add(ActionCard(
+                    "Página oficial de BIOS — revisão " + confirmed.Revision,
+                    "Link liberado somente após confirmação manual da revisão física. A atualização continua manual.",
+                    "Abrir página de BIOS",
+                    () => OpenTargetAsync(confirmed.Bios),
+                    "SOMENTE CONSULTA"));
+                revisionDetailsPanel.Children.Add(ActionCard(
+                    "Suporte oficial — revisão " + confirmed.Revision,
+                    "Drivers e utilitários da revisão confirmada. Verifique versão do Windows e IDs dos dispositivos antes de instalar.",
+                    "Abrir suporte da revisão",
+                    () => OpenTargetAsync(confirmed.Support),
+                    "SOMENTE CONSULTA"));
+            };
+            revisionConfirmPanel.Children.Add(revisionPicker);
+            revisionConfirmPanel.Children.Add(confirmRevisionButton);
+            revisionConfirmPanel.Children.Add(revisionConfirmStatus);
+            revisionConfirmPanel.Children.Add(revisionDetailsPanel);
+            revisionConfirmCard.Child = revisionConfirmPanel;
+            root.Children.Add(revisionConfirmCard);
+
+            var deviceCard = MakeCard();
+            var devicePanel = new StackPanel { Margin = new Thickness(20) };
+            devicePanel.Children.Add(Heading("Dispositivos reais de rede, áudio e sistema", 15));
+            devicePanel.Children.Add(Body("Consulta o inventário PnP do Windows e associa os drivers assinados encontrados pelo Windows. Mostra ID de hardware, classe, fabricante, estado, provedor, versão, data e INF. Use os IDs para comparar com os pacotes oficiais da revisão física confirmada; o ynoez não instala nem atualiza drivers automaticamente."));
+            var deviceStatus = Body("Inventário de dispositivos ainda não consultado.");
+            var deviceDetails = Body("Selecione um dispositivo para ver seu ID de hardware e detalhes.");
+            deviceDetails.TextWrapping = TextWrapping.Wrap;
+            var deviceGrid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                CanUserDeleteRows = false,
+                CanUserResizeRows = false,
+                SelectionMode = DataGridSelectionMode.Single,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                Background = BrushFrom("#171717"),
+                Foreground = PrimaryBrush,
+                RowBackground = BrushFrom("#171717"),
+                AlternatingRowBackground = BrushFrom("#202020"),
+                BorderBrush = BorderBrushSoft,
+                Height = 300,
+                Margin = new Thickness(0, 10, 0, 10)
+            };
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Classe", Binding = new Binding(nameof(MotherboardDeviceInfo.CategoryDisplay)), Width = new DataGridLength(100) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Dispositivo", Binding = new Binding(nameof(MotherboardDeviceInfo.Name)), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Fabricante", Binding = new Binding(nameof(MotherboardDeviceInfo.Manufacturer)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(MotherboardDeviceInfo.StateDisplay)), Width = new DataGridLength(185) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Provedor do driver", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverProviderDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverVersionDisplay)), Width = new DataGridLength(110) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Data do driver", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverDateDisplay)), Width = new DataGridLength(95) });
+            IReadOnlyList<MotherboardDeviceInfo> motherboardDevices = Array.Empty<MotherboardDeviceInfo>();
+            deviceGrid.SelectionChanged += (_, _) =>
+            {
+                if (deviceGrid.SelectedItem is not MotherboardDeviceInfo selected)
+                {
+                    deviceDetails.Text = "Selecione um dispositivo para ver seu ID de hardware e detalhes.";
+                    return;
+                }
+
+                deviceDetails.Text = selected.Name +
+                    "\nCategoria: " + selected.CategoryDisplay +
+                    " • Fabricante: " + (string.IsNullOrWhiteSpace(selected.Manufacturer) ? "Não informado" : selected.Manufacturer) +
+                    "\nEstado: " + selected.StateDisplay +
+                    " • Serviço: " + (string.IsNullOrWhiteSpace(selected.ServiceName) ? "Não informado" : selected.ServiceName) +
+                    "\nDriver: " + selected.DriverProviderDisplay + " • " + selected.DriverVersionDisplay +
+                    " • " + selected.DriverDateDisplay + " • INF: " +
+                    (string.IsNullOrWhiteSpace(selected.InfName) ? "Não informado" : selected.InfName) +
+                    "\nDeviceID: " + selected.DeviceId +
+                    "\nHardware IDs:\n" + selected.HardwareIdsDisplay;
+            };
+            var deviceButtons = new WrapPanel();
+            var queryDevices = new Button { Content = "Consultar dispositivos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+            var cancelDevices = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+            var exportDevices = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+            queryDevices.Click += async (_, _) =>
+            {
+                if (_motherboardDeviceInventoryCts is not null) return;
+                var cts = new CancellationTokenSource();
+                _motherboardDeviceInventoryCts = cts;
+                queryDevices.IsEnabled = false;
+                cancelDevices.IsEnabled = true;
+                exportDevices.IsEnabled = false;
+                deviceStatus.Text = "Consultando dispositivos PnP e drivers assinados…";
+                try
+                {
+                    var snapshot = await MotherboardDeviceInventoryService.CaptureAsync(cts.Token);
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        motherboardDevices = snapshot.Devices;
+                        deviceGrid.ItemsSource = motherboardDevices;
+                        deviceStatus.Text = snapshot.DeviceCount + " dispositivos • " +
+                            snapshot.DevicesWithReportedErrors + " com código de configuração diferente de zero • " +
+                            snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") +
+                            "\nA data/provedor são o que Win32_PnPSignedDriver reporta; ausência de dados não prova que o driver seja inválido.";
+                        exportDevices.IsEnabled = motherboardDevices.Count > 0;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    if (!Dispatcher.HasShutdownStarted) deviceStatus.Text = "Consulta cancelada. Nenhum driver foi alterado.";
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Write("Inventário de dispositivos da placa-mãe falhou: " + ex);
+                    if (!Dispatcher.HasShutdownStarted) deviceStatus.Text = "Não foi possível consultar dispositivos: " + ex.Message;
+                }
+                finally
+                {
+                    if (ReferenceEquals(_motherboardDeviceInventoryCts, cts)) _motherboardDeviceInventoryCts = null;
+                    cts.Dispose();
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        queryDevices.IsEnabled = true;
+                        cancelDevices.IsEnabled = false;
+                    }
+                }
+            };
+            cancelDevices.Click += (_, _) => _motherboardDeviceInventoryCts?.Cancel();
+            exportDevices.Click += (_, _) =>
+            {
+                if (motherboardDevices.Count == 0) return;
+                var dialog = new SaveFileDialog
+                {
+                    Title = "Exportar inventário de dispositivos da placa-mãe",
+                    Filter = "CSV (*.csv)|*.csv",
+                    FileName = "ynoez-dispositivos-placa-mae.csv",
+                    AddExtension = true,
+                    DefaultExt = ".csv"
+                };
+                if (dialog.ShowDialog(this) != true) return;
+                try
+                {
+                    var snapshot = new MotherboardDeviceInventorySnapshot(DateTimeOffset.Now, motherboardDevices);
+                    File.WriteAllText(dialog.FileName, MotherboardDeviceInventoryService.BuildCsv(snapshot), new System.Text.UTF8Encoding(true));
+                    deviceStatus.Text = "Inventário de dispositivos exportado: " + dialog.FileName;
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Write("Falha ao exportar inventário de dispositivos: " + ex);
+                    MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+            deviceButtons.Children.Add(queryDevices);
+            deviceButtons.Children.Add(cancelDevices);
+            deviceButtons.Children.Add(exportDevices);
+            devicePanel.Children.Add(deviceStatus);
+            devicePanel.Children.Add(deviceGrid);
+            devicePanel.Children.Add(deviceDetails);
+            devicePanel.Children.Add(deviceButtons);
+            deviceCard.Child = devicePanel;
+            root.Children.Add(deviceCard);
 
             var specs = MakeCard();
             var specsPanel = new StackPanel { Margin = new Thickness(20) };
@@ -1760,7 +2214,331 @@ public partial class MainWindow : Window
         search.TextChanged += (_, _) => RenderResults();
         root.Children.Add(search);
         root.Children.Add(results);
-        root.Children.Add(NoteCard("Ações de serviço", "A Toolbox localiza e abre o Gerenciador de Serviços, mas não oferece desligamento em massa. Serviços essenciais, Store, impressão, busca, atualização e segurança precisam ser avaliados individualmente antes de qualquer mudança."));
+
+        var serviceCard = MakeCard();
+        var servicePanel = new StackPanel { Margin = new Thickness(20) };
+        servicePanel.Children.Add(Heading("Inventário ao vivo de serviços", 15));
+        servicePanel.Children.Add(Body("Consulta todos os serviços registrados no Windows, incluindo nome interno, descrição, estado, tipo de inicialização e PID. A classificação é apenas informativa: protegidos, opcionais que já constam na whitelist de Debloat e serviços sem política de alteração. Esta tela não altera nem encerra serviços."));
+        var serviceSearch = new TextBox
+        {
+            Height = 38,
+            FontSize = 12,
+            Padding = new Thickness(11, 8, 11, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            CaretBrush = AccentBrush,
+            ToolTip = "Pesquisar pelo nome, serviço, descrição, estado ou classificação"
+        };
+        var serviceStatus = Body("A consulta ainda não foi executada.");
+        var serviceDetails = Body("Selecione um serviço para ver a explicação da classificação.");
+        serviceDetails.TextWrapping = TextWrapping.Wrap;
+        var serviceGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            SelectionMode = DataGridSelectionMode.Single,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 330,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Serviço", Binding = new Binding(nameof(WindowsServiceInfo.Name)), Width = new DataGridLength(1.0, DataGridLengthUnitType.Star) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Nome de exibição", Binding = new Binding(nameof(WindowsServiceInfo.DisplayName)), Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsServiceInfo.StateDisplay)), Width = new DataGridLength(100) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Inicialização", Binding = new Binding(nameof(WindowsServiceInfo.StartModeDisplay)), Width = new DataGridLength(105) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "PID", Binding = new Binding(nameof(WindowsServiceInfo.ProcessIdDisplay)), Width = new DataGridLength(55) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Política", Binding = new Binding(nameof(WindowsServiceInfo.SafetyDisplay)), Width = new DataGridLength(150) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Descrição", Binding = new Binding(nameof(WindowsServiceInfo.Description)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        IReadOnlyList<WindowsServiceInfo> allServices = Array.Empty<WindowsServiceInfo>();
+        void RenderServices()
+        {
+            var query = serviceSearch.Text.Trim();
+            var filtered = string.IsNullOrWhiteSpace(query)
+                ? allServices
+                : allServices.Where(x =>
+                    x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.StateDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.StartModeDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Explanation.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+            serviceGrid.ItemsSource = filtered;
+            serviceStatus.Text = allServices.Count == 0
+                ? "Nenhum inventário carregado."
+                : filtered.Count + " de " + allServices.Count + " serviços • somente leitura";
+        }
+        serviceSearch.TextChanged += (_, _) => RenderServices();
+        serviceGrid.SelectionChanged += (_, _) =>
+        {
+            if (serviceGrid.SelectedItem is not WindowsServiceInfo selected)
+            {
+                serviceDetails.Text = "Selecione um serviço para ver a explicação da classificação.";
+                return;
+            }
+            serviceDetails.Text = selected.DisplayName + " (" + selected.Name + ")" +
+                "\nEstado: " + selected.StateDisplay +
+                " • Inicialização: " + selected.StartModeDisplay +
+                " • PID: " + selected.ProcessIdDisplay +
+                "\nPolítica: " + selected.Safety.Explanation +
+                (string.IsNullOrWhiteSpace(selected.Description) ? "" : "\nDescrição: " + selected.Description);
+        };
+        var serviceButtons = new WrapPanel();
+        var refreshServices = new Button { Content = "Consultar serviços", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelServices = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportServices = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var openServicesConsole = new Button { Content = "Abrir services.msc", Style = (Style)FindResource("QuietButton") };
+        refreshServices.Click += async (_, _) =>
+        {
+            if (_serviceInventoryCts is not null) return;
+            var cts = new CancellationTokenSource();
+            _serviceInventoryCts = cts;
+            refreshServices.IsEnabled = false;
+            cancelServices.IsEnabled = true;
+            exportServices.IsEnabled = false;
+            serviceStatus.Text = "Consultando Win32_Service. A operação pode levar alguns segundos…";
+            try
+            {
+                var captured = await WindowsServiceInventoryService.CaptureAsync(cts.Token);
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    allServices = captured;
+                    RenderServices();
+                    exportServices.IsEnabled = allServices.Count > 0;
+                    serviceStatus.Text = allServices.Count + " serviços inventariados • nenhum serviço foi alterado";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!Dispatcher.HasShutdownStarted) serviceStatus.Text = "Consulta cancelada. Nenhuma alteração foi feita.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário de serviços do Windows falhou: " + ex);
+                if (!Dispatcher.HasShutdownStarted) serviceStatus.Text = "Falha na consulta: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_serviceInventoryCts, cts)) _serviceInventoryCts = null;
+                cts.Dispose();
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    refreshServices.IsEnabled = true;
+                    cancelServices.IsEnabled = false;
+                }
+            }
+        };
+        cancelServices.Click += (_, _) => _serviceInventoryCts?.Cancel();
+        exportServices.Click += (_, _) =>
+        {
+            if (allServices.Count == 0) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar inventário de serviços",
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = "ynoez-servicos-windows.csv",
+                AddExtension = true,
+                DefaultExt = ".csv"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, WindowsServiceInventoryService.BuildCsv(allServices), new System.Text.UTF8Encoding(true));
+                serviceStatus.Text = "Inventário completo exportado: " + dialog.FileName;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao exportar inventário de serviços: " + ex);
+                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        openServicesConsole.Click += async (_, _) => await OpenTargetAsync("services.msc");
+        serviceButtons.Children.Add(refreshServices);
+        serviceButtons.Children.Add(cancelServices);
+        serviceButtons.Children.Add(exportServices);
+        serviceButtons.Children.Add(openServicesConsole);
+        servicePanel.Children.Add(serviceSearch);
+        servicePanel.Children.Add(serviceStatus);
+        servicePanel.Children.Add(serviceGrid);
+        servicePanel.Children.Add(serviceDetails);
+        servicePanel.Children.Add(serviceButtons);
+        serviceCard.Child = servicePanel;
+        root.Children.Add(serviceCard);
+
+        var taskCard = MakeCard();
+        var taskPanel = new StackPanel { Margin = new Thickness(20) };
+        taskPanel.Children.Add(Heading("Inventário ao vivo de tarefas agendadas", 15));
+        taskPanel.Children.Add(Body("Consulta as tarefas registradas no Agendador do Windows: nome, caminho, estado, autor, descrição, última execução, próxima execução e último resultado. A classificação separa tarefas protegidas, seis tarefas opcionais avaliadas pelo Debloat e todo o restante como somente leitura. Esta tela não habilita, desabilita, inicia ou encerra tarefas."));
+        var taskSearch = new TextBox
+        {
+            Height = 38,
+            FontSize = 12,
+            Padding = new Thickness(11, 8, 11, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            CaretBrush = AccentBrush,
+            ToolTip = "Pesquisar nome, caminho, estado, autor, descrição ou classificação"
+        };
+        var taskStatus = Body("A consulta ainda não foi executada.");
+        var taskDetails = Body("Selecione uma tarefa para ver sua classificação e descrição.");
+        taskDetails.TextWrapping = TextWrapping.Wrap;
+        var taskGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            SelectionMode = DataGridSelectionMode.Single,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 330,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Tarefa", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskName)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Caminho", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskPath)), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsScheduledTaskInfo.StateDisplay)), Width = new DataGridLength(105) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Política", Binding = new Binding(nameof(WindowsScheduledTaskInfo.SafetyDisplay)), Width = new DataGridLength(150) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Última execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.LastRunDisplay)), Width = new DataGridLength(135) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Próxima execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.NextRunDisplay)), Width = new DataGridLength(135) });
+        IReadOnlyList<WindowsScheduledTaskInfo> allTasks = Array.Empty<WindowsScheduledTaskInfo>();
+        void RenderTasks()
+        {
+            var query = taskSearch.Text.Trim();
+            var filtered = string.IsNullOrWhiteSpace(query)
+                ? allTasks
+                : allTasks.Where(x =>
+                    x.TaskName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.TaskPath.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.StateDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Author.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Explanation.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+            taskGrid.ItemsSource = filtered;
+            taskStatus.Text = allTasks.Count == 0
+                ? "Nenhum inventário carregado."
+                : filtered.Count + " de " + allTasks.Count + " tarefas • " +
+                  allTasks.Count(x => x.Safety.IsProtected) + " protegidas • " +
+                  allTasks.Count(x => x.Safety.IsOptional) + " opcionais avaliadas • somente leitura";
+        }
+        taskSearch.TextChanged += (_, _) => RenderTasks();
+        taskGrid.SelectionChanged += (_, _) =>
+        {
+            if (taskGrid.SelectedItem is not WindowsScheduledTaskInfo selected)
+            {
+                taskDetails.Text = "Selecione uma tarefa para ver sua classificação e descrição.";
+                return;
+            }
+            taskDetails.Text = selected.FullName +
+                "\nEstado: " + selected.StateDisplay +
+                " • Autor: " + (string.IsNullOrWhiteSpace(selected.Author) ? "Não informado" : selected.Author) +
+                " • Último resultado: " + selected.LastResultDisplay +
+                "\nÚltima execução: " + selected.LastRunDisplay +
+                " • Próxima execução: " + selected.NextRunDisplay +
+                "\nPolítica: " + selected.Safety.Explanation +
+                (string.IsNullOrWhiteSpace(selected.Description) ? "" : "\nDescrição: " + selected.Description);
+        };
+        var taskButtons = new WrapPanel();
+        var refreshTasks = new Button { Content = "Consultar tarefas", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelTasks = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportTasks = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var openTaskScheduler = new Button { Content = "Abrir taskschd.msc", Style = (Style)FindResource("QuietButton") };
+        refreshTasks.Click += async (_, _) =>
+        {
+            if (_scheduledTaskInventoryCts is not null) return;
+            var cts = new CancellationTokenSource();
+            _scheduledTaskInventoryCts = cts;
+            refreshTasks.IsEnabled = false;
+            cancelTasks.IsEnabled = true;
+            exportTasks.IsEnabled = false;
+            taskStatus.Text = "Consultando o Agendador de Tarefas. A primeira leitura pode levar alguns segundos…";
+            try
+            {
+                var captured = await WindowsScheduledTaskInventoryService.CaptureAsync(cts.Token);
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    allTasks = captured;
+                    RenderTasks();
+                    exportTasks.IsEnabled = allTasks.Count > 0;
+                    taskStatus.Text = allTasks.Count + " tarefas inventariadas • consulta somente leitura; nenhuma tarefa foi alterada.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Consulta cancelada. Nenhuma tarefa foi alterada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário de tarefas agendadas falhou: " + ex);
+                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Falha na consulta: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_scheduledTaskInventoryCts, cts)) _scheduledTaskInventoryCts = null;
+                cts.Dispose();
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    refreshTasks.IsEnabled = true;
+                    cancelTasks.IsEnabled = false;
+                }
+            }
+        };
+        cancelTasks.Click += (_, _) => _scheduledTaskInventoryCts?.Cancel();
+        exportTasks.Click += (_, _) =>
+        {
+            if (allTasks.Count == 0) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar inventário de tarefas agendadas",
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = "ynoez-tarefas-agendadas.csv",
+                AddExtension = true,
+                DefaultExt = ".csv"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, WindowsScheduledTaskInventoryService.BuildCsv(allTasks), new System.Text.UTF8Encoding(true));
+                taskStatus.Text = "Inventário de tarefas exportado: " + dialog.FileName;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao exportar inventário de tarefas: " + ex);
+                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        openTaskScheduler.Click += async (_, _) => await OpenTargetAsync("taskschd.msc");
+        taskButtons.Children.Add(refreshTasks);
+        taskButtons.Children.Add(cancelTasks);
+        taskButtons.Children.Add(exportTasks);
+        taskButtons.Children.Add(openTaskScheduler);
+        taskPanel.Children.Add(taskSearch);
+        taskPanel.Children.Add(taskStatus);
+        taskPanel.Children.Add(taskGrid);
+        taskPanel.Children.Add(taskDetails);
+        taskPanel.Children.Add(taskButtons);
+        taskCard.Child = taskPanel;
+        root.Children.Add(taskCard);
+
+        root.Children.Add(NoteCard("Ações de serviço e tarefas", "A Toolbox é somente leitura. A página Debloat contém listas curtas de seis serviços e seis tarefas opcionais, com backup, confirmação, verificação e restauração; não há desligamento em massa. Windows Search, impressão, Store, Defender, Firewall, Windows Update, manutenção, rede, áudio e anti-cheats permanecem protegidos."));
         RenderResults();
         return root;
     }
