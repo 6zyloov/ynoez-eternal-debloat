@@ -119,8 +119,8 @@ public sealed class ServiceTweakService
         var modeScript = BuildRestoreModeScript(definition.Name, backup.StartMode, backup.DelayedAutoStart);
         var startScript = backup.WasRunning
             ? (backup.StartMode == "Disabled"
-                ? "Set-Service -Name $n -StartupType Manual; Start-Service -Name $n; (Get-Service -Name $n).WaitForStatus('Running',[TimeSpan]::FromSeconds(12)); Set-Service -Name $n -StartupType Disabled; "
-                : "Start-Service -Name $n; (Get-Service -Name $n).WaitForStatus('Running',[TimeSpan]::FromSeconds(12)); ")
+                ? "Set-Service -Name $n -StartupType Manual; if ((Get-Service -Name $n).Status -ne 'Running') { Start-Service -Name $n; (Get-Service -Name $n).WaitForStatus('Running',[TimeSpan]::FromSeconds(12)) }; Set-Service -Name $n -StartupType Disabled; "
+                : "if ((Get-Service -Name $n).Status -ne 'Running') { Start-Service -Name $n; (Get-Service -Name $n).WaitForStatus('Running',[TimeSpan]::FromSeconds(12)) }; ")
             : "";
         var script = "$ErrorActionPreference='Stop'; $n='" + definition.Name + "'; " + modeScript + startScript + "exit 0";
         RunElevatedPowerShell(script);
