@@ -51,7 +51,7 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Diagnóstico de desconexões de madrugada/AFK sem alegar que o app controla quedas do ISP/roteador.
 
 ## Fase 6 — Central de hardware
-- [ ] Banco por fabricante/modelo/revisão física, com fontes oficiais, BIOS, drivers e utilitários.
+- [~] Base inicial GIGABYTE A520M K V2 com fontes oficiais por revisão e links de BIOS liberados somente após confirmação manual da revisão física do PCB; expandir catálogo e validação por fabricante/modelo.
 - [ ] Primeira placa: GIGABYTE A520M K V2; revisão do PCB precisa ser confirmada.
 - [ ] Identificar CPU instalada e suporte mínimo de BIOS; exibir aviso de risco antes de qualquer recomendação de firmware.
 - [ ] Integração com APP Center, EasyTune, SIV/Smart Fan 5 e Q-Flash apenas como links/ações oficiais e com detecção de instalação.
