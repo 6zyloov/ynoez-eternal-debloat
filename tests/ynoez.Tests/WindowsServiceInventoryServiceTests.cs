@@ -15,6 +15,11 @@ public sealed class WindowsServiceInventoryServiceTests
     [InlineData("vgk")]
     [InlineData("FaceitService")]
     [InlineData("NVDisplay.ContainerLocalSystem")]
+    [InlineData("BFE")]
+    [InlineData("TBS")]
+    [InlineData("AudioEndpointBuilder")]
+    [InlineData("EasyAntiCheat_EOS")]
+    [InlineData("BEService")]
     public void ClassifyService_KnownCriticalServices_AreProtected(string name)
     {
         var classification = WindowsServiceInventoryService.ClassifyService(name);
