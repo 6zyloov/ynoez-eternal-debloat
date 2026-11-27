@@ -1,14 +1,18 @@
 using System.IO;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace ynoez.Services;
+
+public sealed record BackupFileInfo(string Name, long Length, string Sha256);
 
 public sealed class BackupResult
 {
     public string Folder { get; init; } = "";
     public string PowerSchemeGuid { get; init; } = "";
     public DateTime CreatedAt { get; init; }
+    public IReadOnlyList<BackupFileInfo> Files { get; init; } = Array.Empty<BackupFileInfo>();
 }
 
 public static class BackupService
@@ -18,22 +22,88 @@ public static class BackupService
     public static async Task<string> CreateLocalSnapshotAsync()
     {
         Directory.CreateDirectory(AppPaths.Backups);
-        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        var folder = Path.Combine(AppPaths.Backups, $"snapshot-{stamp}");
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var folder = Path.Combine(AppPaths.Backups, $"snapshot-{stamp}-{suffix}");
         Directory.CreateDirectory(folder);
 
-        var hardware = await HardwareService.GetSnapshotAsync();
-        await File.WriteAllTextAsync(Path.Combine(folder, "hardware.json"), JsonSerializer.Serialize(hardware, JsonOptions));
-        var power = RunCommand("powercfg.exe", "/getactivescheme");
-        await File.WriteAllTextAsync(Path.Combine(folder, "active-power-plan.txt"), power.Output + Environment.NewLine + power.Error);
-        var network = RunCommand("ipconfig.exe", "/all");
-        await File.WriteAllTextAsync(Path.Combine(folder, "network-ipconfig.txt"), network.Output + Environment.NewLine + network.Error);
+        try
+        {
+            var hardware = await HardwareService.GetSnapshotAsync();
+            await WriteTextAtomicallyAsync(Path.Combine(folder, "hardware.json"),
+                JsonSerializer.Serialize(hardware, JsonOptions));
 
-        var schemeGuid = ExtractGuid(power.Output);
-        var result = new BackupResult { Folder = folder, PowerSchemeGuid = schemeGuid, CreatedAt = DateTime.Now };
-        await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"), JsonSerializer.Serialize(result, JsonOptions));
-        AppLog.Write($"Snapshot local criado: {folder}");
-        return folder;
+            var power = RunCommand("powercfg.exe", "/getactivescheme");
+            await WriteTextAtomicallyAsync(Path.Combine(folder, "active-power-plan.txt"),
+                power.Output + Environment.NewLine + power.Error);
+
+            var network = RunCommand("ipconfig.exe", "/all");
+            await WriteTextAtomicallyAsync(Path.Combine(folder, "network-ipconfig.txt"),
+                network.Output + Environment.NewLine + network.Error);
+
+            var files = await BuildSnapshotManifestAsync(folder);
+            var result = new BackupResult
+            {
+                Folder = folder,
+                PowerSchemeGuid = ExtractGuid(power.Output),
+                CreatedAt = DateTime.UtcNow,
+                Files = files
+            };
+            await WriteTextAtomicallyAsync(Path.Combine(folder, "backup.json"),
+                JsonSerializer.Serialize(result, JsonOptions));
+            AppLog.Write($"Snapshot local criado e verificado: {folder} ({files.Count} arquivos com SHA-256).");
+            return folder;
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                var root = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
+                var fullFolder = Path.GetFullPath(folder);
+                if (fullFolder.StartsWith(root, StringComparison.OrdinalIgnoreCase) && Directory.Exists(fullFolder))
+                    Directory.Delete(fullFolder, recursive: true);
+            }
+            catch (Exception cleanupError)
+            {
+                AppLog.Write("Falha ao remover snapshot incompleto: " + cleanupError.Message);
+            }
+            AppLog.Write("Criação do snapshot falhou: " + ex);
+            throw;
+        }
+    }
+
+    public static async Task<IReadOnlyList<BackupFileInfo>> BuildSnapshotManifestAsync(string folder)
+    {
+        var fullFolder = Path.GetFullPath(folder);
+        if (!Directory.Exists(fullFolder))
+            throw new DirectoryNotFoundException("A pasta do snapshot não existe.");
+
+        var result = new List<BackupFileInfo>();
+        foreach (var path in Directory.EnumerateFiles(fullFolder, "*", SearchOption.TopDirectoryOnly)
+                     .Where(path => !string.Equals(Path.GetFileName(path), "backup.json", StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
+        {
+            var info = new FileInfo(path);
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                bufferSize: 64 * 1024, useAsync: true);
+            var hash = await SHA256.HashDataAsync(stream);
+            result.Add(new BackupFileInfo(info.Name, info.Length, Convert.ToHexString(hash).ToLowerInvariant()));
+        }
+        return result;
+    }
+
+    private static async Task WriteTextAtomicallyAsync(string path, string content)
+    {
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            await File.WriteAllTextAsync(temp, content);
+            File.Move(temp, path, overwrite: false);
+        }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+        }
     }
 
     public static async Task<string> CreateRestorePointAsync()

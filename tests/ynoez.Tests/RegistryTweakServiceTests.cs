@@ -206,6 +206,50 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void PowerProfileResolution_FallsBackToBalancedWhenOptionalPlanIsMissing()
+    {
+        var balancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e";
+        var resolution = PowerProfileService.ResolveTarget(PowerProfileMode.Afk,
+            alias => alias == "SCHEME_BALANCED" ? balancedGuid : null);
+
+        Assert.Equal(PowerProfileMode.Afk, resolution.RequestedMode);
+        Assert.Equal(PowerProfileMode.Balanced, resolution.AppliedMode);
+        Assert.True(resolution.UsedFallback);
+        Assert.Equal("SCHEME_BALANCED", resolution.AppliedAlias);
+        Assert.Equal(balancedGuid, resolution.Guid);
+    }
+
+    [Fact]
+    public void PowerProfileResolution_DoesNotInventFallbackWhenBalancedIsMissing()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            PowerProfileService.ResolveTarget(PowerProfileMode.Performance, _ => null));
+    }
+
+    [Fact]
+    public async Task SnapshotManifest_RecordsFileSizesAndSha256()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "ynoez-snapshot-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            const string content = "{\"cpu\":\"test\"}";
+            var filePath = Path.Combine(folder, "hardware.json");
+            await File.WriteAllTextAsync(filePath, content);
+            var manifest = await BackupService.BuildSnapshotManifestAsync(folder);
+            var file = Assert.Single(manifest);
+            Assert.Equal("hardware.json", file.Name);
+            Assert.Equal(new FileInfo(filePath).Length, file.Length);
+            Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(content))).ToLowerInvariant(), file.Sha256);
+        }
+        finally
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScheduledTaskCatalog_ContainsOnlyExplicitOptionalTasks()
     {
         var catalog = ScheduledTaskTweakService.GetCatalog();

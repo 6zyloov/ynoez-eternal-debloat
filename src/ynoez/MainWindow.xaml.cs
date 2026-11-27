@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private string _currentPage = "Home";
     private bool _isBusy;
     private CancellationTokenSource? _networkMonitorCts;
+    private CancellationTokenSource? _networkDiagnosticCts;
     private CancellationTokenSource? _autoProfileCts;
     private CancellationTokenSource? _metricsCts;
     private CancellationTokenSource? _benchmarkCts;
@@ -62,7 +63,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
+        Closed += (_, _) => { _networkDiagnosticCts?.Cancel(); _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); _benchmarkCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -538,19 +539,44 @@ public partial class MainWindow : Window
             FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 15, 0, 10)
         };
         var progressText = new TextBlock { Text = "", Foreground = AccentBrush, FontSize = 10, Margin = new Thickness(0, 0, 0, 10) };
-        var run = new Button { Content = "Executar diagnóstico", Style = (Style)FindResource("AccentButton"), HorizontalAlignment = HorizontalAlignment.Left };
+        var diagnosticButtons = new WrapPanel();
+        var run = new Button { Content = "Executar diagnóstico", Style = (Style)FindResource("AccentButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 8, 0) };
+        var cancelDiagnostic = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
         run.Click += async (_, _) =>
         {
+            if (_networkDiagnosticCts is not null) return;
+            _networkDiagnosticCts = new CancellationTokenSource();
+            var token = _networkDiagnosticCts.Token;
             run.IsEnabled = false;
+            cancelDiagnostic.IsEnabled = true;
             output.Text = "Executando…";
+            progressText.Text = "Preparando medições";
             var progress = new Progress<string>(s => progressText.Text = s);
-            try { output.Text = await NetworkDiagnosticService.RunAsync(progress); }
-            catch (Exception ex) { output.Text = "Falha no diagnóstico: " + ex.Message; AppLog.Write("Diagnóstico de rede: " + ex); }
-            finally { run.IsEnabled = true; progressText.Text = "Concluído"; }
+            try { output.Text = await NetworkDiagnosticService.RunAsync(progress, token); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                if (IsLoaded) output.Text = "Diagnóstico cancelado. Nenhuma configuração de rede foi alterada.";
+            }
+            catch (Exception ex)
+            {
+                output.Text = "Falha no diagnóstico: " + ex.Message;
+                AppLog.Write("Diagnóstico de rede: " + ex);
+            }
+            finally
+            {
+                _networkDiagnosticCts?.Dispose();
+                _networkDiagnosticCts = null;
+                run.IsEnabled = true;
+                cancelDiagnostic.IsEnabled = false;
+                if (IsLoaded) progressText.Text = "Concluído";
+            }
         };
+        cancelDiagnostic.Click += (_, _) => _networkDiagnosticCts?.Cancel();
+        diagnosticButtons.Children.Add(run);
+        diagnosticButtons.Children.Add(cancelDiagnostic);
         panel.Children.Add(progressText);
         panel.Children.Add(output);
-        panel.Children.Add(run);
+        panel.Children.Add(diagnosticButtons);
         resultCard.Child = panel;
         root.Children.Add(resultCard);
 
@@ -695,20 +721,24 @@ public partial class MainWindow : Window
             MessageBox.Show(result.Summary, "Discord", MessageBoxButton.OK, MessageBoxImage.Information);
         }, "PERFIL PRESERVADO"));
         root.Children.Add(Heading("Gerenciador de inicialização", 15));
-        root.Children.Add(Body("Mostra entradas de inicialização do usuário e do sistema. Nesta versão, somente entradas HKCU não protegidas podem ser desativadas; entradas de drivers, segurança, NVIDIA, áudio, rede e anti-cheats ficam protegidas."));
+        root.Children.Add(Body("Mostra entradas HKCU, pastas de inicialização do usuário e do sistema e chaves HKLM 32/64 bits. É possível desativar entradas HKCU não protegidas e mover arquivos da pasta pessoal para backup reversível. Pastas compartilhadas e entradas de máquina são somente leitura. Drivers, segurança, NVIDIA, áudio, rede, jogos, downloads e anti-cheats ficam protegidos."));
         var startupManager = new StartupManagerService();
         foreach (var entry in startupManager.GetActiveEntries())
         {
-            var detail = entry.Command + "\nOrigem: " + entry.Scope;
+            var detail = (entry.FilePath is null ? "Comando: " + entry.Command : "Arquivo: " + entry.FilePath) + "\nOrigem: " + entry.Scope;
             if (entry.CanDisable)
             {
-                root.Children.Add(ActionCard(entry.Name, detail, "Desativar inicialização", () =>
+                var actionText = entry.FilePath is null ? "Desativar inicialização" : "Mover para backup";
+                root.Children.Add(ActionCard(entry.Name, detail, actionText, () =>
                 {
-                    if (MessageBox.Show("Desativar a inicialização automática de \"" + entry.Name + "\"? O comando será salvo para restauração.",
+                    if (MessageBox.Show("Desativar \"" + entry.Name + "\" na inicialização? O estado original será salvo para restauração.",
                         "Confirmar", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                         return Task.CompletedTask;
                     startupManager.Disable(entry);
-                    MessageBox.Show("Entrada removida da inicialização e backup criado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(entry.FilePath is null
+                        ? "Entrada removida da inicialização e backup criado."
+                        : "Arquivo movido para a pasta de backup do ynoez; ele pode ser restaurado depois.",
+                        "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
                     ShowPage("Debloat");
                     return Task.CompletedTask;
                 }, "USUÁRIO"));

@@ -12,6 +12,10 @@ public enum PowerProfileMode { Performance, Balanced, Afk }
 public sealed record PowerProfileState(string Mode, string AppliedGuid, DateTimeOffset AppliedAt);
 public sealed record PowerProfileBackup(string OriginalGuid, DateTimeOffset SavedAt, string? ExportPath = null);
 public sealed record PowerProfileSession(string OriginalGuid, string ExportPath, DateTimeOffset StartedAt);
+public sealed record PowerProfileResolution(PowerProfileMode RequestedMode, PowerProfileMode AppliedMode, string RequestedAlias, string AppliedAlias, string Guid)
+{
+    public bool UsedFallback => RequestedMode != AppliedMode;
+}
 
 public static class PowerProfileService
 {
@@ -44,12 +48,13 @@ public static class PowerProfileService
 
     private static string ApplyCore(PowerProfileMode mode, bool createPersistentBackup, bool persistState)
     {
-        var targetGuid = GetTargetGuid(mode);
+        var resolution = ResolveTarget(mode);
+        var targetGuid = resolution.Guid;
         var current = GetActiveSchemeGuid();
         if (string.Equals(current, targetGuid, StringComparison.OrdinalIgnoreCase))
         {
             SetExecutionRequirement(mode);
-            return "O plano solicitado já está ativo.";
+            return DescribeAppliedProfile(resolution, alreadyActive: true);
         }
 
         if (createPersistentBackup)
@@ -71,7 +76,7 @@ public static class PowerProfileService
             SetExecutionRequirement(mode);
             if (persistState)
             {
-                var state = new PowerProfileState(mode.ToString(), active, DateTimeOffset.UtcNow);
+                var state = new PowerProfileState(resolution.AppliedMode.ToString(), active, DateTimeOffset.UtcNow);
                 WriteAtomic(StatePath, JsonSerializer.Serialize(state, JsonOptions));
             }
         }
@@ -82,9 +87,24 @@ public static class PowerProfileService
             throw;
         }
 
-        AppLog.Write("Perfil de energia aplicado: " + mode + " (" + active + ")" +
+        AppLog.Write("Perfil solicitado: " + mode + "; plano aplicado: " + resolution.AppliedMode + " (" + active + ")" +
             (mode == PowerProfileMode.Afk ? "; suspensão automática bloqueada enquanto o ynoez estiver aberto." : ""));
-        return mode switch
+        return DescribeAppliedProfile(resolution, alreadyActive: false);
+    }
+
+    private static string DescribeAppliedProfile(PowerProfileResolution resolution, bool alreadyActive)
+    {
+        if (resolution.UsedFallback)
+        {
+            if (resolution.RequestedMode == PowerProfileMode.Afk)
+                return "Este Windows não disponibilizou o plano Economia (SCHEME_MAX). O plano Equilibrado foi usado no lugar; a suspensão automática do sistema ficará bloqueada enquanto o ynoez estiver aberto. A tela pode apagar normalmente.";
+            return "Este Windows não disponibilizou o plano Alto desempenho (SCHEME_MIN). O plano Equilibrado foi mantido. Nenhum ajuste de clock, tensão ou BIOS foi feito.";
+        }
+
+        if (alreadyActive)
+            return "O plano " + resolution.AppliedMode + " já estava ativo. A política de suspensão foi atualizada conforme o perfil.";
+
+        return resolution.AppliedMode switch
         {
             PowerProfileMode.Performance => "Perfil Alto desempenho ativado. O plano original está exportado para restauração.",
             PowerProfileMode.Balanced => "Perfil Equilibrado ativado. O plano original está exportado para restauração.",
@@ -250,21 +270,45 @@ public static class PowerProfileService
         return "Plano de energia original restaurado e verificado.";
     }
 
-    public static string GetTargetGuid(PowerProfileMode mode)
+    public static string GetTargetGuid(PowerProfileMode mode) => ResolveTarget(mode).Guid;
+
+    public static PowerProfileResolution ResolveTarget(PowerProfileMode mode) =>
+        ResolveTarget(mode, QueryPowerSchemeGuid);
+
+    public static PowerProfileResolution ResolveTarget(PowerProfileMode mode, Func<string, string?> queryAlias)
     {
-        var alias = mode switch
+        ArgumentNullException.ThrowIfNull(queryAlias);
+        var requestedAlias = mode switch
         {
             PowerProfileMode.Performance => "SCHEME_MIN",
             PowerProfileMode.Balanced => "SCHEME_BALANCED",
             PowerProfileMode.Afk => "SCHEME_MAX",
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
-        var result = RunPowerCfg("/query " + alias);
-        var match = Regex.Match(result.Output, @"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}");
-        if (result.ExitCode != 0 || !match.Success)
-            throw new InvalidOperationException("Plano de energia não disponível: " + alias);
-        return match.Value;
+        var requestedGuid = NormalizeGuid(queryAlias(requestedAlias));
+        if (requestedGuid is not null)
+            return new PowerProfileResolution(mode, mode, requestedAlias, requestedAlias, requestedGuid);
+
+        if (mode != PowerProfileMode.Balanced)
+        {
+            var balancedGuid = NormalizeGuid(queryAlias("SCHEME_BALANCED"));
+            if (balancedGuid is not null)
+                return new PowerProfileResolution(mode, PowerProfileMode.Balanced, requestedAlias, "SCHEME_BALANCED", balancedGuid);
+        }
+
+        throw new InvalidOperationException("O Windows não disponibilizou um plano de energia compatível. O ynoez não alterou o plano ativo.");
     }
+
+    private static string? QueryPowerSchemeGuid(string alias)
+    {
+        var result = RunPowerCfg("/query " + alias);
+        if (result.ExitCode != 0) return null;
+        var match = Regex.Match(result.Output, @"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}");
+        return match.Success ? NormalizeGuid(match.Value) : null;
+    }
+
+    private static string? NormalizeGuid(string? value) =>
+        Guid.TryParse(value, out var parsed) ? parsed.ToString() : null;
 
     public static void ClearExecutionRequirement() => SetExecutionRequirement(PowerProfileMode.Balanced);
 

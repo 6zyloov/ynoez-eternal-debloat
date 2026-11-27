@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace ynoez.Services;
 
-public sealed record AutoProfileStatus(PowerProfileMode Mode, bool GameDetected, TimeSpan IdleTime, string ActiveGame);
+public sealed record AutoProfileStatus(PowerProfileMode Mode, PowerProfileMode AppliedMode, bool UsedFallback, bool GameDetected, TimeSpan IdleTime, string ActiveGame);
 
 public static class AutoProfileService
 {
@@ -34,16 +34,16 @@ public static class AutoProfileService
                     ? PowerProfileMode.Afk
                     : game.Length > 0 ? PowerProfileMode.Performance : PowerProfileMode.Balanced;
 
-                var target = PowerProfileService.GetTargetGuid(desired);
+                var resolution = PowerProfileService.ResolveTarget(desired);
                 var active = PowerProfileService.GetActiveSchemeGuid();
-                if (!string.Equals(active, target, StringComparison.OrdinalIgnoreCase))
-                    PowerProfileService.ApplyForAutomaticSession(desired);
-                else if (lastMode != desired)
+                if (!string.Equals(active, resolution.Guid, StringComparison.OrdinalIgnoreCase)
+                    || lastMode != desired)
                     PowerProfileService.ApplyForAutomaticSession(desired);
 
                 if (lastMode != desired)
                 {
-                    onStatus?.Invoke(new AutoProfileStatus(desired, game.Length > 0, idle, game));
+                    onStatus?.Invoke(new AutoProfileStatus(desired, resolution.AppliedMode, resolution.UsedFallback,
+                        game.Length > 0, idle, game));
                     lastMode = desired;
                 }
                 await Task.Delay(pollInterval, token);
