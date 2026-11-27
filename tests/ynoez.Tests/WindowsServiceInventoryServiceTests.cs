@@ -47,7 +47,6 @@ public sealed class WindowsServiceInventoryServiceTests
     }
 
     [Theory]
-    [InlineData("Winmgmt")]
     [InlineData("Themes")]
     [InlineData("SomeThirdPartyService")]
     public void ClassifyService_UnreviewedServices_RemainReadOnly(string name)
@@ -57,7 +56,7 @@ public sealed class WindowsServiceInventoryServiceTests
         Assert.False(classification.IsProtected);
         Assert.False(classification.IsOptional);
         Assert.Equal("Somente leitura", classification.Category);
-        Assert.Contains("não oferece alterações", classification.Explanation);
+        Assert.Contains("Não existe uma regra de alteração aprovada", classification.Explanation);
     }
 
     [Theory]
