@@ -81,11 +81,13 @@ try {
     }
 
     $fileInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
-    if ($fileInfo.FileVersion -ne $versionQuad) {
-        throw "Versão PE do instalador ($($fileInfo.FileVersion)) difere do projeto ($versionQuad)."
+    $actualFileVersion = ($fileInfo.FileVersion ?? "").Trim()
+    $actualProductName = ($fileInfo.ProductName ?? "").Trim()
+    if ($actualFileVersion -ne $versionQuad) {
+        throw "Versão PE do instalador ('$actualFileVersion') difere do projeto ('$versionQuad')."
     }
-    if ($fileInfo.ProductName -ne "ynoez") {
-        throw "Metadado ProductName do instalador não é ynoez."
+    if ($actualProductName -ne "ynoez") {
+        throw "Metadado ProductName do instalador ('$actualProductName') não é ynoez."
     }
 
     Write-Host "Instalador $version gerado e metadados PE verificados: $setup"
