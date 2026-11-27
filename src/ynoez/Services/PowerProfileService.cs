@@ -27,8 +27,19 @@ public static class PowerProfileService
 
     public static string Apply(PowerProfileMode mode)
     {
+        var targetGuid = GetTargetGuid(mode);
         var current = GetActiveSchemeGuid();
-        if (!File.Exists(BaseBackupPath))
+        if (string.Equals(current, targetGuid, StringComparison.OrdinalIgnoreCase))
+            return "O plano solicitado já está ativo. Nenhuma alteração foi necessária.";
+
+        if (File.Exists(BaseBackupPath))
+        {
+            var existing = JsonSerializer.Deserialize<PowerProfileBackup>(File.ReadAllText(BaseBackupPath), JsonOptions)
+                ?? throw new InvalidDataException("Backup do plano base inválido; a alteração foi bloqueada.");
+            if (!Regex.IsMatch(existing.OriginalGuid, @"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$"))
+                throw new InvalidDataException("GUID no backup do plano base inválido; a alteração foi bloqueada.");
+        }
+        else
         {
             Directory.CreateDirectory(AppPaths.Backups);
             var exportPath = Path.Combine(AppPaths.Backups, "power-profile-base-" + current + ".pow");
@@ -38,26 +49,21 @@ public static class PowerProfileService
             WriteAtomic(BaseBackupPath, JsonSerializer.Serialize(new PowerProfileBackup(current, DateTimeOffset.UtcNow, exportPath), JsonOptions));
         }
 
-        var alias = mode switch
-        {
-            PowerProfileMode.Performance => "SCHEME_MIN",
-            PowerProfileMode.Balanced => "SCHEME_BALANCED",
-            PowerProfileMode.Afk => "SCHEME_MAX",
-            _ => throw new ArgumentOutOfRangeException(nameof(mode))
-        };
-
-        var result = RunPowerCfg("/setactive " + alias);
+        var result = RunPowerCfg("/setactive " + targetGuid);
         if (result.ExitCode != 0)
             throw new InvalidOperationException("O Windows não conseguiu alterar o plano de energia: " + result.Error);
 
         var active = GetActiveSchemeGuid();
+        if (!string.Equals(active, targetGuid, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("O Windows não confirmou o plano solicitado; o backup original foi mantido.");
+
         var state = new PowerProfileState(mode.ToString(), active, DateTimeOffset.UtcNow);
         WriteAtomic(StatePath, JsonSerializer.Serialize(state, JsonOptions));
         AppLog.Write("Perfil de energia aplicado: " + mode + " (" + active + ")");
         return mode switch
         {
-            PowerProfileMode.Performance => "Perfil Alto desempenho ativado. O plano original está salvo para restauração.",
-            PowerProfileMode.Balanced => "Perfil Equilibrado ativado. O plano original está salvo para restauração.",
+            PowerProfileMode.Performance => "Perfil Alto desempenho ativado. O plano original está exportado para restauração.",
+            PowerProfileMode.Balanced => "Perfil Equilibrado ativado. O plano original está exportado para restauração.",
             PowerProfileMode.Afk => "Perfil Economia de energia ativado. Aplicativos e processos permanecem abertos.",
             _ => "Perfil aplicado."
         };
