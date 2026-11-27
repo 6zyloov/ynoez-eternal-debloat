@@ -16,6 +16,10 @@ A organização por áreas é útil como referência. O ynoez mantém implementa
 
 ## Riscos concretos encontrados
 
+- Os handlers chamam comandos elevados individualmente via cmd/PowerShell. Não foi encontrado um journal transacional por ação que preserve valores anteriores e faça rollback individual. O ponto de restauração do Windows não substitui backup por operação.
+- Um handler baixa um arquivo BAT de um link Dropbox e o executa como administrador sem hash fixado ou assinatura verificada. O ynoez não repetirá esse padrão: dependências externas precisam de origem oficial, versão e hash.
+
+
 | Área | Operações identificadas no código | Decisão ynoez |
 |---|---|---|
 | Segurança do Windows | Desativar UAC, vulnerable driver blocklist, VBS, HVCI e DMA remapping | Bloqueado. Preservar UAC, TPM, Secure Boot, VBS/HVCI e IOMMU/DMA |
@@ -28,6 +32,8 @@ A organização por áreas é útil como referência. O ynoez mantém implementa
 | GPU | Escritas em chaves internas NVIDIA e AMD como RM* power gating, EnableUlps, UVD/VCE clock gating, VSyncControl e HAGS | Sem alteração universal. Separar por vendor/modelo/driver e medir antes/depois |
 | Debloat | Remover AppX para todos os usuários, desinstalar OneDrive, remover pastas ASUS/Armoury Crate e desativar serviços OEM | Não executar em massa. Identificar publisher, dependências, hardware e possibilidade real de reinstalação |
 | Energia | Desativar hibernação, Modern Standby, SleepStudy e recursos de economia sem distinguir desktop/laptop | Perfil condicionado ao hardware; preservar modo de energia original e reversão |
+| Dependências externas | Baixar script BAT de Dropbox e executar elevado; baixar Autoruns de Sysinternals | Não executar scripts externos sem hash, origem verificável e revisão; ferramentas oficiais podem ser abertas sob demanda |
+| Backup/rollback | Criar ponto de restauração do Windows, mas comandos individuais não guardam estado original por ajuste | Ponto de restauração opcional + backup granular e undo verificado por ação |
 
 ## Evidência de manutenção
 
