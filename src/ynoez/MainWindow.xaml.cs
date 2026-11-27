@@ -604,6 +604,67 @@ public partial class MainWindow : Window
         monitorCard.Child = monitorPanel;
         root.Children.Add(monitorCard);
 
+        var adapterCard = MakeCard();
+        var adapterPanel = new StackPanel { Margin = new Thickness(20) };
+        adapterPanel.Children.Add(Heading("Energia dos adaptadores físicos", 15));
+        adapterPanel.Children.Add(Body("Consulta opções de economia de energia do driver. Se compatível, permite desativar somente Selective Suspend e Device Sleep on Disconnect, salvando os valores originais. Exige UAC, não reinicia o adaptador automaticamente e pode exigir reconexão/reinício para aplicar. Pode aumentar consumo e não garante corrigir quedas."));
+        var adapterResults = new StackPanel();
+        var adapterService = new AdapterPowerManagementService();
+        var scanAdapters = new Button { Content = "Analisar adaptadores", Style = (Style)FindResource("AccentButton"), MinWidth = 155, Margin = new Thickness(0, 10, 0, 10) };
+        scanAdapters.Click += async (_, _) =>
+        {
+            scanAdapters.IsEnabled = false;
+            adapterResults.Children.Clear();
+            adapterResults.Children.Add(Body("Consultando recursos do driver. O Windows pode solicitar UAC…"));
+            try
+            {
+                var adapters = await Task.Run(() => adapterService.GetPhysicalAdapters());
+                adapterResults.Children.Clear();
+                if (adapters.Count == 0)
+                    adapterResults.Children.Add(NoteCard("Nenhum adaptador compatível", "O Windows não retornou adaptadores físicos com dados de gerenciamento de energia."));
+                foreach (var adapter in adapters)
+                {
+                    var details = adapter.InterfaceDescription + "\nEstado: " + adapter.Status + " | Link: " + adapter.LinkSpeed +
+                        "\nSelective Suspend: " + adapter.SelectiveSuspend + " | Device Sleep on Disconnect: " + adapter.DeviceSleepOnDisconnect;
+                    if (adapterService.CanRestore(adapter.Name))
+                    {
+                        adapterResults.Children.Add(ActionCard(adapter.Name, details, "Restaurar energia original", async () =>
+                        {
+                            if (MessageBox.Show("Restaurar as opções originais de energia de \"" + adapter.Name + "\"?", "Confirmar restauração",
+                                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                            await Task.Run(() => adapterService.Restore(adapter.Name));
+                            MessageBox.Show("Opções originais restauradas e verificadas.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                            ShowPage("Network");
+                        }, "BACKUP"));
+                    }
+                    else if (adapterService.CanReducePowerSaving(adapter))
+                    {
+                        adapterResults.Children.Add(ActionCard(adapter.Name, details, "Reduzir economia", async () =>
+                        {
+                            if (MessageBox.Show("Desativar apenas as opções de economia compatíveis neste adaptador? A alteração pode aumentar o consumo e pode exigir reconexão/reinício. O estado original será salvo.",
+                                "Confirmar adaptador", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                            await Task.Run(() => adapterService.ReducePowerSaving(adapter));
+                            MessageBox.Show("Opções selecionadas desativadas e verificadas. Backup original salvo.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                            ShowPage("Network");
+                        }, "REVERSÍVEL"));
+                    }
+                    else
+                        adapterResults.Children.Add(NoteCard(adapter.Name + " — sem ajuste necessário", details + "\nNenhuma das opções suportadas está habilitada."));
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Consulta de energia dos adaptadores falhou: " + ex);
+                adapterResults.Children.Clear();
+                adapterResults.Children.Add(NoteCard("Não foi possível consultar", ex.Message));
+            }
+            finally { scanAdapters.IsEnabled = true; }
+        };
+        adapterPanel.Children.Add(scanAdapters);
+        adapterPanel.Children.Add(adapterResults);
+        adapterCard.Child = adapterPanel;
+        root.Children.Add(adapterCard);
+
         root.Children.Add(NoteCard("Como interpretar", "Perda também no gateway sugere um problema dentro da rede local (Wi-Fi, cabo, adaptador ou roteador). Perda somente no destino externo pode estar na rota ou no provedor. Um teste curto não prova sozinho a causa de desconexões intermitentes."));
         return root;
     }
