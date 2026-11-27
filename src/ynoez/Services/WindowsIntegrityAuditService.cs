@@ -69,7 +69,7 @@ try {
     $hvciRunning = (@($g.SecurityServicesRunning) -contains 2)
 } catch {}
 
-$names = @('WinDefend','wuauserv','WSearch','Spooler','ClipSVC','InstallService','vgc','vgk','FACEITService','FaceitService','faceit')
+$names = @('WinDefend','wuauserv','WSearch','Spooler','ClipSVC','InstallService','vgc','vgk','FACEITService','faceit')
 $services = @(foreach ($name in $names) {
     $filter = 'Name=' + [char]39 + $name + [char]39
     $s = Get-CimInstance -ClassName Win32_Service -Filter $filter -ErrorAction SilentlyContinue
@@ -187,7 +187,6 @@ ConvertTo-Json -InputObject $result -Depth 6 -Compress
         AddServiceRow(rows, snapshot, "vgc", "Riot Vanguard — serviço");
         AddServiceRow(rows, snapshot, "vgk", "Riot Vanguard — driver");
         AddServiceRow(rows, snapshot, "FACEITService", "FACEIT Anti-Cheat");
-        AddServiceRow(rows, snapshot, "FaceitService", "FACEIT Anti-Cheat (variante)");
         AddServiceRow(rows, snapshot, "faceit", "FACEIT Anti-Cheat (driver/serviço)");
         return rows;
     }

@@ -22,7 +22,7 @@
 - Auditoria de integridade somente leitura para Defender/Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update e estados conhecidos de serviços/drivers Vanguard/FACEIT; não declara compatibilidade por conta própria.
 - Tratamento global de exceções não tratadas: registra stack trace em Logs, fecha a aplicação de forma controlada e tenta restaurar sessão de energia pendente.
 - CI Windows executa testes antes de publicar o executável autocontido.
-- Auditoria somente leitura de Defender/Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers relacionados a Search, impressão, Store, Windows Update, Vanguard e FACEIT; valores não fornecidos pelo Windows aparecem como indisponíveis.
+- Auditoria somente leitura de Defender/Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers relacionados a Search, impressão, Store, Windows Update, Vanguard e FACEIT; valores não fornecidos pelo Windows aparecem como indisponíveis. Distingue serviço ausente de serviço parado e não afirma compatibilidade anti-cheat.
 - Verificador manual de atualização consulta somente quando solicitado a release estável do repositório GitHub, valida tag/URL e abre a página oficial; não baixa nem instala silenciosamente.
 - Pipeline separada de release por tag vX.Y.Z, com teste Windows, instalador Inno Setup, pacote portátil e manifesto SHA-256.
 
