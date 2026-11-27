@@ -18,14 +18,16 @@ public static class AutoProfileService
 
     public static async Task RunAsync(Action<AutoProfileStatus>? onStatus, CancellationToken token)
     {
-        var games = LoadGames();
+        var settings = LoadSettings();
+        var idleThreshold = TimeSpan.FromMinutes(settings.IdleThresholdMinutes);
+        var pollInterval = TimeSpan.FromSeconds(settings.PollIntervalSeconds);
         PowerProfileMode? lastMode = null;
         while (true)
         {
             token.ThrowIfCancellationRequested();
             var idle = GetIdleTime();
-            var game = FindRunningGame(games);
-            var desired = idle >= TimeSpan.FromMinutes(15)
+            var game = FindRunningGame(settings.ProcessNames);
+            var desired = idle >= idleThreshold
                 ? PowerProfileMode.Afk
                 : game.Length > 0 ? PowerProfileMode.Performance : PowerProfileMode.Balanced;
 
@@ -39,27 +41,34 @@ public static class AutoProfileService
                 onStatus?.Invoke(new AutoProfileStatus(desired, game.Length > 0, idle, game));
                 lastMode = desired;
             }
-            await Task.Delay(TimeSpan.FromSeconds(15), token);
+            await Task.Delay(pollInterval, token);
         }
     }
 
-    private static string[] LoadGames()
+    private static AutoProfileSettings LoadSettings()
     {
         try
         {
-            if (!File.Exists(GamesPath)) return DefaultGames;
+            if (!File.Exists(GamesPath))
+                return new AutoProfileSettings(DefaultGames, 15, 15);
             using var document = JsonDocument.Parse(File.ReadAllText(GamesPath));
-            var names = document.RootElement.GetProperty("processNames").EnumerateArray()
+            var root = document.RootElement;
+            var names = root.GetProperty("processNames").EnumerateArray()
                 .Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            return names.Length > 0 ? names : DefaultGames;
+            var idle = root.TryGetProperty("idleThresholdMinutes", out var idleElement) ? idleElement.GetInt32() : 15;
+            var poll = root.TryGetProperty("pollIntervalSeconds", out var pollElement) ? pollElement.GetInt32() : 15;
+            return new AutoProfileSettings(names.Length > 0 ? names : DefaultGames,
+                Math.Clamp(idle, 1, 120), Math.Clamp(poll, 5, 120));
         }
         catch (Exception ex)
         {
-            AppLog.Write("Lista de jogos inválida; usando padrão: " + ex.Message);
-            return DefaultGames;
+            AppLog.Write("Configuração de perfis automáticos inválida; usando padrão: " + ex.Message);
+            return new AutoProfileSettings(DefaultGames, 15, 15);
         }
     }
+
+    private sealed record AutoProfileSettings(string[] ProcessNames, int IdleThresholdMinutes, int PollIntervalSeconds);
 
     private static string FindRunningGame(IEnumerable<string> processNames)
     {

@@ -286,18 +286,33 @@ public partial class MainWindow : Window
         root.Children.Add(PageIntro("Tweaks", "Ajustes de acesso controlado. Nada é aplicado automaticamente ao abrir o aplicativo."));
         root.Children.Add(ActionCard("Performance", "Ativa Alto desempenho para reduzir economia agressiva de energia. Pode elevar consumo, temperatura e ruído.", "Ativar Performance", () =>
         {
+            if (_autoProfileCts is not null)
+            {
+                MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return Task.CompletedTask;
+            }
             if (MessageBox.Show("Ativar o perfil Performance? O plano original será salvo para restauração.", "Confirmar perfil", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
             MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Performance), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "JOGOS"));
         root.Children.Add(ActionCard("Equilibrado", "Usa o plano equilibrado do Windows para tarefas comuns, sem encerrar processos ou alterar serviços.", "Ativar Equilibrado", () =>
         {
+            if (_autoProfileCts is not null)
+            {
+                MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return Task.CompletedTask;
+            }
             if (MessageBox.Show("Ativar o perfil Equilibrado?", "Confirmar perfil", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return Task.CompletedTask;
             MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Balanced), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "PADRÃO"));
         root.Children.Add(ActionCard("AFK / Economia", "Ativa o plano de economia de energia. Roblox, XT, downloads, Discord e outros processos continuam abertos; o ynoez não mata processos.", "Ativar AFK", () =>
         {
+            if (_autoProfileCts is not null)
+            {
+                MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return Task.CompletedTask;
+            }
             if (MessageBox.Show("Ativar economia de energia? Isso pode reduzir desempenho enquanto jogos ou scripts continuam rodando.", "Confirmar perfil AFK", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
             MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Afk), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;

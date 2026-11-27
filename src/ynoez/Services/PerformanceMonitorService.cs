@@ -98,7 +98,7 @@ public sealed class PerformanceMonitorService
                 process.Kill(entireProcessTree: true);
                 return NvidiaTelemetry.Empty;
             }
-            var output = outputTask.GetAwaiter().GetResult().Trim();
+            var output = outputTask.GetAwaiter().GetResult().Split(new[] { '\\r', '\\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
             if (process.ExitCode != 0 || output.Length == 0) return NvidiaTelemetry.Empty;
             var fields = output.Split(',').Select(x => x.Trim()).ToArray();
             if (fields.Length < 5) return NvidiaTelemetry.Empty;
