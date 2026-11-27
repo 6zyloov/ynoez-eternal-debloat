@@ -61,6 +61,36 @@ public sealed class WindowsScheduledTaskInventoryServiceTests
     }
 
     [Fact]
+    public void BuildReadOnlyScript_UsesOnlyTaskSchedulerQueriesAndWritesToQuotedReportPath()
+    {
+        const string path = @"C:\ynoez\Data\user's tasks.json";
+
+        var script = WindowsScheduledTaskInventoryService.BuildReadOnlyScript(path);
+
+        Assert.Contains("Get-ScheduledTask -ErrorAction Stop", script);
+        Assert.Contains("Get-ScheduledTaskInfo -InputObject $t", script);
+        Assert.Contains("user''s tasks.json", script);
+        Assert.Contains("Set-Content -LiteralPath", script);
+        Assert.DoesNotContain("Disable-ScheduledTask", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Enable-ScheduledTask", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Start-ScheduledTask", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Stop-ScheduledTask", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Unregister-ScheduledTask", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Register-ScheduledTask", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Set-ScheduledTask", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData(null)]
+    public void BuildReadOnlyScript_RejectsMissingReportPath(string? path)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            WindowsScheduledTaskInventoryService.BuildReadOnlyScript(path!));
+    }
+
+    [Fact]
     public void ParseJson_ParsesInventoryAndAppliesSafetyClassification()
     {
         const string json = """
