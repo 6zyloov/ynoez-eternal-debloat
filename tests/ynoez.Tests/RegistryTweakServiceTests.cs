@@ -1,3 +1,4 @@
+using Xunit;
 using Microsoft.Win32;
 using ynoez.Services;
 
