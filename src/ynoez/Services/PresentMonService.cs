@@ -148,7 +148,7 @@ public static class PresentMonService
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private static FrameBenchmarkSummary ParseCsv(string path, CaptureTarget target)
+    internal static FrameBenchmarkSummary ParseCsv(string path, CaptureTarget target)
     {
         using var reader = new StreamReader(path, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var header = reader.ReadLine() ?? throw new InvalidDataException("CSV do PresentMon sem cabeçalho.");

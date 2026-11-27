@@ -134,6 +134,31 @@ public sealed class RegistryTweakServiceTests
         }
     }
 
+
+    [Fact]
+    public void PresentMonCsvParser_ComputesAverageAndOnePercentLow()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "ynoez-presentmon-" + Guid.NewGuid().ToString("N") + ".csv");
+        try
+        {
+            var lines = new List<string> { "Application,ProcessID,MsBetweenPresents" };
+            for (var i = 0; i < 90; i++) lines.Add("\"Game, Window\",123,10");
+            for (var i = 0; i < 10; i++) lines.Add("\"Game, Window\",123,50");
+            File.WriteAllLines(path, lines);
+
+            var summary = PresentMonService.ParseCsv(path, new CaptureTarget(123, "Game"));
+
+            Assert.Equal(100, summary.FrameCount);
+            Assert.Equal(1000d / 14d, summary.AverageFps, 3);
+            Assert.Equal(20d, summary.OnePercentLowFps, 3);
+            Assert.Equal(10, summary.FramesOver33Ms);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     [Fact]
     public void StartupEntry_DisableAndRestoreIsReversible()
     {
