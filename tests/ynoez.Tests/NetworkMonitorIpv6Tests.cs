@@ -140,11 +140,16 @@ public sealed class NetworkMonitorIpv6Tests
 
         var line = NetworkMonitorService.BuildCsvLine(sample, assessment);
 
-        Assert.Contains("dns_a_count", NetworkMonitorService.BuildCsvLine(sample, assessment).Split(',')[17]);
-        Assert.Contains("fe80::1%12", line);
-        Assert.Contains("2606:4700:4700::1111", line);
-        Assert.Contains("2001:4860:4860::8888", line);
-        Assert.Contains("2,2", line);
+        var headerColumns = NetworkMonitorService.BuildCsvHeader().Split(',');
+        var lineColumns = line.Split(',');
+        Assert.Equal(headerColumns.Length, lineColumns.Length);
+        Assert.Equal("dns_a_count", headerColumns[17]);
+        Assert.Equal("dns_aaaa_count", headerColumns[18]);
+        Assert.Equal("2", lineColumns[17]);
+        Assert.Equal("2", lineColumns[18]);
+        Assert.Equal("fe80::1%12", lineColumns[28]);
+        Assert.Equal("2606:4700:4700::1111", lineColumns[31]);
+        Assert.Equal("2001:4860:4860::8888", lineColumns[36]);
     }
 
     [Fact]
