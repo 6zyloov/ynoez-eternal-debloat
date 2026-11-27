@@ -36,6 +36,14 @@ public sealed class NetworkAdapterAdvancedDiagnosticsServiceTests
         {
           "AdapterName": "Ethernet",
           "AdapterDescription": "Realtek PCIe 2.5GbE Family Controller",
+          "DisplayName": "Energy Efficient Ethernet",
+          "DisplayValue": "Enabled",
+          "RegistryKeyword": "*EEE",
+          "RegistryValue": "1"
+        },
+        {
+          "AdapterName": "Ethernet",
+          "AdapterDescription": "Realtek PCIe 2.5GbE Family Controller",
           "DisplayName": "Speed & Duplex",
           "DisplayValue": "1.0 Gbps Full Duplex",
           "RegistryKeyword": "*SpeedDuplex",
@@ -48,6 +56,14 @@ public sealed class NetworkAdapterAdvancedDiagnosticsServiceTests
           "DisplayValue": "Vendor default",
           "RegistryKeyword": "*VendorCustom",
           "RegistryValue": "Default"
+        },
+        {
+          "AdapterName": "Ethernet",
+          "AdapterDescription": "Realtek PCIe 2.5GbE Family Controller",
+          "DisplayName": "",
+          "DisplayValue": "Custom",
+          "RegistryKeyword": "*UndocumentedProperty",
+          "RegistryValue": "42"
         }
       ],
       "Errors": []
@@ -59,7 +75,7 @@ public sealed class NetworkAdapterAdvancedDiagnosticsServiceTests
     {
         var snapshot = NetworkAdapterAdvancedDiagnosticsService.ParseJson(Sample);
 
-        Assert.Equal(5, snapshot.Properties.Count);
+        Assert.Equal(7, snapshot.Properties.Count);
         Assert.Contains(snapshot.Properties, x =>
             x.DisplayName == "Interrupt Moderation" &&
             x.Category == "Latência" &&
@@ -75,6 +91,13 @@ public sealed class NetworkAdapterAdvancedDiagnosticsServiceTests
             x.Assessment == "Velocidade/duplex fixos");
         Assert.Contains(snapshot.Properties, x =>
             x.DisplayName == "Vendor Custom Property" &&
+            x.Category == "Outros");
+        Assert.Contains(snapshot.Properties, x =>
+            x.DisplayName == "Energy Efficient Ethernet" &&
+            x.Category == "Energia");
+        Assert.Contains(snapshot.Properties, x =>
+            x.DisplayName == "*UndocumentedProperty (sem nome visível)" &&
+            x.RegistryValue == "42" &&
             x.Category == "Outros");
     }
 
