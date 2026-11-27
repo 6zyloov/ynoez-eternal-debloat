@@ -52,7 +52,7 @@ public static class NetworkMonitorService
             "-" + Guid.NewGuid().ToString("N")[..8] + ".csv");
         await using var stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
-        await writer.WriteLineAsync("timestamp,gateway_ipv4,gateway_ipv4_status,gateway_ipv4_ms,external_ipv4_1,external_ipv4_1_icmp_status,external_ipv4_1_icmp_ms,external_ipv4_1_tcp_status,external_ipv4_1_tcp_ms,external_ipv4_2,external_ipv4_2_icmp_status,external_ipv4_2_icmp_ms,external_ipv4_2_tcp_status,external_ipv4_2_tcp_ms,dns_host,dns_status,dns_ms,dns_a_count,dns_aaaa_count,gateway_ipv4_loss_60s_pct,external_ipv4_1_loss_60s_pct,external_ipv4_1_tcp_failure_60s_pct,external_ipv4_2_loss_60s_pct,external_ipv4_2_tcp_failure_60s_pct,dns_failure_60s_pct,gateway_ipv4_jitter_60s_ms,external_ipv4_1_jitter_60s_ms,external_ipv4_1_tcp_jitter_60s_ms,ipv6_gateway,ipv6_gateway_status,ipv6_gateway_ms,external_ipv6_1,external_ipv6_1_icmp_status,external_ipv6_1_icmp_ms,external_ipv6_1_tcp_status,external_ipv6_1_tcp_ms,external_ipv6_2,external_ipv6_2_icmp_status,external_ipv6_2_icmp_ms,external_ipv6_2_tcp_status,external_ipv6_2_tcp_ms,ipv6_gateway_loss_60s_pct,external_ipv6_1_loss_60s_pct,external_ipv6_1_tcp_failure_60s_pct,external_ipv6_2_loss_60s_pct,external_ipv6_2_tcp_failure_60s_pct,ipv6_gateway_jitter_60s_ms,external_ipv6_1_jitter_60s_ms,external_ipv6_1_tcp_jitter_60s_ms,root_cause_category,root_cause_assessment");
+        await writer.WriteLineAsync(BuildCsvHeader());
         await writer.FlushAsync();
         AppLog.Write("Monitoramento contínuo de rede iniciado: " + file);
         var window = new Queue<(long Tick, NetworkMonitorSample Sample)>();
@@ -151,6 +151,9 @@ public static class NetworkMonitorService
             return file;
         }
     }
+
+    internal static string BuildCsvHeader() =>
+        "timestamp,gateway_ipv4,gateway_ipv4_status,gateway_ipv4_ms,external_ipv4_1,external_ipv4_1_icmp_status,external_ipv4_1_icmp_ms,external_ipv4_1_tcp_status,external_ipv4_1_tcp_ms,external_ipv4_2,external_ipv4_2_icmp_status,external_ipv4_2_icmp_ms,external_ipv4_2_tcp_status,external_ipv4_2_tcp_ms,dns_host,dns_status,dns_ms,dns_a_count,dns_aaaa_count,gateway_ipv4_loss_60s_pct,external_ipv4_1_loss_60s_pct,external_ipv4_1_tcp_failure_60s_pct,external_ipv4_2_loss_60s_pct,external_ipv4_2_tcp_failure_60s_pct,dns_failure_60s_pct,gateway_ipv4_jitter_60s_ms,external_ipv4_1_jitter_60s_ms,external_ipv4_1_tcp_jitter_60s_ms,ipv6_gateway,ipv6_gateway_status,ipv6_gateway_ms,external_ipv6_1,external_ipv6_1_icmp_status,external_ipv6_1_icmp_ms,external_ipv6_1_tcp_status,external_ipv6_1_tcp_ms,external_ipv6_2,external_ipv6_2_icmp_status,external_ipv6_2_icmp_ms,external_ipv6_2_tcp_status,external_ipv6_2_tcp_ms,ipv6_gateway_loss_60s_pct,external_ipv6_1_loss_60s_pct,external_ipv6_1_tcp_failure_60s_pct,external_ipv6_2_loss_60s_pct,external_ipv6_2_tcp_failure_60s_pct,ipv6_gateway_jitter_60s_ms,external_ipv6_1_jitter_60s_ms,external_ipv6_1_tcp_jitter_60s_ms,root_cause_category,root_cause_assessment";
 
     internal static string BuildCsvLine(NetworkMonitorSample sample, NetworkRootCause rootCause) =>
         string.Join(",",
