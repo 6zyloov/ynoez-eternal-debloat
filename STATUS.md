@@ -12,7 +12,7 @@
 - Gerenciador de inicialização: inventário HKCU/HKLM 32/64 bits e pastas Startup pessoal/compartilhada; entradas HKCU não protegidas e arquivos pessoais podem ser desativados com backup/reversão; HKLM e Startup compartilhada somente leitura.
 - Catálogo de seis serviços opcionais: DiagTrack, dmwappushservice, MapsBroker, Fax, RetailDemo e WMPNetworkSvc. Backup do modo de inicialização, tratamento de delayed-auto, confirmação, UAC, tentativa de parada sem forçar dependências e restauração verificada.
 - Perfis manuais Performance, Equilibrado e AFK, com backup do plano original.
-- Perfil automático por jogo conhecido e inatividade do teclado/mouse: Performance durante jogos com entrada ativa, Equilibrado no uso comum e AFK após 15 minutos sem entrada. Não encerra processos. Exporta o plano original e restaura ao parar; tenta recuperar sessões interrompidas na próxima inicialização. AFK bloqueia suspensão automática enquanto o app está aberto, sem impedir que a tela apague.
+- Perfil automático por jogo conhecido, processos protegidos configuráveis e inatividade: Performance em jogo com entrada recente; AFK protegido usa plano Equilibrado + bloqueio de suspensão quando jogo/processo protegido continua rodando sem entrada; AFK Economia agressiva só entra após 15 minutos sem entrada e sem carga protegida. Lista extra de processos é editável na interface e salva em Data. Não encerra processos; exporta/restaura o plano original e tenta recuperar sessões interrompidas. A tela pode apagar normalmente.
 - Monitor ao vivo de CPU/RAM via APIs nativas e GPU 3D via NVIDIA SMI ou WMI GPU Engine. Temperatura/VRAM/potência dependem do suporte NVIDIA; não instala drivers de sensor.
 - Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV + resumo JSON, FPS médio, 1% low (inverso do P99), 0,1% low (inverso do P99,9), frametime médio, p99/p99,9 e frames lentos. Sessões A/B com três rodadas em cada fase, mediana, dispersão e JSON persistente. A série não controla a cena, mapa, temperatura ou processos do PC.
 - Verificador manual de atualização: consulta somente quando solicitado o endpoint de release estável oficial do GitHub, valida tag/URL/repositório e apenas abre a página oficial quando há versão mais nova; não baixa nem instala automaticamente. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
@@ -20,7 +20,7 @@
 - Monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, ICMP/TCP para Cloudflare e Google, resolução DNS, janela móvel real de 60 segundos e hipótese de causa, com exportação CSV.
 - Inventário de adaptadores físicos e virtuais com endereços, DNS, gateways, MTU e versão de driver quando o WMI informa; exportação CSV, somente leitura. Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
 - Central Restore consolida recuperação de Registro, plano base/AFK interrompido, serviços opcionais, adaptadores de rede, tarefas, inicialização e snapshots. Backups órfãos ou corrompidos permanecem preservados.
-- Testes Windows de transações de Registro, tipos originais, backups corrompidos, inicialização HKCU e pasta Startup temporária, fallback de energia, manifesto SHA-256 de snapshots, métricas da janela de rede, parser PresentMon e whitelists de serviços/tarefas.
+- Testes Windows de política Performance/Equilibrado/AFK/AFK protegido, validação da lista de processos protegidos e resolução do plano Equilibrado, além de transações de Registro, tipos originais, backups corrompidos, inicialização HKCU, fallback de energia, snapshots, métricas de rede, PresentMon e whitelists.
 - Auditoria de integridade somente leitura para Defender/Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update e estados conhecidos de serviços/drivers Vanguard/FACEIT; não declara compatibilidade por conta própria.
 - Tratamento global de exceções não tratadas: registra stack trace em Logs, fecha a aplicação de forma controlada e tenta restaurar sessão de energia pendente.
 - CI Windows executa testes antes de publicar o executável autocontido.
@@ -48,8 +48,9 @@
 - Poppins é incorporada sob SIL Open Font License; o texto integral está em `src/ynoez/Assets/Fonts/OFL.txt`.
 
 ## Próxima linha de engenharia
-1. Comparação A/B repetida e controlada de benchmarks por jogo, agregação de várias sessões e controle/registro de cena, temperaturas e processos concorrentes.
-2. Inventário AppX/Win32/provisionados e remoção só quando houver pacote de recuperação confiável.
+1. Validar o modo AFK protegido com Roblox/automação real, mudanças de estado do processo e retomada após suspensão/cancelamento.
+2. Comparação A/B repetida e controlada de benchmarks por jogo, agregação de várias sessões e controle/registro de cena, temperaturas e processos concorrentes.
+3. Inventário AppX/Win32/provisionados e remoção só quando houver pacote de recuperação confiável.
 3. Diagnóstico de NIC mais completo (driver, EEE, interrupt moderation e propriedades avançadas) com recomendações condicionais.
-4. Migrar code-behind para MVVM/DI e ampliar testes de falhas, concorrência e recuperação após crash.
-5. Atualizador com validação criptográfica, assinatura Authenticode e testes físicos em hardware real.
+5. Migrar code-behind para MVVM/DI e ampliar testes de falhas, concorrência e recuperação após crash.
+6. Atualizador com validação criptográfica, assinatura Authenticode e testes físicos em hardware real.
