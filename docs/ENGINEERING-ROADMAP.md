@@ -30,7 +30,7 @@ Não há data artificial de entrega. Uma versão só avança quando passa pelos 
 - [ ] Lista de apps instalados (Win32, Store/Appx, provisionados) com publisher, versão, tamanho estimado, origem e método oficial de remoção.
 - [x] Startup Run keys HKCU reversíveis e serviços opcionais por whitelist; Startup folders e tarefas de logon ainda pendentes.
 - [ ] Catálogo de apps opcionais com re-instalação documentada e proteção por dependências.
-- [ ] Pesquisa unificada de configurações, serviços, tarefas, recursos e painéis do Windows.
+- [~] Pesquisa unificada de configurações/atalhos, inventário de serviços e tarefas agendadas em tempo real, com filtros, classificação conservadora e CSV. Inventário de recursos opcionais e pesquisa unificada em todos os painéis do Windows ainda pendentes.
 - [ ] Debloat de Windows 10/11 separado por build, edição, idioma e perfil do usuário.
 - [ ] Perfis Lite / Balanceado / Avançado; modo agressivo sempre desmarcado e com riscos explícitos.
 - [ ] Manter Store, Print, Calculator, Clipboard, Notepad, Windows Search, NVIDIA Instant Replay, Defender, Update e componentes anti-cheat protegidos.

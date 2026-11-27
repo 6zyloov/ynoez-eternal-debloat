@@ -37,6 +37,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _benchmarkCts;
     private CancellationTokenSource? _integrityAuditCts;
     private CancellationTokenSource? _windowsRepairCts;
+    private CancellationTokenSource? _serviceInventoryCts;
+    private CancellationTokenSource? _scheduledTaskInventoryCts;
     private bool _allowClose;
     private bool _sessionEnding;
     private bool _trayIconVisible;
@@ -138,6 +140,8 @@ public partial class MainWindow : Window
             _benchmarkCts?.Cancel();
             _integrityAuditCts?.Cancel();
             _windowsRepairCts?.Cancel();
+            _serviceInventoryCts?.Cancel();
+            _scheduledTaskInventoryCts?.Cancel();
         };
     }
 
@@ -1760,7 +1764,331 @@ public partial class MainWindow : Window
         search.TextChanged += (_, _) => RenderResults();
         root.Children.Add(search);
         root.Children.Add(results);
-        root.Children.Add(NoteCard("Ações de serviço", "A Toolbox localiza e abre o Gerenciador de Serviços, mas não oferece desligamento em massa. Serviços essenciais, Store, impressão, busca, atualização e segurança precisam ser avaliados individualmente antes de qualquer mudança."));
+
+        var serviceCard = MakeCard();
+        var servicePanel = new StackPanel { Margin = new Thickness(20) };
+        servicePanel.Children.Add(Heading("Inventário ao vivo de serviços", 15));
+        servicePanel.Children.Add(Body("Consulta todos os serviços registrados no Windows, incluindo nome interno, descrição, estado, tipo de inicialização e PID. A classificação é apenas informativa: protegidos, opcionais que já constam na whitelist de Debloat e serviços sem política de alteração. Esta tela não altera nem encerra serviços."));
+        var serviceSearch = new TextBox
+        {
+            Height = 38,
+            FontSize = 12,
+            Padding = new Thickness(11, 8, 11, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            CaretBrush = AccentBrush,
+            ToolTip = "Pesquisar pelo nome, serviço, descrição, estado ou classificação"
+        };
+        var serviceStatus = Body("A consulta ainda não foi executada.");
+        var serviceDetails = Body("Selecione um serviço para ver a explicação da classificação.");
+        serviceDetails.TextWrapping = TextWrapping.Wrap;
+        var serviceGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            SelectionMode = DataGridSelectionMode.Single,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 330,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Serviço", Binding = new Binding(nameof(WindowsServiceInfo.Name)), Width = new DataGridLength(1.0, DataGridLengthUnitType.Star) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Nome de exibição", Binding = new Binding(nameof(WindowsServiceInfo.DisplayName)), Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsServiceInfo.StateDisplay)), Width = new DataGridLength(100) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Inicialização", Binding = new Binding(nameof(WindowsServiceInfo.StartModeDisplay)), Width = new DataGridLength(105) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "PID", Binding = new Binding(nameof(WindowsServiceInfo.ProcessIdDisplay)), Width = new DataGridLength(55) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Política", Binding = new Binding(nameof(WindowsServiceInfo.SafetyDisplay)), Width = new DataGridLength(150) });
+        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Descrição", Binding = new Binding(nameof(WindowsServiceInfo.Description)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+        IReadOnlyList<WindowsServiceInfo> allServices = Array.Empty<WindowsServiceInfo>();
+        void RenderServices()
+        {
+            var query = serviceSearch.Text.Trim();
+            var filtered = string.IsNullOrWhiteSpace(query)
+                ? allServices
+                : allServices.Where(x =>
+                    x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.StateDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.StartModeDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Explanation.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+            serviceGrid.ItemsSource = filtered;
+            serviceStatus.Text = allServices.Count == 0
+                ? "Nenhum inventário carregado."
+                : filtered.Count + " de " + allServices.Count + " serviços • somente leitura";
+        }
+        serviceSearch.TextChanged += (_, _) => RenderServices();
+        serviceGrid.SelectionChanged += (_, _) =>
+        {
+            if (serviceGrid.SelectedItem is not WindowsServiceInfo selected)
+            {
+                serviceDetails.Text = "Selecione um serviço para ver a explicação da classificação.";
+                return;
+            }
+            serviceDetails.Text = selected.DisplayName + " (" + selected.Name + ")" +
+                "\nEstado: " + selected.StateDisplay +
+                " • Inicialização: " + selected.StartModeDisplay +
+                " • PID: " + selected.ProcessIdDisplay +
+                "\nPolítica: " + selected.Safety.Explanation +
+                (string.IsNullOrWhiteSpace(selected.Description) ? "" : "\nDescrição: " + selected.Description);
+        };
+        var serviceButtons = new WrapPanel();
+        var refreshServices = new Button { Content = "Consultar serviços", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelServices = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportServices = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var openServicesConsole = new Button { Content = "Abrir services.msc", Style = (Style)FindResource("QuietButton") };
+        refreshServices.Click += async (_, _) =>
+        {
+            if (_serviceInventoryCts is not null) return;
+            var cts = new CancellationTokenSource();
+            _serviceInventoryCts = cts;
+            refreshServices.IsEnabled = false;
+            cancelServices.IsEnabled = true;
+            exportServices.IsEnabled = false;
+            serviceStatus.Text = "Consultando Win32_Service. A operação pode levar alguns segundos…";
+            try
+            {
+                var captured = await WindowsServiceInventoryService.CaptureAsync(cts.Token);
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    allServices = captured;
+                    RenderServices();
+                    exportServices.IsEnabled = allServices.Count > 0;
+                    serviceStatus.Text = allServices.Count + " serviços inventariados • nenhum serviço foi alterado";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!Dispatcher.HasShutdownStarted) serviceStatus.Text = "Consulta cancelada. Nenhuma alteração foi feita.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário de serviços do Windows falhou: " + ex);
+                if (!Dispatcher.HasShutdownStarted) serviceStatus.Text = "Falha na consulta: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_serviceInventoryCts, cts)) _serviceInventoryCts = null;
+                cts.Dispose();
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    refreshServices.IsEnabled = true;
+                    cancelServices.IsEnabled = false;
+                }
+            }
+        };
+        cancelServices.Click += (_, _) => _serviceInventoryCts?.Cancel();
+        exportServices.Click += (_, _) =>
+        {
+            if (allServices.Count == 0) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar inventário de serviços",
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = "ynoez-servicos-windows.csv",
+                AddExtension = true,
+                DefaultExt = ".csv"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, WindowsServiceInventoryService.BuildCsv(allServices), new System.Text.UTF8Encoding(true));
+                serviceStatus.Text = "Inventário completo exportado: " + dialog.FileName;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao exportar inventário de serviços: " + ex);
+                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        openServicesConsole.Click += async (_, _) => await OpenTargetAsync("services.msc");
+        serviceButtons.Children.Add(refreshServices);
+        serviceButtons.Children.Add(cancelServices);
+        serviceButtons.Children.Add(exportServices);
+        serviceButtons.Children.Add(openServicesConsole);
+        servicePanel.Children.Add(serviceSearch);
+        servicePanel.Children.Add(serviceStatus);
+        servicePanel.Children.Add(serviceGrid);
+        servicePanel.Children.Add(serviceDetails);
+        servicePanel.Children.Add(serviceButtons);
+        serviceCard.Child = servicePanel;
+        root.Children.Add(serviceCard);
+
+        var taskCard = MakeCard();
+        var taskPanel = new StackPanel { Margin = new Thickness(20) };
+        taskPanel.Children.Add(Heading("Inventário ao vivo de tarefas agendadas", 15));
+        taskPanel.Children.Add(Body("Consulta as tarefas registradas no Agendador do Windows: nome, caminho, estado, autor, descrição, última execução, próxima execução e último resultado. A classificação separa tarefas protegidas, seis tarefas opcionais avaliadas pelo Debloat e todo o restante como somente leitura. Esta tela não habilita, desabilita, inicia ou encerra tarefas."));
+        var taskSearch = new TextBox
+        {
+            Height = 38,
+            FontSize = 12,
+            Padding = new Thickness(11, 8, 11, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            CaretBrush = AccentBrush,
+            ToolTip = "Pesquisar nome, caminho, estado, autor, descrição ou classificação"
+        };
+        var taskStatus = Body("A consulta ainda não foi executada.");
+        var taskDetails = Body("Selecione uma tarefa para ver sua classificação e descrição.");
+        taskDetails.TextWrapping = TextWrapping.Wrap;
+        var taskGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserResizeRows = false,
+            SelectionMode = DataGridSelectionMode.Single,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#171717"),
+            AlternatingRowBackground = BrushFrom("#202020"),
+            BorderBrush = BorderBrushSoft,
+            Height = 330,
+            Margin = new Thickness(0, 10, 0, 10)
+        };
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Tarefa", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskName)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Caminho", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskPath)), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsScheduledTaskInfo.StateDisplay)), Width = new DataGridLength(105) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Política", Binding = new Binding(nameof(WindowsScheduledTaskInfo.SafetyDisplay)), Width = new DataGridLength(150) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Última execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.LastRunDisplay)), Width = new DataGridLength(135) });
+        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Próxima execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.NextRunDisplay)), Width = new DataGridLength(135) });
+        IReadOnlyList<WindowsScheduledTaskInfo> allTasks = Array.Empty<WindowsScheduledTaskInfo>();
+        void RenderTasks()
+        {
+            var query = taskSearch.Text.Trim();
+            var filtered = string.IsNullOrWhiteSpace(query)
+                ? allTasks
+                : allTasks.Where(x =>
+                    x.TaskName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.TaskPath.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.StateDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Author.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    x.Safety.Explanation.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+            taskGrid.ItemsSource = filtered;
+            taskStatus.Text = allTasks.Count == 0
+                ? "Nenhum inventário carregado."
+                : filtered.Count + " de " + allTasks.Count + " tarefas • " +
+                  allTasks.Count(x => x.Safety.IsProtected) + " protegidas • " +
+                  allTasks.Count(x => x.Safety.IsOptional) + " opcionais avaliadas • somente leitura";
+        }
+        taskSearch.TextChanged += (_, _) => RenderTasks();
+        taskGrid.SelectionChanged += (_, _) =>
+        {
+            if (taskGrid.SelectedItem is not WindowsScheduledTaskInfo selected)
+            {
+                taskDetails.Text = "Selecione uma tarefa para ver sua classificação e descrição.";
+                return;
+            }
+            taskDetails.Text = selected.FullName +
+                "\nEstado: " + selected.StateDisplay +
+                " • Autor: " + (string.IsNullOrWhiteSpace(selected.Author) ? "Não informado" : selected.Author) +
+                " • Último resultado: " + selected.LastResultDisplay +
+                "\nÚltima execução: " + selected.LastRunDisplay +
+                " • Próxima execução: " + selected.NextRunDisplay +
+                "\nPolítica: " + selected.Safety.Explanation +
+                (string.IsNullOrWhiteSpace(selected.Description) ? "" : "\nDescrição: " + selected.Description);
+        };
+        var taskButtons = new WrapPanel();
+        var refreshTasks = new Button { Content = "Consultar tarefas", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var cancelTasks = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var exportTasks = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+        var openTaskScheduler = new Button { Content = "Abrir taskschd.msc", Style = (Style)FindResource("QuietButton") };
+        refreshTasks.Click += async (_, _) =>
+        {
+            if (_scheduledTaskInventoryCts is not null) return;
+            var cts = new CancellationTokenSource();
+            _scheduledTaskInventoryCts = cts;
+            refreshTasks.IsEnabled = false;
+            cancelTasks.IsEnabled = true;
+            exportTasks.IsEnabled = false;
+            taskStatus.Text = "Consultando o Agendador de Tarefas. A primeira leitura pode levar alguns segundos…";
+            try
+            {
+                var captured = await WindowsScheduledTaskInventoryService.CaptureAsync(cts.Token);
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    allTasks = captured;
+                    RenderTasks();
+                    exportTasks.IsEnabled = allTasks.Count > 0;
+                    taskStatus.Text = allTasks.Count + " tarefas inventariadas • consulta somente leitura; nenhuma tarefa foi alterada.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Consulta cancelada. Nenhuma tarefa foi alterada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Inventário de tarefas agendadas falhou: " + ex);
+                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Falha na consulta: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_scheduledTaskInventoryCts, cts)) _scheduledTaskInventoryCts = null;
+                cts.Dispose();
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    refreshTasks.IsEnabled = true;
+                    cancelTasks.IsEnabled = false;
+                }
+            }
+        };
+        cancelTasks.Click += (_, _) => _scheduledTaskInventoryCts?.Cancel();
+        exportTasks.Click += (_, _) =>
+        {
+            if (allTasks.Count == 0) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar inventário de tarefas agendadas",
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = "ynoez-tarefas-agendadas.csv",
+                AddExtension = true,
+                DefaultExt = ".csv"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                File.WriteAllText(dialog.FileName, WindowsScheduledTaskInventoryService.BuildCsv(allTasks), new System.Text.UTF8Encoding(true));
+                taskStatus.Text = "Inventário de tarefas exportado: " + dialog.FileName;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao exportar inventário de tarefas: " + ex);
+                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        openTaskScheduler.Click += async (_, _) => await OpenTargetAsync("taskschd.msc");
+        taskButtons.Children.Add(refreshTasks);
+        taskButtons.Children.Add(cancelTasks);
+        taskButtons.Children.Add(exportTasks);
+        taskButtons.Children.Add(openTaskScheduler);
+        taskPanel.Children.Add(taskSearch);
+        taskPanel.Children.Add(taskStatus);
+        taskPanel.Children.Add(taskGrid);
+        taskPanel.Children.Add(taskDetails);
+        taskPanel.Children.Add(taskButtons);
+        taskCard.Child = taskPanel;
+        root.Children.Add(taskCard);
+
+        root.Children.Add(NoteCard("Ações de serviço e tarefas", "A Toolbox é somente leitura. A página Debloat contém listas curtas de seis serviços e seis tarefas opcionais, com backup, confirmação, verificação e restauração; não há desligamento em massa. Windows Search, impressão, Store, Defender, Firewall, Windows Update, manutenção, rede, áudio e anti-cheats permanecem protegidos."));
         RenderResults();
         return root;
     }
