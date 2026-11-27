@@ -1,3 +1,4 @@
+using System.Globalization;
 using Xunit;
 using ynoez.Services;
 
@@ -93,7 +94,9 @@ public sealed class WindowsScheduledTaskInventoryServiceTests
         var optional = tasks.Single(x => x.TaskName == "MapsUpdateTask");
         Assert.Equal("Pronta", optional.StateDisplay);
         Assert.Equal("Opcional avaliada", optional.Safety.Category);
-        Assert.Equal("27/11/2026 10:30:00", optional.LastRunDisplay);
+        var expectedLastRun = DateTimeOffset.Parse("2026-11-27T10:30:00-03:00", CultureInfo.InvariantCulture)
+            .ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.CurrentCulture);
+        Assert.Equal(expectedLastRun, optional.LastRunDisplay);
         Assert.Equal("Não agendada", optional.NextRunDisplay);
         Assert.Equal("0", optional.LastResultDisplay);
 
