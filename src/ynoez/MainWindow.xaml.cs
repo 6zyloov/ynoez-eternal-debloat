@@ -424,6 +424,11 @@ public partial class MainWindow : Window
         }, "ECONOMIA"));
         root.Children.Add(ActionCard("Restaurar plano original", "Restaura o GUID do plano que estava ativo antes do primeiro perfil ynoez e verifica o resultado.", "Restaurar original", () =>
         {
+            if (_autoProfileCts is not null)
+            {
+                MessageBox.Show("Pare os perfis automáticos antes de restaurar o plano original.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return Task.CompletedTask;
+            }
             MessageBox.Show(PowerProfileService.RestoreOriginal(), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "RESTAURAÇÃO"));
@@ -451,8 +456,10 @@ public partial class MainWindow : Window
                 await AutoProfileService.RunAsync(status =>
                 {
                     if (!Dispatcher.HasShutdownStarted)
-                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + status.Mode + " | Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") +
-                            " min" + (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : ""));
+                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + status.Mode +
+                            (status.UsedFallback ? " (plano efetivo: " + status.AppliedMode + ")" : "") +
+                            " | Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") + " min" +
+                            (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : ""));
                 }, token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -1138,9 +1145,14 @@ public partial class MainWindow : Window
         var root = PageContainer();
         root.Children.Add(PageIntro("Restore", "Abra a restauração do sistema ou recupere o plano de energia salvo anteriormente."));
         root.Children.Add(ActionCard("Restauração do Sistema", "Abre o utilitário nativo do Windows para escolher um ponto de restauração disponível.", "Abrir Restauração", () => OpenTargetAsync("rstrui.exe"), "WINDOWS"));
-        root.Children.Add(ActionCard("Restaurar plano de energia", "Reaplica o plano salvo antes da última alteração de Alto desempenho feita pelo ynoez.", "Restaurar plano", () =>
+        root.Children.Add(ActionCard("Restaurar plano de energia original", "Recupera o plano exportado antes do primeiro perfil manual do ynoez, com verificação e reimportação do arquivo .pow se necessário.", "Restaurar original", () =>
         {
-            var message = BackupService.RestorePreviousPowerScheme();
+            if (_autoProfileCts is not null)
+            {
+                MessageBox.Show("Pare os perfis automáticos antes de restaurar o plano original.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                return Task.CompletedTask;
+            }
+            var message = PowerProfileService.RestoreOriginal();
             MessageBox.Show(message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }, "REVERSÍVEL"));
@@ -1150,8 +1162,30 @@ public partial class MainWindow : Window
         var panel = new StackPanel { Margin = new Thickness(20) };
         panel.Children.Add(Heading("Backups locais", 15));
         panel.Children.Add(Body("Local: " + AppPaths.Backups));
+        panel.Children.Add(Body("Snapshots são inventários locais de hardware, plano de energia e configuração de rede. Não são uma imagem completa do Windows nem substituem um ponto de restauração ou backup externo."));
         if (backups.Count == 0) panel.Children.Add(Body("Nenhum snapshot criado ainda."));
-        foreach (var path in backups.Take(10)) panel.Children.Add(Body("• " + Path.GetFileName(path) + "  —  " + Directory.GetCreationTime(path).ToString("dd/MM/yyyy HH:mm")));
+        foreach (var path in backups.Take(10))
+        {
+            var snapshotPath = path;
+            panel.Children.Add(ActionCard(
+                Path.GetFileName(snapshotPath) + " — " + Directory.GetCreationTime(snapshotPath).ToString("dd/MM/yyyy HH:mm"),
+                "Verifica a presença, o tamanho e o SHA-256 dos arquivos capturados. A verificação é somente leitura.",
+                "Verificar integridade",
+                async () =>
+                {
+                    var result = await BackupService.VerifyLocalSnapshotAsync(snapshotPath);
+                    MessageBox.Show(result.Details, result.IsValid ? "Snapshot íntegro" : "Verificação do snapshot",
+                        MessageBoxButton.OK, result.IsValid ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                },
+                "SHA-256"));
+        }
+        var openBackupFolder = new Button { Content = "Abrir pasta Backups", Style = (Style)FindResource("QuietButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 10, 0, 0) };
+        openBackupFolder.Click += async (_, _) =>
+        {
+            try { await OpenTargetAsync(AppPaths.Backups); }
+            catch (Exception ex) { MessageBox.Show(ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+        panel.Children.Add(openBackupFolder);
         listCard.Child = panel;
         root.Children.Add(listCard);
         return root;

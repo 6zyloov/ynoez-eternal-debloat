@@ -251,6 +251,61 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public async Task SnapshotVerification_ConfirmsHashesAndDetectsChanges()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-snapshot-verify-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(root, "snapshot-test");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            const string content = "{\"adapter\":\"Ethernet\"}";
+            var file = Path.Combine(folder, "network.json");
+            await File.WriteAllTextAsync(file, content);
+            var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
+            var backup = new BackupResult
+            {
+                Folder = folder,
+                CreatedAt = DateTime.UtcNow,
+                Files = new[] { new BackupFileInfo("network.json", new FileInfo(file).Length, hash) }
+            };
+            await File.WriteAllTextAsync(Path.Combine(folder, "backup.json"),
+                System.Text.Json.JsonSerializer.Serialize(backup));
+
+            var valid = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.True(valid.IsValid);
+            Assert.Equal(1, valid.VerifiedFiles);
+
+            await File.WriteAllTextAsync(file, content + "tampered");
+            var invalid = await BackupService.VerifyLocalSnapshotAsync(folder, root);
+            Assert.False(invalid.IsValid);
+            Assert.Contains("tamanho diferente", invalid.Details, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SnapshotVerification_RejectsFoldersOutsideBackupRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-backup-root-" + Guid.NewGuid().ToString("N"));
+        var outside = Path.Combine(Path.GetTempPath(), "ynoez-snapshot-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(outside);
+        try
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => BackupService.VerifyLocalSnapshotAsync(outside, root));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            if (Directory.Exists(outside)) Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Fact]
     public void NetworkDiagnosticJitter_DoesNotBridgeAcrossFailedPings()
     {
         Assert.Null(NetworkDiagnosticService.CalculateJitter(new long?[] { 20, null, 170 }));

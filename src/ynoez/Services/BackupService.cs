@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 namespace ynoez.Services;
 
 public sealed record BackupFileInfo(string Name, long Length, string Sha256);
+public sealed record SnapshotVerificationResult(bool IsValid, int VerifiedFiles, string Details);
 
 public sealed class BackupResult
 {
@@ -90,6 +91,99 @@ public static class BackupService
             result.Add(new BackupFileInfo(info.Name, info.Length, Convert.ToHexString(hash).ToLowerInvariant()));
         }
         return result;
+    }
+
+    public static async Task<SnapshotVerificationResult> VerifyLocalSnapshotAsync(
+        string folder, string? backupsDirectory = null)
+    {
+        var root = Path.GetFullPath(backupsDirectory ?? AppPaths.Backups).TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var fullFolder = Path.GetFullPath(folder);
+        if (!string.Equals(Path.GetDirectoryName(fullFolder), root, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("O snapshot precisa estar diretamente dentro da pasta Backups do ynoez.");
+        if (!Directory.Exists(fullFolder))
+            throw new DirectoryNotFoundException("A pasta do snapshot não existe.");
+
+        var manifestPath = Path.Combine(fullFolder, "backup.json");
+        if (!File.Exists(manifestPath))
+            return new SnapshotVerificationResult(false, 0, "Manifesto backup.json ausente. O snapshot pode estar incompleto ou ser de uma versão antiga.");
+
+        BackupResult manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<BackupResult>(await File.ReadAllTextAsync(manifestPath), JsonOptions)
+                ?? throw new InvalidDataException("Manifesto de backup vazio.");
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidDataException)
+        {
+            return new SnapshotVerificationResult(false, 0, "Manifesto inválido: " + ex.Message);
+        }
+
+        if (string.IsNullOrWhiteSpace(manifest.Folder) ||
+            !string.Equals(Path.GetFullPath(manifest.Folder), fullFolder, StringComparison.OrdinalIgnoreCase))
+            return new SnapshotVerificationResult(false, 0, "O caminho registrado no manifesto não corresponde à pasta selecionada.");
+        if (manifest.Files is null || manifest.Files.Count == 0)
+            return new SnapshotVerificationResult(false, 0, "Este snapshot não contém hashes de integridade (formato antigo ou manifesto vazio).");
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var issues = new List<string>();
+        var verified = 0;
+        foreach (var file in manifest.Files)
+        {
+            if (string.IsNullOrWhiteSpace(file.Name) ||
+                file.Name is "." or ".." ||
+                !string.Equals(Path.GetFileName(file.Name), file.Name, StringComparison.Ordinal) ||
+                string.Equals(file.Name, "backup.json", StringComparison.OrdinalIgnoreCase) ||
+                !names.Add(file.Name))
+            {
+                issues.Add("Nome de arquivo inválido ou duplicado no manifesto.");
+                continue;
+            }
+            if (file.Length < 0 || file.Sha256.Length != 64 ||
+                !file.Sha256.All(Uri.IsHexDigit))
+            {
+                issues.Add(file.Name + ": metadados de hash/tamanho inválidos.");
+                continue;
+            }
+
+            var path = Path.Combine(fullFolder, file.Name);
+            if (!File.Exists(path))
+            {
+                issues.Add(file.Name + ": arquivo ausente.");
+                continue;
+            }
+
+            var info = new FileInfo(path);
+            if (info.Length != file.Length)
+            {
+                issues.Add(file.Name + ": tamanho diferente do manifesto.");
+                continue;
+            }
+
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                bufferSize: 64 * 1024, useAsync: true);
+            var hash = Convert.ToHexString(await SHA256.HashDataAsync(stream)).ToLowerInvariant();
+            if (!string.Equals(hash, file.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add(file.Name + ": SHA-256 não corresponde.");
+                continue;
+            }
+            verified++;
+        }
+
+        var actualNames = Directory.EnumerateFiles(fullFolder, "*", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .Where(name => !string.Equals(name, "backup.json", StringComparison.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var untracked in actualNames.Except(names, StringComparer.OrdinalIgnoreCase))
+            issues.Add(untracked + ": arquivo fora do manifesto.");
+
+        return new SnapshotVerificationResult(
+            issues.Count == 0 && verified == manifest.Files.Count,
+            verified,
+            issues.Count == 0
+                ? "Integridade confirmada: " + verified + " arquivos correspondem ao tamanho e ao SHA-256 do manifesto."
+                : string.Join(Environment.NewLine, issues));
     }
 
     private static async Task WriteTextAtomicallyAsync(string path, string content)
