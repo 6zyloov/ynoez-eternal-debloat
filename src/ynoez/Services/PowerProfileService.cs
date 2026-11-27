@@ -8,7 +8,7 @@ namespace ynoez.Services;
 public enum PowerProfileMode { Performance, Balanced, Afk }
 
 public sealed record PowerProfileState(string Mode, string AppliedGuid, DateTimeOffset AppliedAt);
-public sealed record PowerProfileBackup(string OriginalGuid, DateTimeOffset SavedAt);
+public sealed record PowerProfileBackup(string OriginalGuid, DateTimeOffset SavedAt, string? ExportPath = null);
 
 public static class PowerProfileService
 {
@@ -29,7 +29,14 @@ public static class PowerProfileService
     {
         var current = GetActiveSchemeGuid();
         if (!File.Exists(BaseBackupPath))
-            WriteAtomic(BaseBackupPath, JsonSerializer.Serialize(new PowerProfileBackup(current, DateTimeOffset.UtcNow), JsonOptions));
+        {
+            Directory.CreateDirectory(AppPaths.Backups);
+            var exportPath = Path.Combine(AppPaths.Backups, "power-profile-base-" + current + ".pow");
+            var export = RunPowerCfg("/export " + Quote(exportPath) + " " + current);
+            if (export.ExitCode != 0 || !File.Exists(exportPath))
+                throw new InvalidOperationException("Não foi possível exportar o plano original antes da alteração. Nenhum perfil foi aplicado. " + export.Error);
+            WriteAtomic(BaseBackupPath, JsonSerializer.Serialize(new PowerProfileBackup(current, DateTimeOffset.UtcNow, exportPath), JsonOptions));
+        }
 
         var alias = mode switch
         {
@@ -67,6 +74,13 @@ public static class PowerProfileService
             throw new InvalidDataException("GUID do plano original inválido.");
 
         var result = RunPowerCfg("/setactive " + backup.OriginalGuid);
+        if (result.ExitCode != 0 && !string.IsNullOrWhiteSpace(backup.ExportPath) && File.Exists(backup.ExportPath))
+        {
+            var import = RunPowerCfg("/import " + Quote(backup.ExportPath) + " " + backup.OriginalGuid);
+            if (import.ExitCode != 0)
+                throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
+            result = RunPowerCfg("/setactive " + backup.OriginalGuid);
+        }
         if (result.ExitCode != 0)
             throw new InvalidOperationException("Falha ao restaurar o plano original: " + result.Error);
 
@@ -114,6 +128,8 @@ public static class PowerProfileService
         process.WaitForExit();
         return (process.ExitCode, outputTask.GetAwaiter().GetResult(), errorTask.GetAwaiter().GetResult());
     }
+
+    private static string Quote(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
 
     private static void WriteAtomic(string path, string content)
     {
