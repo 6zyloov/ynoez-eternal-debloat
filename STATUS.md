@@ -12,7 +12,8 @@
 - Perfis manuais Performance, Equilibrado e AFK, com backup do plano original.
 - Perfil automático por jogo conhecido e inatividade do teclado/mouse: Performance durante jogos com entrada ativa, Equilibrado no uso comum e AFK após 15 minutos sem entrada. Não encerra processos. Exporta o plano original e restaura ao parar; tenta recuperar sessões interrompidas na próxima inicialização. AFK bloqueia suspensão automática enquanto o app está aberto, sem impedir que a tela apague.
 - Monitor ao vivo de CPU/RAM via APIs nativas e GPU 3D via NVIDIA SMI ou WMI GPU Engine. Temperatura/VRAM/potência dependem do suporte NVIDIA; não instala drivers de sensor.
-- Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV + resumo JSON, FPS médio, 1% low (inverso do P99), 0,1% low (inverso do P99,9), frametime médio, p99/p99,9 e frames lentos. Sessões A/B com três rodadas em cada fase, mediana, dispersão e JSON persistente. A série não controla a cena, mapa, temperatura ou processos do PC. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
+- Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV + resumo JSON, FPS médio, 1% low (inverso do P99), 0,1% low (inverso do P99,9), frametime médio, p99/p99,9 e frames lentos. Sessões A/B com três rodadas em cada fase, mediana, dispersão e JSON persistente. A série não controla a cena, mapa, temperatura ou processos do PC.
+- Verificador manual de atualização: consulta somente quando solicitado o endpoint de release estável oficial do GitHub, valida tag/URL/repositório e apenas abre a página oficial quando há versão mais nova; não baixa nem instala automaticamente. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
 - Diagnóstico de rede: ICMP, TCP/443, DNS IPv4/IPv6 e tracert.
 - Monitoramento contínuo a cada 5 segundos com gateway IPv4 dinâmico, ICMP/TCP para Cloudflare e Google, resolução DNS, janela móvel real de 60 segundos e hipótese de causa, com exportação CSV.
 - Inventário de adaptadores físicos e virtuais com endereços, DNS, gateways, MTU e versão de driver quando o WMI informa; exportação CSV, somente leitura. Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
@@ -32,7 +33,7 @@
 - A telemetria de GPU depende do driver/Windows; temperatura de CPU e sensores AMD/Intel ainda não estão integrados.
 - O benchmark precisa ser testado com jogos reais; PresentMon exige permissão ETW e não mede ganho causado por tweaks sozinho.
 - O monitor de rede ajuda a separar ICMP de TCP e gateway de destino, mas não determina sozinho a causa de desconexões do roteador/ISP.
-- Ainda falta validação física com Vanguard/FACEIT, instalador/atualizador/desinstalador e teste de recuperação em Windows real.
+- Ainda falta validação física com Vanguard/FACEIT, assinatura Authenticode e teste de recuperação em Windows real. O verificador de versões não substitui assinatura nem atualização automática.
 
 ## Limites adicionais
 - Snapshots locais são inventários de hardware/energia/rede com hashes de integridade; não são uma imagem completa do Windows nem substituem backup externo.

@@ -27,9 +27,11 @@ public sealed class BenchmarkSessionService
     private const int CurrentSchema = 1;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly string _directory;
+    private readonly bool _writeApplicationLog;
 
     public BenchmarkSessionService(string? directory = null)
     {
+        _writeApplicationLog = directory is null;
         _directory = directory ?? Path.Combine(AppPaths.Logs, "BenchmarkSessions");
         Directory.CreateDirectory(_directory);
     }
@@ -45,7 +47,7 @@ public sealed class BenchmarkSessionService
             LimitNotes(sceneNotes), now, now, runs.ToArray(), Array.Empty<FrameBenchmarkSummary>(),
             "", null);
         Write(session);
-        AppLog.Write("Referência de benchmark salva: " + session.Id + " (" + processName + ", 3 rodadas).");
+        Log("Referência de benchmark salva: " + session.Id + " (" + processName + ", 3 rodadas).");
         return session;
     }
 
@@ -66,7 +68,7 @@ public sealed class BenchmarkSessionService
             }
             catch (Exception ex)
             {
-                AppLog.Write("Sessão de benchmark ignorada (" + Path.GetFileName(path) + "): " + ex.Message);
+                Log("Sessão de benchmark ignorada (" + Path.GetFileName(path) + "): " + ex.Message);
             }
         }
         return sessions.OrderByDescending(x => x.CreatedAt).FirstOrDefault();
@@ -88,7 +90,7 @@ public sealed class BenchmarkSessionService
         };
         Write(updated);
         var comparison = Compare(updated);
-        AppLog.Write("Comparação A/B concluída: " + updated.ProcessName + " • " +
+        Log("Comparação A/B concluída: " + updated.ProcessName + " • " +
             comparison.Changes.AverageFpsChangePercent.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "% FPS médio mediano.");
         return comparison;
     }
@@ -150,8 +152,30 @@ public sealed class BenchmarkSessionService
             !Guid.TryParseExact(session.Id, "N", out _) ||
             !string.Equals(Path.GetFullPath(path), Path.GetFullPath(GetSessionPath(session.Id)), StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Identidade ou versão da sessão de benchmark inválida.");
-        if (session.BaselineRuns is null || session.AfterRuns is null)
-            throw new InvalidDataException("A sessão não contém listas de capturas válidas.");
+        if (string.IsNullOrWhiteSpace(session.ProcessName) ||
+            session.DurationSeconds is not 30 and not 60 and not 120 and not 180 ||
+            session.SceneNotes is null || session.AfterSceneNotes is null ||
+            session.BaselineRuns is null || session.AfterRuns is null)
+            throw new InvalidDataException("Os metadados ou as listas da sessão de benchmark são inválidos.");
+        ValidateMetricSamples(session.BaselineRuns);
+        if (session.BaselineRuns.Length != RequiredRuns ||
+            session.BaselineRuns.Any(x => !string.Equals(x.ProcessName, session.ProcessName, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidDataException("As três capturas de referência não correspondem ao jogo registrado.");
+        if (session.AfterRuns.Length != 0 && session.AfterRuns.Length != RequiredRuns)
+            throw new InvalidDataException("A fase pós-ajustes precisa conter zero ou três capturas, nunca uma série parcial.");
+        if (session.AfterRuns.Length == RequiredRuns)
+        {
+            ValidateMetricSamples(session.AfterRuns);
+            if (session.AfterRuns.Any(x => !string.Equals(x.ProcessName, session.ProcessName, StringComparison.OrdinalIgnoreCase)) ||
+                session.CompletedAt is null)
+                throw new InvalidDataException("As capturas pós-ajustes não correspondem ao jogo ou a sessão não foi concluída.");
+        }
+        else if (session.CompletedAt is not null)
+        {
+            throw new InvalidDataException("A sessão está marcada como concluída, mas não contém três capturas pós-ajustes.");
+        }
+        _ = LimitNotes(session.SceneNotes);
+        _ = LimitNotes(session.AfterSceneNotes);
         return session;
     }
 
@@ -209,6 +233,11 @@ public sealed class BenchmarkSessionService
         var values = source.ToArray();
         var median = Median(values);
         return median <= 0 ? 0 : (values.Max() - values.Min()) / median * 100d;
+    }
+
+    private void Log(string message)
+    {
+        if (_writeApplicationLog) AppLog.Write(message);
     }
 
     private static double PercentChange(double current, double baseline) =>

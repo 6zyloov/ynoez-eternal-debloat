@@ -168,6 +168,65 @@ public partial class MainWindow : Window
         info.Child = panel;
         root.Children.Add(info);
 
+        var updateCard = MakeCard();
+        var updatePanel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
+        updatePanel.Children.Add(Heading("Atualizações", 15));
+        updatePanel.Children.Add(Body("A verificação consulta a release estável do repositório oficial somente quando você clica. O ynoez não envia inventário nem instala atualização em segundo plano."));
+        var updateStatus = Body("Última verificação ainda não realizada.");
+        var updateButtonRow = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var checkUpdate = new Button { Content = "Verificar atualização", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+        var openRelease = new Button { Content = "Abrir release oficial", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+        UpdateCheckResult? latestUpdate = null;
+        checkUpdate.Click += async (_, _) =>
+        {
+            checkUpdate.IsEnabled = false;
+            openRelease.IsEnabled = false;
+            updateStatus.Text = "Consultando a release estável do GitHub…";
+            try
+            {
+                latestUpdate = await UpdateService.CheckLatestAsync();
+                if (latestUpdate is null)
+                {
+                    updateStatus.Text = "Nenhuma release estável foi publicada ainda.";
+                }
+                else if (latestUpdate.IsUpdateAvailable)
+                {
+                    updateStatus.Text = "Atualização disponível: " + latestUpdate.CurrentVersion + " → " + latestUpdate.LatestVersion +
+                        (latestUpdate.PublishedAt.HasValue ? " • publicada em " + latestUpdate.PublishedAt.Value.ToLocalTime().ToString("dd/MM/yyyy") : "") +
+                        "\nO download é manual pela página oficial. Confira a versão e o arquivo antes de instalar.";
+                    openRelease.IsEnabled = true;
+                }
+                else
+                {
+                    updateStatus.Text = "Você já está usando a versão mais recente (" + latestUpdate.CurrentVersion + ").";
+                }
+                AppLog.Write("Verificação manual de atualização concluída: " +
+                    (latestUpdate?.LatestVersion ?? "sem release estável") + ".");
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Verificação de atualização falhou: " + ex);
+                updateStatus.Text = "Não foi possível consultar o GitHub: " + ex.Message;
+            }
+            finally { checkUpdate.IsEnabled = true; }
+        };
+        openRelease.Click += (_, _) =>
+        {
+            if (latestUpdate is null || !latestUpdate.IsUpdateAvailable) return;
+            try { UpdateService.OpenOfficialRelease(latestUpdate); }
+            catch (Exception ex)
+            {
+                AppLog.Write("Abertura da release oficial falhou: " + ex);
+                MessageBox.Show("Não foi possível abrir a página oficial: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        updateButtonRow.Children.Add(checkUpdate);
+        updateButtonRow.Children.Add(openRelease);
+        updatePanel.Children.Add(updateStatus);
+        updatePanel.Children.Add(updateButtonRow);
+        updateCard.Child = updatePanel;
+        root.Children.Add(updateCard);
+
         var actions = new WrapPanel { Margin = new Thickness(0, 15, 0, 0) };
         actions.Children.Add(SmallAction("Abrir Toolbox", () => ShowPage("Toolbox")));
         actions.Children.Add(SmallAction("Diagnosticar Rede", () => ShowPage("Network")));

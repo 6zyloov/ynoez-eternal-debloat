@@ -760,6 +760,33 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void UpdateService_ParsesStableReleaseAndComparesVersions()
+    {
+        const string json = "{\"tag_name\":\"v0.4.0\",\"html_url\":\"https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0\",\"published_at\":\"2026-11-27T12:00:00Z\",\"draft\":false,\"prerelease\":false,\"body\":\"Melhorias e correções.\"}";
+        var update = UpdateService.ParseLatestRelease(json, "0.3.0");
+
+        Assert.Equal("0.3.0", update.CurrentVersion);
+        Assert.Equal("0.4.0", update.LatestVersion);
+        Assert.True(update.IsUpdateAvailable);
+        Assert.Equal("v0.4.0", update.TagName);
+        Assert.Contains("Melhorias", update.ReleaseNotes);
+    }
+
+    [Fact]
+    public void UpdateService_ReportsCurrentVersionAndRejectsUntrustedReleaseUrls()
+    {
+        const string json = "{\"tag_name\":\"v0.3.0\",\"html_url\":\"https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.3.0\",\"draft\":false,\"prerelease\":false}";
+        var update = UpdateService.ParseLatestRelease(json, "0.3.0");
+
+        Assert.False(update.IsUpdateAvailable);
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseLatestRelease(
+            "{\"tag_name\":\"v0.4.0\",\"html_url\":\"https://example.invalid/releases/tag/v0.4.0\",\"draft\":false,\"prerelease\":false}", "0.3.0"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseLatestRelease(
+            "{\"tag_name\":\"v0.4.0-beta\",\"html_url\":\"https://github.com/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0-beta\",\"draft\":false,\"prerelease\":false}", "0.3.0"));
+        Assert.Throws<InvalidDataException>(() => UpdateService.ParseReleaseUrl("https://github.com.evil.invalid/6zyloov/ynoez-eternal-debloat/releases/tag/v0.4.0"));
+    }
+
+    [Fact]
     public void BenchmarkSessions_UsesMediansAndComparesThreeRunsPerPhase()
     {
         var directory = Path.Combine(Path.GetTempPath(), "ynoez-benchmark-session-" + Guid.NewGuid().ToString("N"));
