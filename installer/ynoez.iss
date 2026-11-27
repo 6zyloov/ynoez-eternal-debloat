@@ -4,7 +4,7 @@
 #define MyAppURL "https://github.com/6zyloov/ynoez-eternal-debloat"
 
 [Setup]
-AppId={{A79D82E6-81F5-4A61-9DB2-5CBF90E08F44}}
+AppId={{A79D82E6-81F5-4A61-9DB2-5CBF90E08F44}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
