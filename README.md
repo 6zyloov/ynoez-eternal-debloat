@@ -62,7 +62,7 @@ O executável autocontido será gerado em `dist\ynoez.exe`. Para instalar em `C:
 
 ## Próximas etapas
 
-Ainda faltam remoção AppX/provisioned com recuperação confiável, arquitetura MVVM/DI, maior cobertura de falhas/concorrência, assinatura Authenticode e validação física de compatibilidade. Remoção AppX não é disponibilizada enquanto não houver rollback confiável. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
+Ainda faltam remoção AppX/provisioned com recuperação confiável, arquitetura MVVM/DI, assinatura Authenticode e validação física de compatibilidade. A remoção AppX continua indisponível enquanto não houver rollback confiável. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
 
 ## Licença
 

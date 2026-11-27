@@ -34,7 +34,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             MessageBox.Show(
-                "O ynoez não conseguiu preparar C:\\ynoez. Verifique as permissões da pasta e tente executar o instalador oficial novamente.\\n\\n" +
+                "O ynoez não conseguiu preparar C:\\ynoez. Verifique as permissões da pasta e tente executar o instalador oficial novamente.\n\n" +
                 ex.Message,
                 "ynoez — inicialização", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(-1);
@@ -50,8 +50,8 @@ public partial class App : Application
         {
             AppLog.Write("A recuperação de uma sessão automática anterior falhou: " + ex);
             MessageBox.Show(
-                "O ynoez encontrou uma sessão automática anterior que não pôde ser restaurada. O backup foi preservado.\\n\\n" +
-                ex.Message + "\\n\\nNão inicie uma nova automação até resolver a restauração.",
+                "O ynoez encontrou uma sessão automática anterior que não pôde ser restaurada. O backup foi preservado.\n\n" +
+                ex.Message + "\n\nNão inicie uma nova automação até resolver a restauração.",
                 "ynoez — recuperação de energia", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -65,8 +65,8 @@ public partial class App : Application
         try
         {
             MessageBox.Show(
-                "O ynoez encontrou um erro inesperado e será fechado para evitar continuar com estado interno inconsistente.\\n\\n" +
-                "O diagnóstico foi salvo em C:\\ynoez\\Logs.\\n\\n" + e.Exception.Message,
+                "O ynoez encontrou um erro inesperado e será fechado para evitar continuar com estado interno inconsistente.\n\n" +
+                "O diagnóstico foi salvo em C:\\ynoez\\Logs.\n\n" + e.Exception.Message,
                 "ynoez — erro inesperado", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         catch { }

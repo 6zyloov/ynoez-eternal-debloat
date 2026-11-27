@@ -63,7 +63,7 @@ $vbsStatus = $null
 $hvciConfigured = $null
 $hvciRunning = $null
 try {
-    $g = Get-CimInstance -Namespace rootMicrosoftWindowsDeviceGuard -ClassName Win32_DeviceGuard -ErrorAction Stop
+    $g = Get-CimInstance -Namespace root\Microsoft\Windows\DeviceGuard -ClassName Win32_DeviceGuard -ErrorAction Stop
     $vbsStatus = [int]$g.VirtualizationBasedSecurityStatus
     $hvciConfigured = (@($g.SecurityServicesConfigured) -contains 2)
     $hvciRunning = (@($g.SecurityServicesRunning) -contains 2)
