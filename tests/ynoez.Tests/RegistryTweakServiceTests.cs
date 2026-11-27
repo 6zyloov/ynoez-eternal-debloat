@@ -355,6 +355,49 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void AdapterPowerRestoreInventory_ListsValidBackupAndRejectsCorruptFile()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "ynoez-adapter-restore-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var service = new AdapterPowerManagementService(directory);
+            var backup = new AdapterPowerBackup("Ethernet", "Enabled", "Disabled", DateTimeOffset.UtcNow);
+            File.WriteAllText(Path.Combine(directory, "Ethernet.json"), System.Text.Json.JsonSerializer.Serialize(backup));
+            Assert.Equal(backup, Assert.Single(service.GetPendingRestores()));
+
+            File.WriteAllText(Path.Combine(directory, "broken.json"), "{corrupt");
+            Assert.Throws<InvalidDataException>(() => service.GetPendingRestores());
+            Assert.True(File.Exists(Path.Combine(directory, "broken.json")));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void OptionalServiceRestoreInventory_ExposesOnlyWhitelistedBackups()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "ynoez-service-restore-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var backup = new OptionalServiceBackup("DiagTrack", "Manual", false, false, DateTimeOffset.UtcNow);
+            File.WriteAllText(Path.Combine(directory, "DiagTrack.json"), System.Text.Json.JsonSerializer.Serialize(backup));
+            var manager = new ServiceTweakService(directory);
+
+            Assert.Equal("DiagTrack", Assert.Single(manager.GetPendingRestoreDefinitions()).Name);
+            Assert.True(manager.CanRestore("DiagTrack"));
+            Assert.Throws<InvalidOperationException>(() => manager.CanRestore("WSearch"));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void NetworkStatistics_CalculateErrorAndDiscardRatesSafely()
     {
         Assert.Equal(5.2631579, NetworkAdapterStatisticsService.CalculateProblemPercent(900, 20, 30)!.Value, 5);

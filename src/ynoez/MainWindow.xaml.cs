@@ -1202,6 +1202,13 @@ public partial class MainWindow : Window
                 root.Children.Add(NoteCard("Serviços", "Nenhum serviço opcional desativado pelo ynoez está aguardando restauração."));
             foreach (var service in pending)
             {
+                if (!service.Available)
+                {
+                    root.Children.Add(NoteCard(service.Definition.DisplayName + " — backup preservado",
+                        service.Definition.Description + "\n" + service.State +
+                        "\nO serviço não pode ser consultado neste momento. O backup não será apagado."));
+                    continue;
+                }
                 root.Children.Add(ActionCard(service.Definition.DisplayName,
                     service.Definition.Description + "\nEstado atual: " + service.State +
                     "\nInicialização atual: " + service.StartMode,
@@ -1220,6 +1227,35 @@ public partial class MainWindow : Window
         {
             AppLog.Write("Central de restauração dos serviços falhou: " + ex);
             root.Children.Add(NoteCard("Backups de serviços precisam de atenção", ex.Message));
+        }
+
+        root.Children.Add(Heading("Energia dos adaptadores de rede", 15));
+        try
+        {
+            var manager = new AdapterPowerManagementService();
+            var pending = manager.GetPendingRestores();
+            if (pending.Count == 0)
+                root.Children.Add(NoteCard("Adaptadores", "Nenhuma alteração de economia de energia está aguardando restauração."));
+            foreach (var backup in pending)
+            {
+                root.Children.Add(ActionCard(backup.Name,
+                    "Selective Suspend original: " + backup.SelectiveSuspend +
+                    "\nDevice Sleep on Disconnect original: " + backup.DeviceSleepOnDisconnect,
+                    "Restaurar energia original", async () =>
+                    {
+                        if (MessageBox.Show("Restaurar as opções originais de energia do adaptador \"" + backup.Name + "\"? Pode ser solicitado UAC.",
+                            "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                            return;
+                        await Task.Run(() => manager.Restore(backup.Name));
+                        MessageBox.Show("Energia original do adaptador restaurada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ShowPage("Restore");
+                    }, "BACKUP"));
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Central de restauração dos adaptadores falhou: " + ex);
+            root.Children.Add(NoteCard("Backups dos adaptadores precisam de atenção", ex.Message));
         }
 
         root.Children.Add(Heading("Tarefas agendadas opcionais", 15));

@@ -61,6 +61,40 @@ public sealed class AdapterPowerManagementService
         || string.Equals(adapter.DeviceSleepOnDisconnect, "Enabled", StringComparison.OrdinalIgnoreCase);
 
     public bool CanRestore(string adapterName) => File.Exists(GetBackupPath(adapterName));
+    public IReadOnlyList<AdapterPowerBackup> GetPendingRestores()
+    {
+        if (!Directory.Exists(_backupDirectory)) return Array.Empty<AdapterPowerBackup>();
+        var result = new List<AdapterPowerBackup>();
+        foreach (var path in Directory.EnumerateFiles(_backupDirectory, "*.json", SearchOption.TopDirectoryOnly))
+        {
+            AdapterPowerBackup backup;
+            try
+            {
+                backup = JsonSerializer.Deserialize<AdapterPowerBackup>(File.ReadAllText(path), JsonOptions)
+                    ?? throw new InvalidDataException("Backup de adaptador vazio.");
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Backup de energia de adaptador inválido (" + Path.GetFileName(path) + "): " + ex.Message);
+                throw new InvalidDataException("O backup de energia de adaptador está corrompido; ele foi preservado: " + path, ex);
+            }
+
+            ValidateName(backup.Name);
+            if (!string.Equals(Path.GetFullPath(path), Path.GetFullPath(GetBackupPath(backup.Name)), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("O nome do adaptador não corresponde ao caminho do backup: " + path);
+            if (!IsKnownPowerSetting(backup.SelectiveSuspend) || !IsKnownPowerSetting(backup.DeviceSleepOnDisconnect))
+                throw new InvalidDataException("O backup contém um estado de energia desconhecido: " + path);
+            result.Add(backup);
+        }
+        return result.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static bool IsKnownPowerSetting(string value) =>
+        value.Equals("Enabled", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("Disabled", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("Unsupported", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("Unknown", StringComparison.OrdinalIgnoreCase);
+
 
     public void ReducePowerSaving(AdapterPowerStatus adapter)
     {

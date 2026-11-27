@@ -46,17 +46,40 @@ public sealed class ServiceTweakService
 
     public static IReadOnlyList<OptionalServiceDefinition> GetCatalog() => Catalog;
 
+    public static IReadOnlyList<OptionalServiceDefinition> GetCatalog() => Catalog;
+
+    public bool CanRestore(string name)
+    {
+        Validate(name);
+        return File.Exists(GetBackupPath(name));
+    }
+
+    public IReadOnlyList<OptionalServiceDefinition> GetPendingRestoreDefinitions() =>
+        Catalog.Where(x => CanRestore(x.Name)).ToArray();
+
     public IReadOnlyList<OptionalServiceStatus> GetStatuses()
     {
         var result = new List<OptionalServiceStatus>();
         foreach (var definition in Catalog)
         {
-            var info = ReadService(definition.Name);
-            if (info is null) continue;
+            var hasBackup = CanRestore(definition.Name);
             OptionalServiceBackup? backup = null;
-            var hasBackup = File.Exists(GetBackupPath(definition.Name));
-            try { backup = ReadBackup(definition.Name); }
-            catch (Exception ex) { AppLog.Write("Backup de serviço inválido (" + definition.Name + "): " + ex.Message); }
+            if (hasBackup)
+            {
+                try { backup = ReadBackup(definition.Name); }
+                catch (Exception ex) { AppLog.Write("Backup de serviço inválido (" + definition.Name + "): " + ex.Message); }
+            }
+
+            var info = ReadService(definition.Name);
+            if (info is null)
+            {
+                // Keep orphaned recovery files visible even when the service is gone or WMI cannot read it.
+                if (hasBackup)
+                    result.Add(new OptionalServiceStatus(definition, false, "Não encontrado ou consulta indisponível",
+                        "Indisponível", false, true, backup?.WasRunning ?? false));
+                continue;
+            }
+
             result.Add(new OptionalServiceStatus(definition, true, info.Value.State, info.Value.StartMode,
                 info.Value.Delayed, hasBackup, backup?.WasRunning ?? false));
         }
