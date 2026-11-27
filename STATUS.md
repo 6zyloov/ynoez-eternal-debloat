@@ -51,6 +51,6 @@
 1. Validar o modo AFK protegido com Roblox/automação real, mudanças de estado do processo e retomada após suspensão/cancelamento.
 2. Comparação A/B repetida e controlada de benchmarks por jogo, agregação de várias sessões e controle/registro de cena, temperaturas e processos concorrentes.
 3. Inventário AppX/Win32/provisionados e remoção só quando houver pacote de recuperação confiável.
-3. Diagnóstico de NIC mais completo (driver, EEE, interrupt moderation e propriedades avançadas) com recomendações condicionais.
+4. Diagnóstico de NIC mais completo (driver, EEE, interrupt moderation e propriedades avançadas) com recomendações condicionais.
 5. Migrar code-behind para MVVM/DI e ampliar testes de falhas, concorrência e recuperação após crash.
 6. Atualizador com validação criptográfica, assinatura Authenticode e testes físicos em hardware real.
