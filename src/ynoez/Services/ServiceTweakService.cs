@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
@@ -90,6 +91,11 @@ public sealed class ServiceTweakService
                 throw new InvalidOperationException("O serviço continuou em execução; o backup foi mantido para recuperação.");
             AppLog.Write("Serviço opcional desativado: " + definition.Name);
         }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            try { File.Delete(backupPath); } catch { }
+            throw new OperationCanceledException("A elevação foi cancelada. Nenhuma alteração foi aplicada.", ex);
+        }
         catch
         {
             // Keep the backup if any part of the operation is uncertain.
@@ -113,6 +119,7 @@ public sealed class ServiceTweakService
 
         var after = ReadService(definition.Name);
         if (after is null || !string.Equals(after.Value.StartMode, backup.StartMode, StringComparison.OrdinalIgnoreCase)
+            || after.Value.Delayed != backup.DelayedAutoStart
             || (backup.WasRunning && !string.Equals(after.Value.State, "Running", StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("A verificação da restauração do serviço falhou; o backup foi mantido.");
 

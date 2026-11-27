@@ -135,6 +135,28 @@ public sealed class RegistryTweakServiceTests
     }
 
 
+
+    [Fact]
+    public void OptionalServiceCatalog_ExcludesProtectedWindowsAndAntiCheatServices()
+    {
+        var names = ServiceTweakService.GetCatalog().Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.NotEmpty(names);
+        Assert.DoesNotContain("WSearch", names);
+        Assert.DoesNotContain("Spooler", names);
+        Assert.DoesNotContain("WinDefend", names);
+        Assert.DoesNotContain("wuauserv", names);
+        Assert.DoesNotContain("vgc", names);
+        Assert.DoesNotContain("FaceitService", names);
+    }
+
+    [Fact]
+    public void OptionalServiceManager_RejectsProtectedServiceEvenIfRequestedDirectly()
+    {
+        var manager = new ServiceTweakService(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
+        var protectedService = new OptionalServiceDefinition("WSearch", "Windows Search", "Protected", "High");
+        Assert.Throws<InvalidOperationException>(() => manager.Disable(protectedService));
+    }
+
     [Fact]
     public void PresentMonCsvParser_ComputesAverageAndOnePercentLow()
     {
