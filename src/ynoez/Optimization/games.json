@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "idleThresholdMinutes": 15,
+  "pollIntervalSeconds": 15,
+  "processNames": [
+    "RobloxPlayerBeta",
+    "VALORANT-Win64-Shipping",
+    "cs2",
+    "FortniteClient-Win64-Shipping",
+    "r5apex",
+    "GTA5",
+    "League of Legends",
+    "Overwatch",
+    "Minecraft",
+    "javaw"
+  ],
+  "policy": {
+    "neverTerminateProcesses": true,
+    "neverChangeAntiCheatSecuritySettings": true,
+    "afkMayUsePowerSaverWhileGamesRemainOpen": true
+  }
+}
