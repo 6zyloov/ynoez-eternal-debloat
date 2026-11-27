@@ -136,7 +136,7 @@ public static class WindowsServiceInventoryService
     {
         cancellationToken.ThrowIfCancellationRequested();
         var scope = new ManagementScope(@"\\.\root\CIMV2");
-        var options = new EnumerationOptions
+        var options = new System.Management.EnumerationOptions
         {
             ReturnImmediately = false,
             Rewindable = false,
