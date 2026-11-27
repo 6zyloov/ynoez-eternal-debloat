@@ -7,7 +7,7 @@ Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual tom
 - Projeto: `src/ynoez/`
 - Compilação Windows: `build.bat` ou `scripts/publish.ps1`
 - Instalação local: `scripts/install.ps1`
-- Publicação de builds: `.github/workflows/build.yml` (artefatos win-x64); releases estáveis por tag `vX.Y.Z` em `.github/workflows/release.yml`
+- Publicação de builds: `.github/workflows/build.yml` (artefatos win-x64); releases estáveis por tag `vX.Y.Z` em `.github/workflows/release.yml`; a versão é lida de `<Version>` no `src/ynoez/ynoez.csproj` e propagada para o instalador, metadados PE e nome do pacote.
 - Instalação: `C:\ynoez\`, com `Toolbox\`, `Data\`, `Backups\`, `Logs\` e `Downloads\` na mesma raiz.
 
 ## Estado do aplicativo — 0.3.0 (em desenvolvimento)

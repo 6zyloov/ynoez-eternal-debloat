@@ -1,13 +1,12 @@
 #define MyAppName "ynoez"
-#define MyAppVersion "0.3.0"
 #define MyAppPublisher "ynoez"
 #define MyAppURL "https://github.com/6zyloov/ynoez-eternal-debloat"
 
 [Setup]
 AppId={{A79D82E6-81F5-4A61-9DB2-5CBF90E08F44}
 AppName={#MyAppName}
-AppVersion={#MyAppVersion}
-AppVerName={#MyAppName} {#MyAppVersion}
+AppVersion=__APP_VERSION__
+AppVerName={#MyAppName} __APP_VERSION__
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 DefaultDirName=C:\ynoez
@@ -15,16 +14,16 @@ DisableDirPage=yes
 DefaultGroupName=ynoez
 DisableProgramGroupPage=yes
 OutputDir=..\artifacts
-OutputBaseFilename=ynoez-setup-0.3.0
+OutputBaseFilename=ynoez-setup-__APP_VERSION__
 SetupLogging=yes
 Uninstallable=yes
 UninstallDisplayName=ynoez
 UninstallDisplayIcon={app}\ynoez.exe
-VersionInfoVersion=0.3.0.0
+VersionInfoVersion=__APP_VERSION_QUAD__
 VersionInfoProductName=ynoez
 VersionInfoCompany=ynoez
 ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 CloseApplications=yes
 RestartApplications=no
