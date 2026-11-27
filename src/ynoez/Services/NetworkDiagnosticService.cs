@@ -6,9 +6,9 @@ using System.Text;
 
 namespace ynoez.Services;
 
-public sealed record PingSummary(string Target, int Sent, int Received, double LossPercent, double AverageMs, double MinimumMs, double MaximumMs, double JitterMs)
+public sealed record PingSummary(string Target, int Sent, int Received, double LossPercent, double AverageMs, double MinimumMs, double MaximumMs, double? JitterMs)
 {
-    public string ToDisplay() => $"{Target}: {AverageMs:0.0} ms médio | mín {MinimumMs:0.0} | máx {MaximumMs:0.0} | jitter {JitterMs:0.0} ms | perda {LossPercent:0.#}% ({Received}/{Sent})";
+    public string ToDisplay() => $"{Target}: {AverageMs:0.0} ms médio | mín {MinimumMs:0.0} | máx {MaximumMs:0.0} | jitter {(JitterMs.HasValue ? JitterMs.Value.ToString("0.0") + " ms" : "—")} | perda {LossPercent:0.#}% ({Received}/{Sent})";
 }
 
 public static class NetworkDiagnosticService
