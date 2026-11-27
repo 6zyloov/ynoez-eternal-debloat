@@ -100,15 +100,13 @@ public static class AutoProfileService
         if (idleTime < TimeSpan.Zero)
             idleTime = TimeSpan.Zero;
 
-        // A user is allowed to be AFK while a game or an explicitly protected task
-        // is doing useful work. In that case use Balanced + a sleep-prevention request,
-        // never the aggressive power-saver plan.
+        // Recent user input during a detected game keeps the normal gaming profile.
+        // When the user is AFK, a game or explicitly protected task uses Balanced +
+        // a sleep-prevention request, never the aggressive power-saver plan.
+        if (gameRunning && idleTime < idleThreshold)
+            return PowerProfileMode.Performance;
         if (gameRunning || protectedProcessRunning)
-        {
-            if (gameRunning && !protectedProcessRunning && idleTime < idleThreshold)
-                return PowerProfileMode.Performance;
             return PowerProfileMode.ProtectedAfk;
-        }
 
         return idleTime >= idleThreshold
             ? PowerProfileMode.Afk
@@ -133,6 +131,8 @@ public static class AutoProfileService
             var idleThreshold = TimeSpan.FromMinutes(settings.IdleThresholdMinutes);
             var pollInterval = TimeSpan.FromSeconds(settings.PollIntervalSeconds);
             PowerProfileMode? lastMode = null;
+            string? lastGame = null;
+            string? lastProtectedProcess = null;
             while (true)
             {
                 token.ThrowIfCancellationRequested();
@@ -147,7 +147,9 @@ public static class AutoProfileService
                     || lastMode != desired)
                     _ = PowerProfileService.ApplyForAutomaticSession(desired);
 
-                if (lastMode != desired)
+                if (lastMode != desired ||
+                    !string.Equals(lastGame, game, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(lastProtectedProcess, protectedProcess, StringComparison.OrdinalIgnoreCase))
                 {
                     onStatus?.Invoke(new AutoProfileStatus(
                         desired,
@@ -158,6 +160,8 @@ public static class AutoProfileService
                         game,
                         protectedProcess));
                     lastMode = desired;
+                    lastGame = game;
+                    lastProtectedProcess = protectedProcess;
                 }
                 await Task.Delay(pollInterval, token);
             }
