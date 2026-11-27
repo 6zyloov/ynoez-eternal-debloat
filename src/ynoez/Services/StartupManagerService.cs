@@ -92,7 +92,16 @@ public sealed class StartupManagerService
         var entries = GetDisabledEntries().ToList();
         if (!entries.Any(x => x.BackupId == entry.Id))
             entries.Add(new DisabledStartupEntry(entry.Name, entry.Command, entry.KeyPath, entry.Name, entry.Id, DateTimeOffset.UtcNow));
-        WriteManifest(entries);
+        try
+        {
+            WriteManifest(entries);
+        }
+        catch
+        {
+            try { _registry.Restore(tweak); }
+            catch (Exception rollbackError) { AppLog.Write("Falha ao reverter desativação de inicialização após erro no manifesto: " + rollbackError); }
+            throw;
+        }
         AppLog.Write("Inicialização desativada com backup: " + entry.Name);
     }
 
@@ -100,8 +109,18 @@ public sealed class StartupManagerService
     {
         if (entry.KeyPath != UserRunPath || string.IsNullOrWhiteSpace(entry.ValueName))
             throw new InvalidOperationException("Manifesto de inicialização inválido.");
-        _registry.Restore(MakeTweak(entry.ValueName, entry.Command, entry.BackupId));
-        WriteManifest(GetDisabledEntries().Where(x => x.BackupId != entry.BackupId).ToList());
+        var tweak = MakeTweak(entry.ValueName, entry.Command, entry.BackupId);
+        _registry.Restore(tweak);
+        try
+        {
+            WriteManifest(GetDisabledEntries().Where(x => x.BackupId != entry.BackupId).ToList());
+        }
+        catch
+        {
+            try { _registry.RemoveValue(tweak); }
+            catch (Exception rollbackError) { AppLog.Write("Falha ao reverter restauração de inicialização após erro no manifesto: " + rollbackError); }
+            throw;
+        }
         AppLog.Write("Inicialização restaurada: " + entry.Name);
     }
 
