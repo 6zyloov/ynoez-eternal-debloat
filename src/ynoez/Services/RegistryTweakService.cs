@@ -169,6 +169,8 @@ public sealed class RegistryTweakService
     {
         if (tweak.Hive != RegistryHive.CurrentUser)
             throw new InvalidOperationException("O motor aceita somente HKCU nesta versão.");
+        if (tweak.MinimumBuild > 0 && GetWindowsBuild() < tweak.MinimumBuild)
+            throw new InvalidOperationException("Este ajuste exige Windows build " + tweak.MinimumBuild + " ou superior.");
         var path = tweak.KeyPath.Replace('/', '\\').Trim('\\');
         var allowed = new[] { "Software\\Microsoft\\Windows\\CurrentVersion\\", "Software\\Microsoft\\GameBar\\" };
         if (!allowed.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
@@ -181,6 +183,16 @@ public sealed class RegistryTweakService
             throw new InvalidOperationException("Valor DWORD precisa ser inteiro.");
         if (tweak.Kind == RegistryValueKind.String && tweak.Value is not string)
             throw new InvalidOperationException("Valor REG_SZ precisa ser texto.");
+    }
+
+    private static int GetWindowsBuild()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+            return int.TryParse(Convert.ToString(key?.GetValue("CurrentBuildNumber")), out var build) ? build : 0;
+        }
+        catch { return 0; }
     }
 
     private static bool OriginalValuesEqual(object? left, object? right)
@@ -207,7 +219,7 @@ public sealed class RegistryTweakService
 
 public sealed record RegistryTweak(
     string Id, string Name, string Description, string Category, string Risk,
-    RegistryHive Hive, string KeyPath, string ValueName, object Value, RegistryValueKind Kind);
+    RegistryHive Hive, string KeyPath, string ValueName, object Value, RegistryValueKind Kind, int MinimumBuild = 0);
 
 public sealed record RegistryValueBackup(
     string Id, bool ValueExisted, object? OriginalValue, RegistryValueKind OriginalKind,

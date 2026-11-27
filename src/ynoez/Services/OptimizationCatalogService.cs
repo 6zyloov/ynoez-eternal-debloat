@@ -39,15 +39,30 @@ public static class OptimizationCatalogService
                 _ => throw new InvalidDataException("Tipo não permitido no catálogo: " + id + ".")
             };
 
+            var minimumBuild = item.TryGetProperty("minBuild", out var minBuildElement) ? minBuildElement.GetInt32() : 0;
+            if (minimumBuild < 0) throw new InvalidDataException("Build mínimo inválido no ajuste " + id + ".");
+            var currentBuild = GetWindowsBuild();
+            if (minimumBuild > 0 && currentBuild < minimumBuild) continue;
+
             result.Add(new RegistryTweak(
                 id, RequiredString(item, "name"), RequiredString(item, "description"),
                 RequiredString(item, "category"), RequiredString(item, "risk"), hive,
-                RequiredString(item, "keyPath"), RequiredString(item, "valueName"), value, kind));
+                RequiredString(item, "keyPath"), RequiredString(item, "valueName"), value, kind, minimumBuild));
         }
 
         if (result.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != result.Count)
             throw new InvalidDataException("O catálogo contém IDs duplicados.");
         return result;
+    }
+
+    private static int GetWindowsBuild()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+            return int.TryParse(Convert.ToString(key?.GetValue("CurrentBuildNumber")), out var build) ? build : 0;
+        }
+        catch { return 0; }
     }
 
     private static string RequiredString(JsonElement item, string name)
