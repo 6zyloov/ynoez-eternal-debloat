@@ -481,7 +481,7 @@ public static class PowerProfileService
             || string.IsNullOrWhiteSpace(Path.GetFileName(fullPath)))
             throw new InvalidDataException("O arquivo .pow precisa estar diretamente dentro da pasta Backups.");
 
-        if (File.Exists(fullPath))
+        if (File.Exists(fullPath) || Directory.Exists(fullPath))
         {
             var attributes = File.GetAttributes(fullPath);
             if ((attributes & FileAttributes.ReparsePoint) != 0

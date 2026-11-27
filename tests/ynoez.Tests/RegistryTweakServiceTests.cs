@@ -301,21 +301,25 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
-    public void PowerProfileBackupExportPath_RequiresUsableDirectPowFile()
+    public void PowerProfileBackupExportPath_RejectsDirectoryNamedPowFile()
     {
         var root = Path.Combine(Path.GetTempPath(), "ynoez-power-export-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
-            var absent = Path.Combine(root, "missing.pow");
-            Assert.Equal(absent, Path.GetFullPath(absent));
+            var nestedFolder = Path.Combine(root, "nested");
+            Directory.CreateDirectory(nestedFolder);
             Assert.Throws<InvalidDataException>(() =>
-                PowerProfileService.ValidatePowerSchemeExportPath(Path.Combine(root, "nested", "bad.pow"), root));
+                PowerProfileService.ValidatePowerSchemeExportPath(Path.Combine(nestedFolder, "bad.pow"), root));
 
-            var linkLike = Path.Combine(root, "candidate.pow");
-            Directory.CreateDirectory(linkLike);
+            var directoryNamedPow = Path.Combine(root, "candidate.pow");
+            Directory.CreateDirectory(directoryNamedPow);
             Assert.Throws<InvalidDataException>(() =>
-                PowerProfileService.ValidatePowerSchemeExportPath(linkLike, root));
+                PowerProfileService.ValidatePowerSchemeExportPath(directoryNamedPow, root));
+
+            var futureExport = Path.Combine(root, "future-export.pow");
+            Assert.Equal(Path.GetFullPath(futureExport),
+                PowerProfileService.ValidatePowerSchemeExportPath(futureExport, root));
         }
         finally
         {
