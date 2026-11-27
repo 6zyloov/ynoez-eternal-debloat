@@ -21,7 +21,9 @@ O CSV inclui endereço/estado/latência de cada probe, gateway das duas família
 
 ## Interpretação
 
-- **REDE LOCAL / REDE LOCAL IPv6:** perda recorrente até o gateway da família correspondente.
+- **REDE LOCAL / REDE LOCAL IPv6:** perda recorrente até o gateway da família correspondente. Se ambos os gateways apresentam perda, o resultado é **REDE LOCAL IPv4/IPv6**.
+- A perda do gateway IPv4 é priorizada sobre falhas isoladas de ICMP/TCP em destinos IPv6, para não atribuir uma falha local a uma família externa.
+- A hipótese **IPv6 / SEM CONECTIVIDADE** exige que TCP/443 IPv4 continue saudável, mesmo que ICMP IPv4 esteja filtrado; assim bloqueio de ping não impede a detecção de ausência de rota IPv6.
 - **IPv6 / SEM CONECTIVIDADE:** IPv4 permanece saudável enquanto dois destinos IPv6 falham em ICMP e TCP. Pode significar ausência de rota IPv6, IPv6 desativado/sem delegação ou filtragem; não significa queda geral da Internet.
 - **IPv6 ICMP / FILTRAGEM:** ping IPv6 falha, mas TCP/443 IPv6 responde.
 - **IPv6 TCP / SERVIÇO:** ICMP IPv6 responde, mas TCP/443 falha.
