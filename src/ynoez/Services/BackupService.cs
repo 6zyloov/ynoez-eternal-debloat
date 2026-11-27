@@ -104,6 +104,7 @@ public static class BackupService
             result.Add(new BackupFileInfo(info.Name, info.Length, Convert.ToHexString(hash).ToLowerInvariant()));
         }
 
+        return result;
     }
 
     public static async Task<SnapshotVerificationResult> VerifyLocalSnapshotAsync(
