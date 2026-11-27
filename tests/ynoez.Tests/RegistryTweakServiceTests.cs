@@ -84,6 +84,22 @@ public sealed class RegistryTweakServiceTests
  
 
     [Fact]
+    public void Inspect_RejectsNonCanonicalRegistryPath()
+    {
+        var directory = NewBackupDirectory();
+        try
+        {
+            var service = new RegistryTweakService(directory);
+            var tweak = MakeTweak("test-invalid-path", @"Software\Microsoft\Windows\CurrentVersion\\Unsafe", "Value", 0);
+            Assert.Throws<InvalidOperationException>(() => service.Inspect(tweak));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ApplyAndRestore_PreservesExpandStringTypeAndLiteral()
     {
         var keyPath = TestKeyPath();
