@@ -182,7 +182,6 @@ public static class PowerProfileService
         if (!string.Equals(active, session.OriginalGuid, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("A restauração automática não foi confirmada. O backup foi mantido.");
 
-        SetExecutionRequirement(PowerProfileMode.Balanced);
         TryClearExecutionRequirement();
         File.Delete(SessionPath);
         if (File.Exists(exportPath)) File.Delete(exportPath);

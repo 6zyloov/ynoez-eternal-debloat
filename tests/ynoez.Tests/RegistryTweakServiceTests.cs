@@ -186,6 +186,25 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void ScheduledTaskCatalog_ContainsOnlyExplicitOptionalTasks()
+    {
+        var catalog = ScheduledTaskTweakService.GetCatalog();
+        Assert.NotEmpty(catalog);
+        Assert.Equal(catalog.Count, catalog.Select(x => x.TaskPath + x.TaskName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.DoesNotContain(catalog, x => x.TaskName.Contains("Update", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(catalog, x => x.TaskName.Contains("Defender", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(catalog, x => x.TaskName.Contains("Search", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ScheduledTaskManager_RejectsProtectedOrUnknownTask()
+    {
+        var manager = new ScheduledTaskTweakService(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
+        var protectedTask = new ScheduledTaskDefinition(@"\Microsoft\Windows\WindowsUpdate\", "Scheduled Start", "Update", "Protected", "High");
+        Assert.Throws<InvalidOperationException>(() => manager.Disable(protectedTask));
+    }
+
+    [Fact]
     public void PresentMonCsvParser_ComputesAverageAndOnePercentLow()
     {
         var path = Path.Combine(Path.GetTempPath(), "ynoez-presentmon-" + Guid.NewGuid().ToString("N") + ".csv");

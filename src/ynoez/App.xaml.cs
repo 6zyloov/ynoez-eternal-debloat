@@ -39,6 +39,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try { PowerProfileService.RecoverInterruptedAutomaticSession(); }
+        catch (Exception ex) { AppLog.Write("A sessão automática permaneceu pendente durante o encerramento: " + ex); }
         PowerProfileService.ClearExecutionRequirement();
         AppLog.Write("Aplicativo encerrado.");
         if (_ownsMutex)

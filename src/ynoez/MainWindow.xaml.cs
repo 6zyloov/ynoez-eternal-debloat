@@ -773,6 +773,36 @@ public partial class MainWindow : Window
                     }, service.Definition.Risk.ToUpperInvariant()));
             }
         }
+        root.Children.Add(Heading("Tarefas agendadas opcionais", 15));
+        root.Children.Add(Body("O ynoez mostra somente tarefas opcionais pré-avaliadas de telemetria/feedback e atualização de mapas offline. Não toca em Windows Update, Defender, manutenção, diagnóstico de falhas, indexação, drivers ou anti-cheat. Desativar impede execuções futuras; não encerra tarefas que já estejam em execução."));
+        var taskManager = new ScheduledTaskTweakService();
+        foreach (var task in taskManager.GetStatuses())
+        {
+            var details = task.Definition.Description + "\nEstado: " + task.State +
+                (task.DisabledByYnoez ? "\nBackup do estado original disponível." : "");
+            if (!task.Available)
+                root.Children.Add(NoteCard(task.Definition.DisplayName + " — não encontrada", details));
+            else if (task.DisabledByYnoez)
+                root.Children.Add(ActionCard(task.Definition.DisplayName, details, "Restaurar tarefa", async () =>
+                {
+                    if (MessageBox.Show("Reativar a tarefa original \"" + task.Definition.TaskName + "\"? Pode ser solicitado UAC.",
+                        "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                    await Task.Run(() => taskManager.Restore(task.Definition));
+                    MessageBox.Show("Tarefa restaurada e verificada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowPage("Debloat");
+                }, "BACKUP"));
+            else if (string.Equals(task.State, "Disabled", StringComparison.OrdinalIgnoreCase))
+                root.Children.Add(NoteCard(task.Definition.DisplayName + " — já desativada", details + "\nO Windows já mantém esta tarefa desativada; o ynoez não assumirá a autoria."));
+            else
+                root.Children.Add(ActionCard(task.Definition.DisplayName, details, "Desativar tarefa", async () =>
+                {
+                    if (MessageBox.Show("Desativar \"" + task.Definition.TaskName + "\"? O backup do estado atual será salvo antes da alteração. Pode ser solicitado UAC.",
+                        "Confirmar tarefa opcional", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                    await Task.Run(() => taskManager.Disable(task.Definition));
+                    MessageBox.Show("Tarefa desativada. O estado anterior foi salvo para restauração.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowPage("Debloat");
+                }, task.Definition.Risk.ToUpperInvariant()));
+        }
         root.Children.Add(ProtectedItemsCard());
         return root;
     }
