@@ -94,6 +94,20 @@ public sealed class RegistryTweakService
                 catch (ArgumentException) { /* Preserve non-empty keys. */ }
             }
 
+            using (var verifyKey = Registry.CurrentUser.OpenSubKey(tweak.KeyPath, writable: false))
+            {
+                var restoredExists = verifyKey is not null &&
+                    verifyKey.GetValueNames().Contains(tweak.ValueName, StringComparer.OrdinalIgnoreCase);
+                if (restoredExists != backup.ValueExisted)
+                    throw new InvalidOperationException("A verificação da restauração falhou; o backup foi mantido.");
+                if (backup.ValueExisted)
+                {
+                    var restored = verifyKey!.GetValue(tweak.ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+                    if (!Equals(restored, DecodeOriginalValue(backup)))
+                        throw new InvalidOperationException("O valor restaurado não corresponde ao backup; o backup foi mantido.");
+                }
+            }
+
             File.Delete(backupPath);
             AppLog.Write($"Tweak restaurado: {tweak.Id}");
         }
@@ -122,7 +136,10 @@ public sealed class RegistryTweakService
         return backup.OriginalKind switch
         {
             RegistryValueKind.DWord => element.GetInt32(),
-            RegistryValueKind.String => element.GetString() ?? string.Empty,
+            RegistryValueKind.QWord => element.GetInt64(),
+            RegistryValueKind.String or RegistryValueKind.ExpandString => element.GetString() ?? string.Empty,
+            RegistryValueKind.Binary or RegistryValueKind.None => element.GetBytesFromBase64(),
+            RegistryValueKind.MultiString => element.EnumerateArray().Select(x => x.GetString() ?? string.Empty).ToArray(),
             _ => throw new InvalidDataException("Tipo original de registro não suportado.")
         };
     }

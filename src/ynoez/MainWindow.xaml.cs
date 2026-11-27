@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Input;
+using Microsoft.Win32;
 using ynoez.Services;
 
 namespace ynoez;
@@ -202,7 +203,60 @@ public partial class MainWindow : Window
         root.Children.Add(ActionCard("Modo de Jogo do Windows", "Abre a configuração oficial. O ynoez não remove Xbox, Game Bar, capturas ou overlays.", "Abrir configuração", () => OpenTargetAsync("ms-settings:gaming-gamemode"), "SEM ALTERAÇÃO"));
         root.Children.Add(ActionCard("Energia do adaptador de rede", "Abre o painel de energia do Windows. O comportamento de economia do adaptador será avaliado no diagnóstico, sem forçar valores desconhecidos.", "Abrir energia", () => OpenTargetAsync("ms-settings:powersleep"), "SEM ALTERAÇÃO"));
         root.Children.Add(ActionCard("Windows Update e Segurança", "Atalhos oficiais para revisar atualizações e as proteções que devem continuar disponíveis para os anti-cheats.", "Abrir Windows Update", () => OpenTargetAsync("ms-settings:windowsupdate"), "PROTEGIDO"));
-        root.Children.Add(NoteCard("Ajustes experimentais", "Timers BCD, HPET, MMCSS, VBS/HVCI, IOMMU/DMA, TPM, Secure Boot, desativação de Defender e remoção de serviços críticos não são aplicados por este painel. Não existe um ganho universal que justifique desativá-los indiscriminadamente."));
+        root.Children.Add(Heading("Catálogo de otimizações reversíveis", 15));
+        root.Children.Add(Body("Cada ajuste mostra o estado atual. Aplicar exige confirmação e cria backup individual; restaurar recupera o estado anterior. Nenhum ajuste é executado em lote."));
+        try
+        {
+            var catalog = OptimizationCatalogService.LoadRegistryTweaks();
+            var service = new RegistryTweakService();
+            foreach (var tweak in catalog)
+            {
+                var state = service.Inspect(tweak);
+                var stateText = state switch
+                {
+                    TweakState.Enabled => "ATIVADO",
+                    TweakState.Disabled => "DESATIVADO",
+                    _ => "PADRÃO / NÃO CONFIGURADO"
+                };
+                root.Children.Add(ActionCard(
+                    tweak.Name,
+                    tweak.Description + "\nCategoria: " + tweak.Category + " | Risco: " + tweak.Risk + " | Estado: " + stateText,
+                    "Aplicar",
+                    () =>
+                    {
+                        if (MessageBox.Show("Aplicar \"" + tweak.Name + "\"?\n\nO ynoez salvará o valor original antes de alterar o Registro. Você poderá restaurá-lo depois.",
+                            "Confirmar otimização", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                            return Task.CompletedTask;
+                        service.Apply(tweak);
+                        MessageBox.Show("Ajuste aplicado e verificado. O backup original foi preservado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return Task.CompletedTask;
+                    },
+                    tweak.Risk.ToUpperInvariant()));
+                if (service.CanRestore(tweak.Id))
+                {
+                    root.Children.Add(ActionCard(
+                        "Restaurar — " + tweak.Name,
+                        "Recupera o valor original salvo antes da primeira aplicação deste ajuste.",
+                        "Restaurar original",
+                        () =>
+                        {
+                            if (MessageBox.Show("Restaurar o estado original de \"" + tweak.Name + "\"?", "Confirmar restauração",
+                                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                                return Task.CompletedTask;
+                            service.Restore(tweak);
+                            MessageBox.Show("Estado original restaurado e verificado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return Task.CompletedTask;
+                        },
+                        "REVERSÃO"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Falha ao carregar catálogo de otimizações: " + ex);
+            root.Children.Add(NoteCard("Catálogo indisponível", "Não foi possível carregar ou validar o catálogo. Nenhuma alteração foi aplicada. Detalhe: " + ex.Message));
+        }
+        root.Children.Add(NoteCard("Ajustes experimentais protegidos", "Timers BCD, HPET, MMCSS, VBS/HVCI, IOMMU/DMA, TPM, Secure Boot, desativação de Defender e remoção de serviços críticos não são aplicados por este painel. Não existe um ganho universal que justifique desativá-los indiscriminadamente."));
         return root;
     }
 
