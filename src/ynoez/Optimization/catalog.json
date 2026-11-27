@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "0.2.0",
+  "policy": {
+    "defaultConsent": false,
+    "backupBeforeApply": true,
+    "verifyAfterApply": true,
+    "restoreAvailable": true,
+    "scope": "HKCU only",
+    "protectedFeatures": [
+      "Microsoft Store", "Printing", "Calculator", "Clipboard", "Windows Search",
+      "Notepad", "NVIDIA Instant Replay", "Windows Defender", "Windows Update",
+      "TPM", "Secure Boot", "VBS", "HVCI", "IOMMU", "Vanguard", "FACEIT Anti-Cheat"
+    ]
+  },
+  "tweaks": [
+    {
+      "id": "privacy-disable-consumer-experiences",
+      "name": "Reduzir sugestões e conteúdo promocional",
+      "description": "Desativa experiências de conteúdo sugerido para o usuário atual. Não remove aplicativos nem serviços.",
+      "category": "Privacidade",
+      "risk": "Baixo",
+      "hive": "CurrentUser",
+      "keyPath": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+      "valueName": "SystemPaneSuggestionsEnabled",
+      "value": 0,
+      "kind": "DWord",
+      "reversible": true,
+      "requiresConsent": true
+    },
+    {
+      "id": "privacy-disable-soft-landing",
+      "name": "Desativar dicas e sugestões do Windows",
+      "description": "Reduz notificações de dicas e sugestões na conta atual. Não desativa notificações de aplicativos.",
+      "category": "Privacidade",
+      "risk": "Baixo",
+      "hive": "CurrentUser",
+      "keyPath": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+      "valueName": "SoftLandingEnabled",
+      "value": 0,
+      "kind": "DWord",
+      "reversible": true,
+      "requiresConsent": true
+    },
+    {
+      "id": "gaming-disable-windows-capture",
+      "name": "Desativar captura em segundo plano do Xbox Game Bar",
+      "description": "Desativa a gravação em segundo plano nativa do Windows. Não altera NVIDIA Share/Instant Replay (Alt+Z), OBS ou outros gravadores.",
+      "category": "Jogos",
+      "risk": "Médio",
+      "hive": "CurrentUser",
+      "keyPath": "Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR",
+      "valueName": "AppCaptureEnabled",
+      "value": 0,
+      "kind": "DWord",
+      "reversible": true,
+      "requiresConsent": true
+    },
+    {
+      "id": "gaming-disable-game-dvr-policy-user",
+      "name": "Desativar Game DVR para esta conta",
+      "description": "Impede a captura Game DVR do Windows para o usuário atual. Não desativa serviços de segurança nem recursos NVIDIA.",
+      "category": "Jogos",
+      "risk": "Médio",
+      "hive": "CurrentUser",
+      "keyPath": "Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR",
+      "valueName": "HistoricalCaptureEnabled",
+      "value": 0,
+      "kind": "DWord",
+      "reversible": true,
+      "requiresConsent": true
+    }
+  ]
+}

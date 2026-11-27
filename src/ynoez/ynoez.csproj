@@ -8,7 +8,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>ynoez</AssemblyName>
     <RootNamespace>ynoez</RootNamespace>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <Product>ynoez</Product>
     <Company>ynoez</Company>
     <Description>Windows tuning, diagnostics and hardware toolbox.</Description>
@@ -20,5 +20,6 @@
   <ItemGroup>
     <PackageReference Include="System.Management" Version="9.0.2" />
     <None Update="Toolbox\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Optimization\**\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
