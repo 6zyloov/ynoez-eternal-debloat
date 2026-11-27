@@ -359,6 +359,31 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void PowerProfileExport_RejectsMissingEmptyDirectoriesAndReparsePoints()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-power-export-valid-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var missing = Path.Combine(root, "missing.pow");
+            var empty = Path.Combine(root, "empty.pow");
+            var populated = Path.Combine(root, "populated.pow");
+            Directory.CreateDirectory(Path.Combine(root, "folder.pow"));
+            File.WriteAllBytes(empty, Array.Empty<byte>());
+            File.WriteAllBytes(populated, new byte[] { 1, 2, 3 });
+
+            Assert.False(PowerProfileService.IsUsablePowerSchemeExportFile(missing));
+            Assert.False(PowerProfileService.IsUsablePowerSchemeExportFile(empty));
+            Assert.False(PowerProfileService.IsUsablePowerSchemeExportFile(Path.Combine(root, "folder.pow")));
+            Assert.True(PowerProfileService.IsUsablePowerSchemeExportFile(populated));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void PowerProfileResolution_FallsBackToBalancedWhenOptionalPlanIsMissing()
     {
         var balancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e";

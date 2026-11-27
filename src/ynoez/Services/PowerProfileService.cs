@@ -230,8 +230,12 @@ public static class PowerProfileService
         var originalGuid = GetActiveSchemeGuid();
         var exportPath = Path.Combine(AppPaths.Backups, "auto-profile-original-" + Guid.NewGuid().ToString("N") + ".pow");
         var export = RunPowerCfg("/export " + Quote(exportPath) + " " + originalGuid);
-        if (export.ExitCode != 0 || !File.Exists(exportPath))
-            throw new InvalidOperationException("Não foi possível salvar o plano original da sessão automática. A automação não foi iniciada. " + export.Error);
+        if (export.ExitCode != 0 || !IsUsablePowerSchemeExportFile(exportPath))
+        {
+            try { if (File.Exists(exportPath)) File.Delete(exportPath); } catch { }
+            throw new InvalidOperationException("Não foi possível salvar e verificar o arquivo .pow do plano original. A automação não foi iniciada. " + export.Error);
+        }
+        exportPath = ValidateSessionExportPath(exportPath);
 
         var session = new PowerProfileSession(originalGuid, exportPath, DateTimeOffset.UtcNow);
         try
@@ -274,8 +278,8 @@ public static class PowerProfileService
 
             if (!string.Equals(active, session.OriginalGuid, StringComparison.OrdinalIgnoreCase))
             {
-                if (!File.Exists(exportPath))
-                    throw new InvalidOperationException("O plano original não está disponível e o arquivo exportado da sessão não foi encontrado. O backup foi mantido.");
+                if (!IsUsablePowerSchemeExportFile(exportPath))
+                    throw new InvalidOperationException("O plano original não está ativo e o arquivo .pow exportado está ausente, vazio ou inválido. O backup foi mantido.");
                 var import = RunPowerCfg("/import " + Quote(exportPath) + " " + session.OriginalGuid);
                 if (import.ExitCode != 0)
                     throw new InvalidOperationException("Não foi possível importar o plano original da sessão: " + import.Error);
@@ -324,14 +328,17 @@ public static class PowerProfileService
         }
 
         if (!string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(backup.ExportPath) && File.Exists(backup.ExportPath))
+            && !string.IsNullOrWhiteSpace(backup.ExportPath))
         {
             var exportPath = ValidatePowerSchemeExportPath(backup.ExportPath, AppPaths.Backups);
-            var import = RunPowerCfg("/import " + Quote(exportPath) + " " + backup.OriginalGuid);
-            if (import.ExitCode != 0)
-                throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
-            result = RunPowerCfg("/setactive " + backup.OriginalGuid);
-            if (result.ExitCode == 0) active = GetActiveSchemeGuid();
+            if (IsUsablePowerSchemeExportFile(exportPath))
+            {
+                var import = RunPowerCfg("/import " + Quote(exportPath) + " " + backup.OriginalGuid);
+                if (import.ExitCode != 0)
+                    throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
+                result = RunPowerCfg("/setactive " + backup.OriginalGuid);
+                if (result.ExitCode == 0) active = GetActiveSchemeGuid();
+            }
         }
 
         if (result.ExitCode != 0 || !string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase))
@@ -490,6 +497,19 @@ public static class PowerProfileService
         }
 
         return fullPath;
+    }
+
+    internal static bool IsUsablePowerSchemeExportFile(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return false;
+            var attributes = File.GetAttributes(path);
+            if ((attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+                return false;
+            return new FileInfo(path).Length > 0;
+        }
+        catch { return false; }
     }
 
     private static void TrySetActive(string guid)
