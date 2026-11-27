@@ -55,10 +55,11 @@ public sealed class NetworkMonitorIpv6Tests
         var samples = new[]
         {
             Sample(ipv6GatewayMs: 2, ipv6Ms: 10, ipv6TcpMs: 20),
+            Sample(ipv6GatewayMs: 4, ipv6Ms: 14, ipv6TcpMs: 24),
             Sample(ipv6GatewayMs: null, ipv6Ms: null, ipv6TcpMs: null,
-                ipv6SecondaryMs: null, ipv6SecondaryTcpMs: null,
-                ipv6GatewayLoss: 50, ipv6Loss: 50, ipv6TcpFailure: 50,
-                ipv6SecondaryLoss: 50, ipv6SecondaryTcpFailure: 50)
+                ipv6SecondaryMs: null, ipv6SecondaryTcpMs: null),
+            Sample(ipv6GatewayMs: null, ipv6Ms: null, ipv6TcpMs: null,
+                ipv6SecondaryMs: null, ipv6SecondaryTcpMs: null)
         };
 
         var summary = NetworkMonitorService.SummarizeWindow(samples);
