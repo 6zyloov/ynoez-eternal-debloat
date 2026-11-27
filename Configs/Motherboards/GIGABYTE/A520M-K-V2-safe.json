@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "profileId": "gigabyte-a520m-k-v2",
+  "configId": "gigabyte-a520m-k-v2-safe",
+  "displayName": "A520M K V2 — Safe Debloat and Configuration",
+  "mode": "conservative",
+  "defaults": {
+    "applyAutomatically": false,
+    "createBackupBeforeChanges": true,
+    "requireUserConfirmation": true,
+    "logEveryChange": true,
+    "allowFirmwareOperations": false,
+    "allowOverclocking": false
+  },
+  "preserveWindowsComponents": [
+    "Microsoft Store",
+    "Store licensing and deployment services",
+    "Print Spooler and printer support",
+    "Windows Calculator",
+    "Windows Clipboard and clipboard history",
+    "Windows Notepad",
+    "Windows Search and Start menu search",
+    "Windows Update, Update Orchestrator, BITS and Delivery Optimization",
+    "Windows Defender, Security Center, SmartScreen and Firewall",
+    "TPM, Secure Boot, VBS and HVCI",
+    "IOMMU and DMA remapping",
+    "Microsoft Visual C++ runtimes",
+    "Windows Installer and device installation services"
+  ],
+  "preserveGamingAndCapture": [
+    "NVIDIA display driver and NVIDIA Container components",
+    "NVIDIA App / GeForce Experience overlay components",
+    "NVIDIA Instant Replay and Alt+Z overlay",
+    "VALORANT Vanguard components",
+    "FACEIT Anti-Cheat components"
+  ],
+  "neverDisableServicesInBulk": [
+    "wuauserv",
+    "UsoSvc",
+    "BITS",
+    "DoSvc",
+    "WSearch",
+    "Spooler",
+    "ClipSVC",
+    "InstallService",
+    "AppXSvc",
+    "StateRepository",
+    "WinDefend",
+    "SecurityHealthService",
+    "mpssvc",
+    "BFE",
+    "vgc",
+    "vgk"
+  ],
+  "allowedInitialCleanup": [
+    {
+      "id": "user-temp",
+      "scope": "%TEMP%",
+      "policy": "Delete only files that are not locked; never follow junctions outside the target tree."
+    },
+    {
+      "id": "brave-cache",
+      "scope": "Brave User Data profile Cache, Code Cache and GPUCache folders",
+      "policy": "Preserve profiles, passwords, cookies, history, bookmarks, extensions and sessions."
+    },
+    {
+      "id": "discord-cache",
+      "scope": "Discord Cache, Code Cache and GPUCache folders",
+      "policy": "Preserve account/session data, configuration and all other profile files."
+    }
+  ],
+  "boardSpecificPolicy": {
+    "detectChipset": "AMD A520",
+    "detectSocket": "AM4",
+    "detectNetworkControllerByHardwareId": true,
+    "detectAudioControllerByHardwareId": true,
+    "driverSource": "Use only the confirmed revision's official Gigabyte support page or AMD's official driver channel.",
+    "fanPolicy": "Read-only until motherboard sensor and fan-header mapping is confirmed.",
+    "biosPolicy": "Read-only/manual link; confirm physical revision and CPU support before firmware workflow."
+  },
+  "prohibitedTweaks": [
+    "Disable Windows Defender or firewall",
+    "Disable VBS/HVCI, TPM, Secure Boot, SVM, IOMMU or DMA remapping",
+    "Use bcdedit timer/HPET/dynamic tick tweaks without measured device-specific evidence",
+    "Disable IPv6, NetBIOS, QoS or network services globally as a blanket optimization",
+    "Delete Windows Store, Search, Print, Calculator, Clipboard or Notepad packages",
+    "Disable NVIDIA overlay or background components required for Alt+Z/Instant Replay",
+    "Uninstall or interfere with Vanguard or FACEIT Anti-Cheat",
+    "Apply BIOS, PBO, voltage, memory timing or fan curve changes without explicit review"
+  ],
+  "restorePolicy": {
+    "savePreviousValue": true,
+    "saveRegistryExports": true,
+    "saveServiceStartMode": true,
+    "providePerChangeUndo": true,
+    "requireRestartOnlyWhenNecessary": true
+  }
+}
