@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "ynoez-windows-preserve-core",
+  "description": "Lista de preservação obrigatória para operações de debloat. Dados declarativos; não executa comandos.",
+  "applyAutomatically": false,
+  "preserveApplications": [
+    "Microsoft Store", "Calculadora", "Bloco de Notas", "Área de transferência",
+    "Windows Search e pesquisa do menu Iniciar", "NVIDIA Instant Replay / Alt+Z"
+  ],
+  "preserveServices": [
+    "wuauserv", "UsoSvc", "BITS", "DoSvc", "WSearch", "Spooler", "ClipSVC",
+    "InstallService", "AppXSvc", "StateRepository", "WinDefend", "SecurityHealthService", "mpssvc", "BFE"
+  ],
+  "preserveSecurity": [
+    "TPM", "Secure Boot", "VBS", "HVCI / Memory Integrity", "IOMMU", "DMA remapping", "UAC", "SmartScreen", "Windows Defender", "Windows Firewall"
+  ],
+  "preserveGaming": [
+    "VALORANT Vanguard", "FACEIT Anti-Cheat", "NVIDIA display driver", "NVIDIA App/GeForce Experience overlay", "NVIDIA Instant Replay"
+  ],
+  "cleanupAllowList": [
+    { "id": "user-temp", "scope": "%TEMP%", "deleteLocked": false, "followReparsePoints": false },
+    { "id": "brave-cache", "scope": ["Cache", "Code Cache", "GPUCache"], "preserveProfile": true, "preserveCredentials": true },
+    { "id": "discord-cache", "scope": ["Cache", "Code Cache", "GPUCache"], "preserveProfile": true, "preserveCredentials": true }
+  ],
+  "forbiddenGenericTweaks": [
+    "Disable Defender/firewall/SmartScreen/UAC", "Disable Windows Update or BITS", "Remove Store/Search/Print/Calculator/Notepad/Clipboard",
+    "Disable NVIDIA overlay/Instant Replay", "Disable TPM/Secure Boot/VBS/HVCI/IOMMU/DMA", "Disable IPv6 globally",
+    "Apply universal BCD/HPET/timer tweaks", "Uninstall Vanguard or FACEIT Anti-Cheat", "Mass-disable Windows services"
+  ],
+  "executionPolicy": {
+    "backupBeforeChange": true,
+    "explicitConfirmation": true,
+    "recordBeforeAndAfterState": true,
+    "undoPerChange": true,
+    "noSilentReboot": true
+  }
+}
