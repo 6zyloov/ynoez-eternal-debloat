@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _benchmarkCts;
     private CancellationTokenSource? _integrityAuditCts;
     private CancellationTokenSource? _windowsRepairCts;
+    private CancellationTokenSource? _motherboardDeviceInventoryCts;
     private bool _allowClose;
     private bool _sessionEnding;
     private bool _trayIconVisible;
@@ -138,6 +139,7 @@ public partial class MainWindow : Window
             _benchmarkCts?.Cancel();
             _integrityAuditCts?.Cancel();
             _windowsRepairCts?.Cancel();
+            _motherboardDeviceInventoryCts?.Cancel();
         };
     }
 
@@ -1744,6 +1746,140 @@ public partial class MainWindow : Window
             revisionConfirmPanel.Children.Add(revisionDetailsPanel);
             revisionConfirmCard.Child = revisionConfirmPanel;
             root.Children.Add(revisionConfirmCard);
+
+            var deviceCard = MakeCard();
+            var devicePanel = new StackPanel { Margin = new Thickness(20) };
+            devicePanel.Children.Add(Heading("Dispositivos reais de rede, áudio e sistema", 15));
+            devicePanel.Children.Add(Body("Consulta o inventário PnP do Windows e associa os drivers assinados encontrados pelo Windows. Mostra ID de hardware, classe, fabricante, estado, provedor, versão, data e INF. Use os IDs para comparar com os pacotes oficiais da revisão física confirmada; o ynoez não instala nem atualiza drivers automaticamente."));
+            var deviceStatus = Body("Inventário de dispositivos ainda não consultado.");
+            var deviceDetails = Body("Selecione um dispositivo para ver seu ID de hardware e detalhes.");
+            deviceDetails.TextWrapping = TextWrapping.Wrap;
+            var deviceGrid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                CanUserDeleteRows = false,
+                CanUserResizeRows = false,
+                SelectionMode = DataGridSelectionMode.Single,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                Background = BrushFrom("#171717"),
+                Foreground = PrimaryBrush,
+                RowBackground = BrushFrom("#171717"),
+                AlternatingRowBackground = BrushFrom("#202020"),
+                BorderBrush = BorderBrushSoft,
+                Height = 300,
+                Margin = new Thickness(0, 10, 0, 10)
+            };
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Classe", Binding = new Binding(nameof(MotherboardDeviceInfo.CategoryDisplay)), Width = new DataGridLength(100) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Dispositivo", Binding = new Binding(nameof(MotherboardDeviceInfo.Name)), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Fabricante", Binding = new Binding(nameof(MotherboardDeviceInfo.Manufacturer)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(MotherboardDeviceInfo.StateDisplay)), Width = new DataGridLength(185) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Provedor do driver", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverProviderDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverVersionDisplay)), Width = new DataGridLength(110) });
+            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Data do driver", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverDateDisplay)), Width = new DataGridLength(95) });
+            IReadOnlyList<MotherboardDeviceInfo> motherboardDevices = Array.Empty<MotherboardDeviceInfo>();
+            deviceGrid.SelectionChanged += (_, _) =>
+            {
+                if (deviceGrid.SelectedItem is not MotherboardDeviceInfo selected)
+                {
+                    deviceDetails.Text = "Selecione um dispositivo para ver seu ID de hardware e detalhes.";
+                    return;
+                }
+
+                deviceDetails.Text = selected.Name +
+                    "\nCategoria: " + selected.CategoryDisplay +
+                    " • Fabricante: " + (string.IsNullOrWhiteSpace(selected.Manufacturer) ? "Não informado" : selected.Manufacturer) +
+                    "\nEstado: " + selected.StateDisplay +
+                    " • Serviço: " + (string.IsNullOrWhiteSpace(selected.ServiceName) ? "Não informado" : selected.ServiceName) +
+                    "\nDriver: " + selected.DriverProviderDisplay + " • " + selected.DriverVersionDisplay +
+                    " • " + selected.DriverDateDisplay + " • INF: " +
+                    (string.IsNullOrWhiteSpace(selected.InfName) ? "Não informado" : selected.InfName) +
+                    "\nDeviceID: " + selected.DeviceId +
+                    "\nHardware IDs:\n" + selected.HardwareIdsDisplay;
+            };
+            var deviceButtons = new WrapPanel();
+            var queryDevices = new Button { Content = "Consultar dispositivos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
+            var cancelDevices = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
+            var exportDevices = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
+            queryDevices.Click += async (_, _) =>
+            {
+                if (_motherboardDeviceInventoryCts is not null) return;
+                var cts = new CancellationTokenSource();
+                _motherboardDeviceInventoryCts = cts;
+                queryDevices.IsEnabled = false;
+                cancelDevices.IsEnabled = true;
+                exportDevices.IsEnabled = false;
+                deviceStatus.Text = "Consultando dispositivos PnP e drivers assinados…";
+                try
+                {
+                    var snapshot = await MotherboardDeviceInventoryService.CaptureAsync(cts.Token);
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        motherboardDevices = snapshot.Devices;
+                        deviceGrid.ItemsSource = motherboardDevices;
+                        deviceStatus.Text = snapshot.DeviceCount + " dispositivos • " +
+                            snapshot.DevicesWithReportedErrors + " com código de configuração diferente de zero • " +
+                            snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") +
+                            "\nA data/provedor são o que Win32_PnPSignedDriver reporta; ausência de dados não prova que o driver seja inválido.";
+                        exportDevices.IsEnabled = motherboardDevices.Count > 0;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    if (!Dispatcher.HasShutdownStarted) deviceStatus.Text = "Consulta cancelada. Nenhum driver foi alterado.";
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Write("Inventário de dispositivos da placa-mãe falhou: " + ex);
+                    if (!Dispatcher.HasShutdownStarted) deviceStatus.Text = "Não foi possível consultar dispositivos: " + ex.Message;
+                }
+                finally
+                {
+                    if (ReferenceEquals(_motherboardDeviceInventoryCts, cts)) _motherboardDeviceInventoryCts = null;
+                    cts.Dispose();
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        queryDevices.IsEnabled = true;
+                        cancelDevices.IsEnabled = false;
+                    }
+                }
+            };
+            cancelDevices.Click += (_, _) => _motherboardDeviceInventoryCts?.Cancel();
+            exportDevices.Click += (_, _) =>
+            {
+                if (motherboardDevices.Count == 0) return;
+                var dialog = new SaveFileDialog
+                {
+                    Title = "Exportar inventário de dispositivos da placa-mãe",
+                    Filter = "CSV (*.csv)|*.csv",
+                    FileName = "ynoez-dispositivos-placa-mae.csv",
+                    AddExtension = true,
+                    DefaultExt = ".csv"
+                };
+                if (dialog.ShowDialog(this) != true) return;
+                try
+                {
+                    var snapshot = new MotherboardDeviceInventorySnapshot(DateTimeOffset.Now, motherboardDevices);
+                    File.WriteAllText(dialog.FileName, MotherboardDeviceInventoryService.BuildCsv(snapshot), new System.Text.UTF8Encoding(true));
+                    deviceStatus.Text = "Inventário de dispositivos exportado: " + dialog.FileName;
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Write("Falha ao exportar inventário de dispositivos: " + ex);
+                    MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+            deviceButtons.Children.Add(queryDevices);
+            deviceButtons.Children.Add(cancelDevices);
+            deviceButtons.Children.Add(exportDevices);
+            devicePanel.Children.Add(deviceStatus);
+            devicePanel.Children.Add(deviceGrid);
+            devicePanel.Children.Add(deviceDetails);
+            devicePanel.Children.Add(deviceButtons);
+            deviceCard.Child = devicePanel;
+            root.Children.Add(deviceCard);
 
             var specs = MakeCard();
             var specsPanel = new StackPanel { Margin = new Thickness(20) };
