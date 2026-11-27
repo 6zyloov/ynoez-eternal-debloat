@@ -270,10 +270,7 @@ public static class PowerProfileService
         if (!string.Equals(active, backup.OriginalGuid, StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(backup.ExportPath) && File.Exists(backup.ExportPath))
         {
-            var exportPath = Path.GetFullPath(backup.ExportPath);
-            var backupsRoot = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
-            if (!exportPath.StartsWith(backupsRoot, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Caminho do backup do plano original fora da pasta Backups.");
+            var exportPath = ValidatePowerSchemeExportPath(backup.ExportPath, AppPaths.Backups);
             var import = RunPowerCfg("/import " + Quote(exportPath) + " " + backup.OriginalGuid);
             if (import.ExitCode != 0)
                 throw new InvalidOperationException("O plano original não existe e o backup exportado não pôde ser importado: " + import.Error);
@@ -409,14 +406,33 @@ public static class PowerProfileService
         }
     }
 
-    private static string ValidateSessionExportPath(string path)
+    private static string ValidateSessionExportPath(string path) =>
+        ValidatePowerSchemeExportPath(path, AppPaths.Backups);
+
+    internal static string ValidatePowerSchemeExportPath(string path, string backupsDirectory)
     {
-        if (string.IsNullOrWhiteSpace(path)) throw new InvalidDataException("Caminho de exportação da sessão vazio.");
+        if (string.IsNullOrWhiteSpace(path))
+            throw new InvalidDataException("Caminho de exportação de plano vazio.");
+        if (string.IsNullOrWhiteSpace(backupsDirectory))
+            throw new ArgumentException("Pasta Backups não pode ser vazia.", nameof(backupsDirectory));
+
         var fullPath = Path.GetFullPath(path);
-        var root = Path.GetFullPath(AppPaths.Backups) + Path.DirectorySeparatorChar;
-        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(Path.GetExtension(fullPath), ".pow", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Caminho da exportação da sessão fora da pasta Backups.");
+        var root = Path.GetFullPath(backupsDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var parent = Path.GetDirectoryName(fullPath);
+        if (!string.Equals(parent, root, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(Path.GetExtension(fullPath), ".pow", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(Path.GetFileName(fullPath)))
+            throw new InvalidDataException("O arquivo .pow precisa estar diretamente dentro da pasta Backups.");
+
+        if (File.Exists(fullPath))
+        {
+            var attributes = File.GetAttributes(fullPath);
+            if ((attributes & FileAttributes.ReparsePoint) != 0
+                || (attributes & FileAttributes.Directory) != 0)
+                throw new InvalidDataException("Arquivos .pow não podem ser links ou diretórios.");
+        }
+
         return fullPath;
     }
 

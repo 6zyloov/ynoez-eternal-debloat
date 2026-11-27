@@ -288,6 +288,37 @@ public sealed class RegistryTweakServiceTests
     }
 
     [Fact]
+    public void PowerProfileExportPath_OnlyAcceptsDirectPowFilesInsideBackupRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ynoez-power-backups-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var valid = Path.Combine(root, "automatic-session.pow");
+            Assert.Equal(Path.GetFullPath(valid),
+                PowerProfileService.ValidatePowerSchemeExportPath(valid, root));
+
+            var outside = Path.Combine(Path.GetTempPath(), "outside-" + Guid.NewGuid().ToString("N") + ".pow");
+            Assert.Throws<InvalidDataException>(() =>
+                PowerProfileService.ValidatePowerSchemeExportPath(outside, root));
+
+            var nestedFolder = Path.Combine(root, "nested");
+            Directory.CreateDirectory(nestedFolder);
+            var nested = Path.Combine(nestedFolder, "automatic-session.pow");
+            Assert.Throws<InvalidDataException>(() =>
+                PowerProfileService.ValidatePowerSchemeExportPath(nested, root));
+
+            var wrongExtension = Path.Combine(root, "automatic-session.exe");
+            Assert.Throws<InvalidDataException>(() =>
+                PowerProfileService.ValidatePowerSchemeExportPath(wrongExtension, root));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void PowerProfileResolution_FallsBackToBalancedWhenOptionalPlanIsMissing()
     {
         var balancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e";
