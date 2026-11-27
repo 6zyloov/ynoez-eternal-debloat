@@ -50,7 +50,7 @@ A revisão física impressa no PCB deve ser confirmada antes de escolher BIOS; o
 
 ## Construir localmente
 
-Requer .NET 10 SDK LTS no Windows:
+Requer .NET 10 SDK LTS no Windows. O repositório fixa a faixa do SDK em `global.json` para evitar que uma versão maior instalada localmente seja selecionada por engano:
 
 ```powershell
 .\build.bat
