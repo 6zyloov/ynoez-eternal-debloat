@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private bool _isBusy;
     private CancellationTokenSource? _networkMonitorCts;
     private CancellationTokenSource? _autoProfileCts;
+    private CancellationTokenSource? _metricsCts;
 
     private sealed record ToolboxEntry(string Name, string Description, string[] Keywords, string Target, string Kind = "Configuração", string? ServiceName = null);
 
@@ -60,7 +61,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetNavigationState("Home");
-        Closed += (_, _) => { _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); };
+        Closed += (_, _) => { _networkMonitorCts?.Cancel(); _autoProfileCts?.Cancel(); _metricsCts?.Cancel(); };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -107,6 +108,7 @@ public partial class MainWindow : Window
         PageHost.Content = page switch
         {
             "Home" => BuildHome(),
+            "Monitor" => BuildMonitor(),
             "Backup" => BuildBackup(),
             "Tweaks" => BuildTweaks(),
             "Network" => BuildNetwork(),
@@ -123,7 +125,7 @@ public partial class MainWindow : Window
     {
         var map = new Dictionary<string, Button>
         {
-            ["Home"] = NavHome, ["Backup"] = NavBackup, ["Tweaks"] = NavTweaks,
+            ["Home"] = NavHome, ["Monitor"] = NavMonitor, ["Backup"] = NavBackup, ["Tweaks"] = NavTweaks,
             ["Network"] = NavNetwork, ["Debloat"] = NavDebloat, ["Motherboard"] = NavBoard,
             ["Toolbox"] = NavToolbox, ["Restore"] = NavRestore, ["Logs"] = NavLogs
         };
@@ -166,6 +168,97 @@ public partial class MainWindow : Window
         actions.Children.Add(SmallAction("Central A520M K V2", () => ShowPage("Motherboard")));
         root.Children.Add(actions);
         return root;
+    }
+
+    private UIElement BuildMonitor()
+    {
+        var root = PageContainer();
+        root.Children.Add(PageIntro("Monitor", "Acompanhe CPU, memória e GPU em tempo real. Sensores indisponíveis são identificados sem instalar drivers extras."));
+        var card = MakeCard();
+        var panel = new StackPanel { Margin = new Thickness(20) };
+        panel.Children.Add(Heading("Telemetria do sistema", 15));
+        panel.Children.Add(Body("CPU e memória usam APIs nativas do Windows. GPU usa NVIDIA SMI quando disponível ou contadores de mecanismo 3D do Windows. Temperatura, memória dedicada e potência dependem do suporte do driver NVIDIA."));
+        var cpu = MetricLine("CPU", "Aguardando leitura…");
+        var memory = MetricLine("RAM", "Aguardando leitura…");
+        var gpu = MetricLine("GPU 3D", "Aguardando leitura…");
+        var temperature = MetricLine("Temperatura GPU", "Indisponível até a primeira leitura");
+        var gpuMemory = MetricLine("Memória GPU", "Indisponível até a primeira leitura");
+        var gpuPower = MetricLine("Potência GPU", "Indisponível até a primeira leitura");
+        var source = Body("Fonte GPU: —");
+        var status = Body("Monitor parado.");
+        var buttons = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var start = new Button { Content = "Iniciar monitor", Style = (Style)FindResource("AccentButton"), MinWidth = 125, Margin = new Thickness(0, 0, 8, 0) };
+        var stop = new Button { Content = "Parar", Style = (Style)FindResource("QuietButton"), MinWidth = 85, IsEnabled = false };
+        start.Click += async (_, _) =>
+        {
+            if (_metricsCts is not null) return;
+            _metricsCts = new CancellationTokenSource();
+            var token = _metricsCts.Token;
+            var service = new PerformanceMonitorService();
+            start.IsEnabled = false;
+            stop.IsEnabled = true;
+            status.Text = "Coletando métricas…";
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    var sample = await service.SampleAsync();
+                    cpu.Text = sample.CpuPercent.HasValue ? sample.CpuPercent.Value.ToString("0.0") + "%" : "Aquecendo amostra…";
+                    memory.Text = sample.MemoryUsedGb.ToString("0.0") + " / " + sample.MemoryTotalGb.ToString("0.0") + " GB (" + sample.MemoryPercent.ToString("0") + "%)";
+                    gpu.Text = sample.Gpu3DPercent.HasValue ? sample.Gpu3DPercent.Value.ToString("0.0") + "%" : "Não disponível";
+                    temperature.Text = sample.GpuTemperatureC.HasValue ? sample.GpuTemperatureC.Value.ToString("0") + " °C" : "Não fornecida pelo driver";
+                    gpuMemory.Text = sample.GpuMemoryUsedMb.HasValue && sample.GpuMemoryTotalMb.HasValue
+                        ? sample.GpuMemoryUsedMb.Value.ToString("0") + " / " + sample.GpuMemoryTotalMb.Value.ToString("0") + " MB"
+                        : "Não disponível";
+                    gpuPower.Text = sample.GpuPowerWatts.HasValue ? sample.GpuPowerWatts.Value.ToString("0.0") + " W" : "Não disponível";
+                    source.Text = "Fonte GPU: " + sample.GpuTelemetrySource + " • " + sample.Timestamp.ToString("HH:mm:ss");
+                    status.Text = "Monitoramento ativo • atualização aproximada de 1 segundo";
+                    await Task.Delay(1000, token);
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                status.Text = "Monitor parado.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Monitor de hardware falhou: " + ex);
+                status.Text = "Falha: " + ex.Message;
+            }
+            finally
+            {
+                _metricsCts?.Dispose();
+                _metricsCts = null;
+                start.IsEnabled = true;
+                stop.IsEnabled = false;
+            }
+        };
+        stop.Click += (_, _) => _metricsCts?.Cancel();
+        buttons.Children.Add(start);
+        buttons.Children.Add(stop);
+        foreach (var line in new[] { cpu, memory, gpu, temperature, gpuMemory, gpuPower }) panel.Children.Add(line.Container);
+        panel.Children.Add(source);
+        panel.Children.Add(status);
+        panel.Children.Add(buttons);
+        card.Child = panel;
+        root.Children.Add(card);
+        root.Children.Add(NoteCard("Precisão e compatibilidade", "O ynoez não instala driver de sensor nem altera tensão, clock, curva de ventoinha ou BIOS. Alguns sensores exigem permissões ou suporte específico do fabricante e podem aparecer como indisponíveis."));
+        return root;
+    }
+
+    private static (Border Container, TextBlock Text) MetricLine(string label, string initial)
+    {
+        var border = new Border { Background = BrushFrom("#171717"), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 4, 0, 4) };
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var name = Heading(label, 11);
+        var value = Body(initial);
+        Grid.SetColumn(value, 1);
+        grid.Children.Add(name);
+        grid.Children.Add(value);
+        border.Child = grid;
+        return (border, value);
     }
 
     private UIElement BuildBackup()
