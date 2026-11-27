@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "manufacturer-model",
+  "manufacturer": "MANUFACTURER",
+  "product": "MODEL NAME",
+  "chipset": "CHIPSET",
+  "platform": "SOCKET",
+  "memory": "MEMORY SPECIFICATION",
+  "network": "ONBOARD NETWORK CONTROLLER",
+  "audio": "ONBOARD AUDIO CONTROLLER",
+  "features": [],
+  "revisionLinks": [
+    { "revision": "1.0", "support": "https://official-support-page", "bios": "https://official-bios-page" }
+  ],
+  "utilities": [
+    { "name": "Utility name", "purpose": "Verified purpose", "safety": "Known risks and restrictions" }
+  ],
+  "safeRecommendations": [],
+  "blockedAutomaticActions": [
+    "BIOS flashing",
+    "Voltage/clock/overclock automation",
+    "Disabling TPM/Secure Boot/VBS/HVCI/IOMMU/DMA",
+    "Bulk disabling of chipset, LAN or audio drivers"
+  ]
+}
