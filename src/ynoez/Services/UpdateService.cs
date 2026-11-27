@@ -110,7 +110,7 @@ public static class UpdateService
             throw new InvalidDataException("A URL não aponta para uma tag de release do repositório oficial.");
 
         var tag = Uri.UnescapeDataString(segments[4]);
-        if (!System.Text.RegularExpressions.Regex.IsMatch(tag, @"^v?[0-9]+\\.[0-9]+\\.[0-9]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant) ||
+        if (!System.Text.RegularExpressions.Regex.IsMatch(tag, @"^v?[0-9]+\.[0-9]+\.[0-9]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant) ||
             (expectedTag is not null && !string.Equals(tag, expectedTag, StringComparison.Ordinal)))
             throw new InvalidDataException("A URL não corresponde a uma tag estável e exata do ynoez.");
         return uri;
