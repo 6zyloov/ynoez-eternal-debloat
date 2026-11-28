@@ -410,7 +410,7 @@ public static class FirmwareCompatibilityService
         return plan;
     }
 
-    private static bool TryReadLenovoSettings(out bool available)
+    private static IReadOnlyList<FirmwareDetectedSetting> TryReadLenovoSettings(out bool available)
     {
         try
         {
