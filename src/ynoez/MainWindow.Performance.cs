@@ -76,7 +76,7 @@ public partial class MainWindow
                 apply.IsEnabled = true;
             }
         };
-        focus.Click += (_, _) => ShowPage("Foco de Jogo");
+        focus.Click += (_, _) => ShowAddonPage("Foco de Jogo", BuildProcessFocusPage(), NavGameFocus, "Tweaks");
         return root;
     }
 }
