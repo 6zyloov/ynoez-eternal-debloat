@@ -31,7 +31,7 @@ Permitir que um jogo principal tenha prioridade de CPU e preferência de GPU de 
 
 ## Teste recomendado
 
-Comece com CS2 em Acima do normal e Roblox em Idle. Verifique se as duas instâncias continuam recebendo atualizações e se o XT não perde a execução. Depois, experimente Alta no CS2 apenas se o sistema permanecer responsivo. Caso Roblox desconecte, altere o perfil AFK para Abaixo do normal. Faça uma sessão longa antes de considerar a configuração estável.
+Comece com CS2 em Alta (após ler e aceitar o aviso) e Roblox em Idle. Verifique se as duas instâncias continuam recebendo atualizações, se o Windows permanece responsivo e se o XT não perde a execução. Se houver falhas de áudio ou lentidão geral, use Acima do normal no CS2. Caso Roblox desconecte ou pare de avançar, mude o perfil AFK para Abaixo do normal. Faça uma sessão longa antes de considerar a configuração estável.
 
 ## Referências técnicas
 

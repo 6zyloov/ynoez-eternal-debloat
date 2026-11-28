@@ -1,7 +1,6 @@
 using System.IO;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -52,12 +51,15 @@ public partial class MainWindow
         var focusPanel = new StackPanel();
         focusPanel.Children.Add(FocusHeading("JOGO PRINCIPAL"));
         focusPanel.Children.Add(FocusDescription("Este aplicativo recebe prioridade de CPU Alta (padrão, com confirmação) ou Acima do normal e prioridade de memória normal. A preferência do Windows para a GPU de alto desempenho também é configurada para o próximo início."));
-        var detectionRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 8) };
+        var detectionRow = new Grid { Margin = new Thickness(0, 2, 0, 8) };
+        detectionRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        detectionRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var detectGames = CreateFocusButton("Detectar CS2 + Roblox", true);
         detectGames.Click += (_, _) => DetectFocusTargets(showSummary: true);
         detectionRow.Children.Add(detectGames);
         _focusDiscoveryStatus = FocusDescription("O ynoez procura o CS2 nas bibliotecas Steam e a versão mais recente instalada do Roblox.", new Thickness(10, 7, 0, 0));
         _focusDiscoveryStatus.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(_focusDiscoveryStatus, 1);
         detectionRow.Children.Add(_focusDiscoveryStatus);
         focusPanel.Children.Add(detectionRow);
         var focusPathTextBox = CreateFocusTextBox();
@@ -275,9 +277,9 @@ public partial class MainWindow
         var steamRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (root, keyPath) in new[]
         {
-            (Registry.CurrentUser, @"Software\\Valve\\Steam"),
-            (Registry.LocalMachine, @"SOFTWARE\\WOW6432Node\\Valve\\Steam"),
-            (Registry.LocalMachine, @"SOFTWARE\\Valve\\Steam")
+            (Registry.CurrentUser, @"Software\Valve\Steam"),
+            (Registry.LocalMachine, @"SOFTWARE\WOW6432Node\Valve\Steam"),
+            (Registry.LocalMachine, @"SOFTWARE\Valve\Steam")
         })
         {
             try
