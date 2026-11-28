@@ -35,13 +35,13 @@ public partial class MainWindow
         var actionRow = new WrapPanel { Orientation = Orientation.Horizontal };
         var analyze = new Button
         {
-            Content = "ANALISAR",
+            Content = "ANALISAR BIOS",
             Style = (Style)FindResource("QuietButton"),
             Margin = new Thickness(0, 0, 7, 0)
         };
         var apply = new Button
         {
-            Content = "APLICAR BIOS",
+            Content = "APLICAR / VER AJUSTES",
             Style = (Style)FindResource("AccentButton"),
             IsEnabled = false,
             Margin = new Thickness(0, 0, 7, 0)
@@ -87,16 +87,18 @@ public partial class MainWindow
                 var vbs = snapshot.VbsEnabled ? "VBS ON" : "VBS OFF";
                 var hvci = snapshot.MemoryIntegrityEnabled ? "HVCI ON" : "HVCI OFF";
                 var iommu = snapshot.DmaProtectionAvailable ? "proteção DMA disponível" : "proteção DMA não confirmada";
-                var writer = snapshot.LenovoWmiAvailable
-                    ? (snapshot.CanWriteBios ? "BIOS com gravação Lenovo disponível" : "gravação bloqueada por segurança")
-                    : "BIOS analisada; gravação automática não suportada neste modelo";
+                var writer = snapshot.AsusActAvailable
+                    ? (snapshot.CanWriteBios ? "ASUS ACT disponível para este modelo" : "gravação ASUS bloqueada por segurança")
+                    : snapshot.LenovoWmiAvailable
+                        ? (snapshot.CanWriteBios ? "BIOS Lenovo com gravação disponível" : "gravação Lenovo bloqueada por segurança")
+                        : "BIOS analisada; ajuste automático não disponível neste modelo";
                 status.Text = snapshot.BiosMode + " • " + tpm + " • " + secure + "\n" +
                     virtual + " • " + iommu + " • " + vbs + " • " + hvci + "\n" + writer;
                 if (!preCheckSupported)
                     status.Text += "\nVanguard Pre-Check requer Windows 11 25H2 ou mais recente.";
                 if (!snapshot.LenovoWmiAvailable)
                     status.Text += "\nEsta BIOS não oferece interface de gravação documentada compatível. Nenhum offset UEFI genérico será escrito.";
-                apply.IsEnabled = snapshot.CanWriteBios;
+                apply.IsEnabled = true;
             }
             catch (Exception ex)
             {
