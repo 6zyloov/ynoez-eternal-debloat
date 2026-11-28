@@ -17,9 +17,11 @@ Este artefato é uma build candidata para avaliação, não uma release estável
 
 ## Integridade e validação
 
-O GitHub Actions executa auditoria NuGet, testes xUnit, publicação Windows, instalador Inno, geração e validação de SBOM, smoke test de instalação, upgrade/rollback e dry-run de checksums. A execução desta rodada deve terminar com sucesso antes de considerar a entrega validada. O manifesto SHA256SUMS inclui os artefatos publicados relevantes.
+A CI do commit `3c07809e50fc56fb74767bafeeb1cabfac990d99` terminou com sucesso no Windows Server 2025 ([run 46092514834](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46092514834)). Foram aprovados auditoria NuGet, testes xUnit, publicação e instalador, geração/validação de SBOM, instalação limpa, reinstalação, desinstalação preservando dados, upgrade do baseline atual de main, rollback, re-upgrade e dry-run de SHA-256. O manifesto inclui instalador, pacote portátil, SBOM e status de assinatura.
 
-Compare o arquivo SHA256SUMS.txt com os hashes calculados localmente antes de executar os pacotes. Consulte docs/SBOM-AND-SIGNING.md para os detalhes da SBOM e da assinatura.
+Na SBOM atual, seis componentes e dez arquivos foram identificados, mas os campos de licença dos pacotes permanecem NOASSERTION; a revisão formal de licenças ainda é necessária. A distribuição atual declara Authenticode NOT SIGNED porque nenhum certificado de assinatura foi configurado.
+
+Compare SHA256SUMS.txt com os hashes calculados localmente antes de executar os pacotes. Consulte docs/SBOM-AND-SIGNING.md para os detalhes da SBOM e da assinatura.
 
 ## Limites
 
