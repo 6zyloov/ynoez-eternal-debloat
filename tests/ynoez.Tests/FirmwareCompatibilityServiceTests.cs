@@ -59,7 +59,7 @@ public sealed class FirmwareCompatibilityServiceTests
         var withoutBoost = FirmwareCompatibilityService.GetTargetSettingIds(["faceit"], includeCpuBoost: false);
         var withBoost = FirmwareCompatibilityService.GetTargetSettingIds(["faceit", "faceit"], includeCpuBoost: true);
         Assert.DoesNotContain("cpu-boost", withoutBoost);
-        Assert.Single(withBoost, "cpu-boost");
+        Assert.Single(withBoost.Where(x => x == "cpu-boost"));
         Assert.Contains("secureboot", withBoost);
     }
 
