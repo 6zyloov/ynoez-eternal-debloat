@@ -116,6 +116,69 @@ public static class SystemRegistryTweakService
         return definition.Values.All(IsTargetValuePresent);
     }
 
+    public static IReadOnlyList<string> ApplyMany(IEnumerable<string> ids)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        lock (Sync)
+        {
+            var definitions = ids.Distinct(StringComparer.Ordinal)
+                .Select(GetDefinition)
+                .Where(definition => !IsApplied(definition.Public.Id))
+                .ToArray();
+            if (definitions.Length == 0) return Array.Empty<string>();
+
+            var backups = new List<(Definition Definition, string Path, SystemRegistryBackup Backup)>();
+            foreach (var definition in definitions)
+            {
+                var backupPath = GetBackupPath(definition.Public.Id);
+                if (File.Exists(backupPath))
+                    throw new InvalidOperationException("O ajuste " + definition.Public.Id +
+                        " já possui backup pendente. Nenhum ajuste em lote foi aplicado.");
+                var backup = new SystemRegistryBackup(definition.Public.Id,
+                    definition.Values.Select(Capture).ToList(), DateTimeOffset.UtcNow);
+                WriteAtomic(backupPath, JsonSerializer.Serialize(backup, JsonOptions));
+                backups.Add((definition, backupPath, backup));
+            }
+
+            try
+            {
+                RunElevated(BuildApplyScript(definitions));
+                foreach (var item in backups)
+                    if (!IsApplied(item.Definition.Public.Id))
+                        throw new InvalidOperationException("O Windows não confirmou o ajuste " + item.Definition.Public.Id + ".");
+                foreach (var item in backups)
+                    AppLog.Write("Ajuste em lote de sistema aplicado: " + item.Definition.Public.Id + ".");
+                return backups.Select(x => x.Definition.Public.Id).ToArray();
+            }
+            catch (OperationCanceledException)
+            {
+                foreach (var item in backups)
+                    try { if (File.Exists(item.Path)) File.Delete(item.Path); } catch { }
+                throw;
+            }
+            catch (Exception applyError)
+            {
+                try
+                {
+                    RunElevated(BuildRestoreScript(backups.Select(x => x.Backup).ToArray()));
+                    foreach (var item in backups)
+                        foreach (var value in item.Backup.Values)
+                            if (!MatchesSnapshot(value))
+                                throw new InvalidOperationException("A reversão não foi confirmada para " + value.ValueName + ".");
+                    foreach (var item in backups)
+                        if (File.Exists(item.Path)) File.Delete(item.Path);
+                }
+                catch (Exception restoreError)
+                {
+                    throw new InvalidOperationException(
+                        "O perfil em lote falhou e a reversão ficou incompleta. Os backups foram preservados. " +
+                        applyError.Message + " | Restauração: " + restoreError.Message, applyError);
+                }
+                throw;
+            }
+        }
+    }
+
     public static void Apply(string id)
     {
         lock (Sync)
@@ -204,10 +267,13 @@ public static class SystemRegistryTweakService
 
     internal static string BuildApplyScript(string id) => BuildApplyScript(GetDefinition(id));
 
-    private static string BuildApplyScript(Definition definition)
+    private static string BuildApplyScript(Definition definition) =>
+        BuildApplyScript(new[] { definition });
+
+    private static string BuildApplyScript(IReadOnlyList<Definition> definitions)
     {
         var commands = new List<string> { "$ErrorActionPreference='Stop'" };
-        foreach (var value in definition.Values)
+        foreach (var value in definitions.SelectMany(x => x.Values))
         {
             var path = "HKLM:\\" + Escape(value.KeyPath);
             var name = Escape(value.ValueName);
@@ -232,10 +298,13 @@ public static class SystemRegistryTweakService
         return string.Join("; ", commands);
     }
 
-    private static string BuildRestoreScript(SystemRegistryBackup backup)
+    private static string BuildRestoreScript(SystemRegistryBackup backup) =>
+        BuildRestoreScript(new[] { backup });
+
+    private static string BuildRestoreScript(IReadOnlyList<SystemRegistryBackup> backups)
     {
         var commands = new List<string> { "$ErrorActionPreference='Stop'" };
-        foreach (var value in backup.Values)
+        foreach (var value in backups.SelectMany(x => x.Values))
         {
             var path = "HKLM:\\" + Escape(value.KeyPath);
             var name = Escape(value.ValueName);
