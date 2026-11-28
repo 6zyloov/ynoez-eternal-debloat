@@ -46,13 +46,14 @@ public partial class MainWindow
         var focusPanel = new StackPanel();
         focusPanel.Children.Add(FocusHeading("JOGO PRINCIPAL"));
         focusPanel.Children.Add(FocusDescription("Este aplicativo recebe prioridade de CPU acima do normal ou alta e prioridade de memória normal. A preferência do Windows para a GPU de alto desempenho também é configurada para o próximo início."));
-        _focusExecutableTextBox = CreateFocusTextBox();
-        _focusExecutableTextBox.Text = settings.FocusExecutablePath ?? string.Empty;
+        var focusPathTextBox = CreateFocusTextBox();
+        focusPathTextBox.Text = settings.FocusExecutablePath ?? string.Empty;
+        _focusExecutableTextBox = focusPathTextBox;
 
         var focusPathRow = new Grid { Margin = new Thickness(0, 10, 0, 12) };
         focusPathRow.ColumnDefinitions.Add(new ColumnDefinition());
         focusPathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        focusPathRow.Children.Add(_focusExecutableTextBox);
+        focusPathRow.Children.Add(focusPathTextBox);
         var browseFocus = CreateFocusButton("Escolher .exe", false);
         browseFocus.Margin = new Thickness(8, 0, 0, 0);
         browseFocus.Click += (_, _) =>
