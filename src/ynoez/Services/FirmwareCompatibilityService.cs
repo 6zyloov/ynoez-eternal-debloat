@@ -22,12 +22,14 @@ public sealed record FirmwareCompatibilitySnapshot(
     bool MemoryIntegrityEnabled,
     bool DmaProtectionAvailable,
     bool LenovoWmiAvailable,
+    bool LenovoPasswordStateKnown,
     bool LenovoSupervisorPasswordSet,
     bool BitLockerProtectionOn,
     IReadOnlyList<string> DetectedAntiCheats,
     IReadOnlyList<FirmwareDetectedSetting> FirmwareSettings)
 {
     public bool CanWriteBios => LenovoWmiAvailable &&
+        LenovoPasswordStateKnown &&
         !LenovoSupervisorPasswordSet &&
         !BitLockerProtectionOn &&
         string.Equals(BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase);
@@ -90,7 +92,8 @@ public static class FirmwareCompatibilityService
         var virtualization = ReadCpuVirtualization();
         var antiCheats = DetectAntiCheats();
         var lenovoSettings = TryReadLenovoSettings(out var lenovoAvailable);
-        var passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState();
+        var passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState(out var passwordStateKnown);
+        var passwordStateConfirmed = lenovoAvailable && passwordStateKnown;
 
         return new FirmwareCompatibilitySnapshot(
             hardware.BoardManufacturer,
@@ -107,6 +110,7 @@ public static class FirmwareCompatibilityService
             deviceGuard.Hvci,
             deviceGuard.Dma,
             lenovoAvailable,
+            passwordStateConfirmed,
             passwordSet,
             IsBitLockerProtectionOn(),
             antiCheats,
@@ -174,13 +178,15 @@ public static class FirmwareCompatibilityService
                 "Esta placa não expõe uma interface de configuração de BIOS documentada e compatível com o ynoez. A análise foi feita; a gravação automática está bloqueada para evitar corromper a NVRAM. Use a entrada UEFI para os itens listados.");
         if (!snapshot.CanWriteBios)
         {
-            var reason = snapshot.LenovoSupervisorPasswordSet
-                ? "A BIOS possui senha de administrador; o ynoez não tenta contornar nem armazenar essa senha."
-                : snapshot.BitLockerProtectionOn
-                    ? "A proteção do BitLocker está ativa. Suspenda-a e guarde a chave de recuperação antes de alterar TPM/Secure Boot."
-                    : !string.Equals(snapshot.BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase)
-                        ? "O Windows iniciou em modo Legacy. Não será alterado o modo de boot automaticamente porque isso pode impedir a inicialização."
-                        : "A BIOS não está liberada para gravação segura.";
+            var reason = !snapshot.LenovoPasswordStateKnown
+                ? "Não foi possível confirmar o estado da senha de administrador da BIOS; a gravação foi bloqueada por segurança."
+                : snapshot.LenovoSupervisorPasswordSet
+                    ? "A BIOS possui senha de administrador; o ynoez não tenta contornar nem armazenar essa senha."
+                    : snapshot.BitLockerProtectionOn
+                        ? "A proteção do BitLocker está ativa ou seu estado é desconhecido. A gravação foi bloqueada para evitar problemas com o TPM/recuperação."
+                        : !string.Equals(snapshot.BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase)
+                            ? "O Windows iniciou em modo Legacy. Não será alterado o modo de boot automaticamente porque isso pode impedir a inicialização."
+                            : "A BIOS não está liberada para gravação segura.";
             return new FirmwareApplyResult(false, false, 0, [], reason);
         }
 
@@ -336,11 +342,13 @@ public static class FirmwareCompatibilityService
         return Convert.ToString(output?["return"]) ?? "Unknown";
     }
 
-    private static bool ReadLenovoSupervisorPasswordState()
+    private static bool ReadLenovoSupervisorPasswordState(out bool known)
     {
+        known = false;
         try
         {
             using var scope = new ManagementScope(WmiNamespace);
+            scope.Connect();
             using var searcher = new ManagementObjectSearcher(scope,
                 new ObjectQuery("SELECT PasswordState FROM Lenovo_BiosPasswordSettings"));
             using var rows = searcher.Get();
@@ -348,13 +356,24 @@ public static class FirmwareCompatibilityService
             {
                 using (row)
                 {
-                    var state = Convert.ToInt32(row["PasswordState"] ?? 0);
+                    if (row["PasswordState"] is null) return false;
+                    var state = Convert.ToInt32(row["PasswordState"]);
+                    known = true;
                     return (state & 2) != 0 || (state & 128) != 0;
                 }
             }
         }
         catch (Exception ex) { AppLog.Write("Estado de senha Lenovo indisponível: " + ex.Message); }
         return false;
+    }
+
+    public static bool IsVanguardPreCheckSupportedOS(HardwareSnapshot hardware)
+    {
+        ArgumentNullException.ThrowIfNull(hardware);
+        if (!hardware.OperatingSystem.Contains("Windows 11", StringComparison.OrdinalIgnoreCase))
+            return false;
+        var buildText = hardware.WindowsBuild.Split([' ', '('], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        return int.TryParse(buildText, out var build) && build >= 26200;
     }
 
     private static bool ReadSecureBoot()
