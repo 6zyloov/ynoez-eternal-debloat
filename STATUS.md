@@ -1,58 +1,35 @@
-# Desenvolvimento — ynoez 0.3.0
+# Status do projeto — ynoez 0.3.0
 
-- Base de build atualizada para .NET 10 LTS (`net10.0-windows`), usando `System.Management 10.0.15`.
+**Situação:** candidato integrado em PR draft #12. O código e o pacote passaram pela CI Windows no commit anterior desta linha; as alterações recentes de interface/avisos estão aguardando nova execução. CI valida compilação, testes automatizados e empacotamento, não compatibilidade física com todos os PCs. Não há release estável publicada.
 
-## Implementado nesta linha
-- Continuidade de operação pela bandeja do sistema: fechar a janela pelo usuário (sem desligar/sair do Windows) enquanto monitoramento de rede, perfil automático, telemetria, benchmark ou reparo Windows está ativo oculta a interface sem encerrar a operação. Duplo clique reabre; menu contextual oferece encerramento explícito.
-- Central de manutenção do Windows: DISM CheckHealth/ScanHealth/RestoreHealth e SFC VerifyOnly/Scannow, com comandos fixos, backup de logs por execução, UAC, timeout e cancelamento. Reparos exigem confirmação; nenhuma ação de boot/segurança/anti-cheat e nenhuma reinicialização automática.
-- Motor transacional de Registro HKCU com whitelist, backup atômico, detecção, verificação e reversão.
-- Catálogo integrado com 11 ajustes opcionais de privacidade, interface e captura Game DVR, incluindo build mínimo do Windows.
-- Inventário Win32: leitura de entradas HKLM/HKCU em registros 32/64 bits, filtro por nome/editor/classificação, exportação CSV com neutralização de fórmula; não executa UninstallString nem remove aplicativos.
-- Inventário AppX/MSIX atual por usuário e inventário administrativo de todos os perfis + pacotes provisionados, com classificação de componentes centrais, UAC explícito e exportação CSV; nenhum pacote é removido.
-- Gerenciador de inicialização: inventário HKCU/HKLM 32/64 bits e pastas Startup pessoal/compartilhada; entradas HKCU não protegidas e arquivos pessoais podem ser desativados com backup/reversão; HKLM e Startup compartilhada somente leitura.
-- Catálogo de seis serviços opcionais: DiagTrack, dmwappushservice, MapsBroker, Fax, RetailDemo e WMPNetworkSvc. Backup do modo de inicialização, delayed-auto, confirmação, UAC, tentativa de parada sem forçar dependências e restauração verificada.
-- Toolbox com inventário sob demanda somente leitura de todos os serviços Win32 e tarefas agendadas: nome/caminho/estado, inicialização/PID ou autor/descrição/última-próxima execução/resultado, filtros, classificação de componentes protegidos e whitelist opcional, detalhes e CSV. Não modifica serviços ou tarefas.
-- Perfis manuais Performance, Equilibrado e AFK, com backup do plano original.
-- Perfis automáticos por jogo conhecido, processos protegidos configuráveis e inatividade: jogo com entrada recente = Performance; jogo/processo protegido durante inatividade = AFK protegido (Equilibrado + bloqueio de suspensão); sem carga protegida após 15 minutos = AFK Economia. Configuração inválida bloqueia a economia agressiva. Nenhum processo é encerrado; plano original exportado/restaurado e sessão interrompida recuperável.
-- Monitor ao vivo de CPU/RAM via APIs nativas e GPU 3D via NVIDIA SMI ou WMI GPU Engine. Home também consulta módulos RAM por WMI/SMBIOS (posição, capacidade, DDR, velocidade reportada/configurada, formato, ECC reportado, fabricante e part number) e exporta CSV. Não é leitura SPD e não infere single/dual channel. Temperatura/VRAM/potência dependem do suporte do driver.
-- Benchmark PresentMon 2.6.0 sob demanda, SHA-256 fixado, captura ETW por PID, CSV + resumo JSON, FPS médio, 1% low (inverso do P99), 0,1% low (inverso do P99,9), frametime médio, p99/p99,9 e frames lentos. Sessões A/B com três rodadas em cada fase, mediana, dispersão e JSON persistente. A série não controla a cena, mapa, temperatura ou processos do PC.
-- Verificador manual de atualização: consulta somente quando solicitado o endpoint de release estável oficial do GitHub, valida tag/URL/repositório e apenas abre a página oficial quando há versão mais nova; não baixa nem instala automaticamente. UAC quando necessário; licenças MIT e avisos de terceiros incluídos.
-- Diagnóstico de rede: ICMP, TCP/443, DNS IPv4/IPv6 e tracert.
-- Monitoramento contínuo a cada 5 segundos com gateway IPv4/IPv6, Cloudflare e Google em ICMP/TCP/443 nas duas famílias, resolução DNS A/AAAA e janela móvel real de 60 segundos. Perda/jitter separados por família/protocolo; classifica rede local IPv4/IPv6, IPv6 indisponível/filtrado, DNS, ICMP e TCP; CSV completo.
-- Inventário de adaptadores físicos e virtuais com endereços, DNS, gateways, MTU e versão de driver quando o WMI informa; exportação CSV, somente leitura. Consulta e ajuste reversível de Selective Suspend/Device Sleep on Disconnect em adaptadores físicos compatíveis, sem reinício automático do adaptador.
-- Central Restore consolida recuperação de Registro, plano base/AFK interrompido, serviços opcionais, adaptadores de rede, tarefas, inicialização e snapshots. Backups órfãos ou corrompidos permanecem preservados.
-- Testes Windows de transações/reversão, AFK protegido e configuração inválida, inventários de serviços/tarefas, classificação de hardware SMBIOS/RAM, confirmação física de revisão, PnP/drivers, monitoramento IPv4/IPv6/DNS e CSV seguro, PresentMon e whitelists.
-- Auditoria de integridade somente leitura para Defender/Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update e estados conhecidos de serviços/drivers Vanguard/FACEIT; não declara compatibilidade por conta própria.
-- Tratamento global de exceções não tratadas: registra stack trace em Logs, fecha a aplicação de forma controlada e tenta restaurar sessão de energia pendente.
-- CI Windows executa testes antes de publicar o executável autocontido.
-- Auditoria somente leitura de Defender/Firewall, TPM, Secure Boot, VBS/HVCI e serviços/drivers relacionados a Search, impressão, Store, Windows Update, Vanguard e FACEIT; valores não fornecidos pelo Windows aparecem como indisponíveis. Distingue serviço ausente de serviço parado e não afirma compatibilidade anti-cheat.
-- Versão do app e instalador têm fonte única em `<Version>` no csproj. O builder gera `.iss` temporário com valores literais, confere FileVersion/ProductName PE e publica nome dinâmico por versão.
-- Verificador manual de atualização consulta somente quando solicitado a release estável do repositório GitHub, valida tag/URL e abre a página oficial; não baixa nem instala silenciosamente.
-- Pipeline separada de release por tag vX.Y.Z, com teste Windows, instalador Inno Setup, pacote portátil e manifesto SHA-256.
+## Funcionalidades integradas
 
-## Base existente mantida
-- Shell WPF com referência visual Stix, Home, Monitor, Backup, Tweaks, Network, Debloat, Motherboard, Toolbox, Restore e Logs.
-- Inventário WMI, snapshot local, ponto de restauração opcional e limpeza seletiva Temp/Brave/Discord, preservando perfis e credenciais.
-- Perfil GIGABYTE A520M K V2 e política de componentes protegidos.
-- Central da A520M K V2 trata SMBIOS como indício; BIOS por revisão só após confirmação manual da serigrafia no PCB. Inventário PnP de rede/áudio/sistema expõe IDs de hardware e provedor/versão/data/INF reportados, sem atualizar drivers.
+- **Home e hardware:** CPU, GPU, memória, Windows, placa-mãe e BIOS via APIs/WMI. Inventário de DIMMs com dados SMBIOS/WMI, sem afirmar leitura SPD ou topologia de canal.
+- **Monitor:** CPU/RAM por APIs nativas; uso 3D por NVIDIA SMI ou contadores Windows GPU Engine. A agregação WMI soma instâncias de processos que compartilham o mesmo engine físico e escolhe o engine 3D mais ocupado, com testes para múltiplos processos e adaptadores. Temperatura, VRAM e potência dependem do suporte do driver NVIDIA; sensores de CPU e fontes AMD/Intel ainda não estão integrados.
+- **Benchmark:** PresentMon oficial baixado sob demanda, com SHA-256 fixado, captura ETW, CSV/JSON, FPS médio, 1%/0,1% low, frametimes e comparação A/B de três rodadas por fase. Não promete ganhos por tweak nem controla a cena do jogo.
+- **Perfis e energia:** perfis manuais Performance/Equilibrado/AFK e automação por jogo/inatividade. Jogo ativo com entrada recente usa Performance; jogo ou processo protegido em inatividade usa Equilibrado + bloqueio de suspensão; economia AFK só entra sem cargas protegidas após 15 minutos. Roblox e jogos do catálogo, cmd, PowerShell, Python, Node.js, Java, WSH e AutoHotkey são protegidos por padrão. A lista personalizada é somada e não substitui os padrões. Configuração corrompida mantém AFK protegido e exibe aviso na tela. Nenhum processo é encerrado; o plano original é exportado, verificado e restaurável.
+- **Registro e Debloat:** 11 ajustes HKCU transacionais e reversíveis. Limpeza seletiva de Temp e caches Brave/Discord, preservando perfis e credenciais. Inventários Win32/AppX/MSIX e provisionados são somente leitura. Inicialização HKCU e Startup pessoal têm backup/reversão; itens de máquina e Startup compartilhada são somente leitura.
+- **Serviços e tarefas:** whitelist conservadora de seis serviços e seis tarefas opcionais para alterações reversíveis. Toolbox oferece inventário somente leitura de serviços e tarefas agendadas, filtro, classificação, detalhes e CSV.
+- **Rede:** inventário de NIC, drivers e propriedades avançadas em modo somente leitura; diagnóstico IPv4/IPv6 ICMP/TCP/DNS/tracert; monitor contínuo com gateways IPv4/IPv6, ICMP/TCP 443, DNS A/AAAA, perda/jitter em 60 segundos e exportação CSV. Energia de NIC só altera opções compatíveis, reversivelmente e sem reiniciar o adaptador.
+- **Placa-mãe:** perfil GIGABYTE A520M K V2, inventário PnP e drivers. SMBIOS é apenas indício; BIOS por revisão só aparece após confirmação manual da serigrafia do PCB (1.0/1.1/1.2).
+- **Manutenção e recuperação:** DISM/SFC em comandos allowlisted, snapshots locais com SHA-256, backups e restauração de Registro/energia/serviços/NIC/tarefas/inicialização. A bandeja mantém operações ativas quando a janela é fechada.
+- **Instalador e distribuição:** .NET 10 self-contained win-x64; versão única no csproj; Inno Setup para C:\ynoez; metadados PE e SHA-256 verificados. A CI audita dependências NuGet, roda testes, publica o app, instala o setup em runner limpo, reinstala sobre ele, testa desinstalação preservando Data, Backups, Logs e Downloads, e publica os dois artefatos.
 
-## Limites conhecidos
-- Entradas de inicialização de máquina são somente leitura; serviços opcionais são uma whitelist curta, não há desativação em massa.
-- Não há remoção AppX/provisioned nem gerenciamento de recursos opcionais. Tarefas agendadas limitadas a seis itens de telemetria/feedback/mapas; manutenção, Update, Defender, indexação, drivers e anti-cheats permanecem fora da whitelist.
-- O modo automático roda somente enquanto o ynoez está aberto; ao parar, tenta restaurar o plano original. Se falhar, mantém metadados e exportação .pow para nova tentativa na abertura seguinte. O bloqueio de suspensão termina quando o app fecha.
-- A telemetria de GPU depende do driver/Windows; temperatura de CPU e sensores AMD/Intel ainda não estão integrados.
-- O benchmark precisa ser testado com jogos reais; PresentMon exige permissão ETW e não mede ganho causado por tweaks sozinho.
-- O monitor de rede ajuda a separar ICMP de TCP e gateway de destino, mas não determina sozinho a causa de desconexões do roteador/ISP. A coleta continua com a janela na bandeja enquanto o PC está acordado; suspensão, hibernação ou desligamento pausam a coleta.
-- Ainda falta validação física com Vanguard/FACEIT, assinatura Authenticode e teste de recuperação em Windows real. O verificador de versões não substitui assinatura nem atualização automática.
+## Regras de segurança
 
-## Limites adicionais
-- Snapshots locais são inventários de hardware/energia/rede com hashes de integridade; não são uma imagem completa do Windows nem substituem backup externo.
-- Alguns Windows não possuem SCHEME_MIN ou SCHEME_MAX; o fallback para Equilibrado é explícito e o perfil AFK ainda ativa o bloqueio de suspensão automática.
-- Poppins é incorporada sob SIL Open Font License; o texto integral está em `src/ynoez/Assets/Fonts/OFL.txt`.
+Permanecem protegidos Microsoft Store/licenciamento, impressão, Calculadora, Clipboard, Notepad, Windows Search, Windows Update, Defender, Firewall, SmartScreen, UAC, NVIDIA Instant Replay/Alt+Z, Vanguard, FACEIT, TPM, Secure Boot, VBS/HVCI e IOMMU/DMA. Não há flash de BIOS, overclock, tensão, alterações BCD/HPET/PlatformTick ou desativação em massa de serviços. AppX não é removido.
 
-## Próxima linha de engenharia
-1. Comparação A/B repetida e controlada de benchmarks por jogo, agregação de várias sessões e controle/registro de cena, temperaturas e processos concorrentes.
-2. Inventário AppX/Win32/provisionados e remoção só quando houver pacote de recuperação confiável.
-3. Diagnóstico de NIC mais completo (driver, EEE, interrupt moderation e propriedades avançadas) com recomendações condicionais.
-4. Migrar code-behind para MVVM/DI e ampliar testes de falhas, concorrência e recuperação após crash.
-5. Atualizador com validação criptográfica, assinatura Authenticode e testes físicos em hardware real.
+## Limites que ainda impedem chamar de release estável
+
+1. Testar em Windows real: abertura, navegação, WMI, sessões longas, PresentMon com jogos reais, rede e recuperação após falhas.
+2. Validar Roblox + automações XT por várias horas e observar que processos/scripts permanecem ativos; cadastrar o nome exato do processo XT se ele for independente dos runtimes protegidos.
+3. Testar Vanguard/FACEIT em ambiente autorizado e hardware AMD/Intel/NVIDIA reais. A CI não confirma compatibilidade de anti-cheat.
+4. Testar Windows 10 e Windows 11 suportados, contas padrão/administrador e cenários sem Internet.
+5. Testar upgrade de uma versão anterior publicada e rollback; o smoke test atual cobre instalação limpa, reinstalação do mesmo setup e desinstalação com retenção de dados.
+6. Integrar sensores adicionais somente por APIs/documentação/licenças verificadas, sem instalar drivers de kernel que possam interferir com anti-cheats.
+7. Produzir SBOM e assinar Authenticode quando houver certificado válido. Sem certificado, a distribuição só pode ser acompanhada de hashes verificáveis.
+8. Refatoração MVVM/DI, journal global e teste de crash-recovery mais abrangente são débitos de arquitetura.
+
+## Política
+
+A CI verde é condição necessária, não suficiente. A versão estável só será marcada após os testes Windows/hardware acima, revisão final do candidato e verificação de todos os artefatos. AppX, firmware e alterações de segurança continuam conservadores por desenho.

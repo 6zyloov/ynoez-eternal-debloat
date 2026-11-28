@@ -36,6 +36,13 @@ jobs:
           $expected = "v" + [string]$project.Project.PropertyGroup.Version
           if ($env:GITHUB_REF_NAME -ne $expected) { throw "Tag $env:GITHUB_REF_NAME difere da versão $expected." }
           dotnet --version
+      - name: Audit NuGet dependencies
+        shell: pwsh
+        run: |
+          dotnet list src/ynoez/ynoez.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências do app falhou." }
+          dotnet list tests/ynoez.Tests/ynoez.Tests.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências dos testes falhou." }
       - name: Run Windows integration tests
         shell: pwsh
         run: dotnet test tests/ynoez.Tests/ynoez.Tests.csproj --configuration Release --logger "console;verbosity=normal"
@@ -48,7 +55,7 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: ./scripts/build-installer.ps1
-      - name: Test install, upgrade and uninstall
+      - name: Test clean install, reinstall and uninstall
         shell: pwsh
         run: ./scripts/test-installer.ps1
       - name: Create and publish release assets
