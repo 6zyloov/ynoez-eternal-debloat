@@ -129,6 +129,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             Application.Current.SessionEnding -= Application_SessionEnding;
+            TimerResolutionService.Disable();
             RemoveTrayIcon();
             if (_trayHookAttached) _windowSource?.RemoveHook(TrayWindowProc);
             _trayHookAttached = false;
@@ -187,22 +188,49 @@ public partial class MainWindow : Window
         await RefreshHardwareAsync();
     }
 
+    private void Login_Click(object sender, RoutedEventArgs e)
+    {
+        // This is a local visual gate only. It deliberately does not authenticate,
+        // store credentials, or transmit any entered text.
+        LoginOverlay.Visibility = Visibility.Collapsed;
+        AppLog.Write("Acesso local iniciado; o painel de login não valida credenciais.");
+    }
+
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || button.Content is null) return;
-        ShowPage(button.Content.ToString() ?? "Home");
+        if (sender is not Button button) return;
+        var page = button.Name switch
+        {
+            "NavHome" => "Home",
+            "NavTweaks" => "Tweaks",
+            "NavDebloat" => "Debloat",
+            "NavNetwork" => "Network",
+            "NavProcessFocus" => "Foco de Jogo",
+            "NavBoard" => "Motherboard",
+            "NavToolbox" => "Toolbox",
+            "NavBackup" => "Backup",
+            _ => "Home"
+        };
+        ShowPage(page);
     }
 
     private void ShowPage(string page)
     {
         _currentPage = page;
-        PageTitle.Text = page;
+        PageTitle.Text = page switch
+        {
+            "Tweaks" => "Otimizações",
+            "Network" => "Rede",
+            "Motherboard" => "Placa-mãe",
+            "Toolbox" => "Ferramentas",
+            "Foco de Jogo" => "Foco de Jogo",
+            _ => page
+        };
         SetNavigationState(page);
         PageScroll.ScrollToTop();
         PageHost.Content = page switch
         {
             "Home" => BuildHome(),
-            "Monitor" => BuildMonitor(),
             "Foco de Jogo" => BuildProcessFocusPage(),
             "Backup" => BuildBackup(),
             "Tweaks" => BuildTweaks(),
@@ -210,8 +238,6 @@ public partial class MainWindow : Window
             "Debloat" => BuildDebloat(),
             "Motherboard" => BuildMotherboard(),
             "Toolbox" => BuildToolbox(),
-            "Restore" => BuildRestore(),
-            "Logs" => BuildLogs(),
             _ => BuildHome()
         };
     }
@@ -220,56 +246,215 @@ public partial class MainWindow : Window
     {
         var map = new Dictionary<string, Button>
         {
-            ["Home"] = NavHome, ["Monitor"] = NavMonitor, ["Foco de Jogo"] = NavProcessFocus, ["Backup"] = NavBackup, ["Tweaks"] = NavTweaks,
-            ["Network"] = NavNetwork, ["Debloat"] = NavDebloat, ["Motherboard"] = NavBoard,
-            ["Toolbox"] = NavToolbox, ["Restore"] = NavRestore, ["Logs"] = NavLogs
+            ["Home"] = NavHome,
+            ["Tweaks"] = NavTweaks,
+            ["Debloat"] = NavDebloat,
+            ["Network"] = NavNetwork,
+            ["Foco de Jogo"] = NavProcessFocus,
+            ["Motherboard"] = NavBoard,
+            ["Toolbox"] = NavToolbox,
+            ["Backup"] = NavBackup
         };
         foreach (var item in map)
         {
-            item.Value.Background = item.Key == page ? BrushFrom("#181818") : PageBrush;
-            item.Value.Foreground = item.Key == page ? AccentBrush : PrimaryBrush;
+            item.Value.Background = item.Key == page ? BrushFrom("#1D1D1D") : PageBrush;
+            item.Value.Foreground = PrimaryBrush;
         }
     }
 
     private UIElement BuildHome()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Visão geral", "Seu hardware e os atalhos que realmente importam."));
+        root.Children.Add(PageIntro("Home", "Seu PC. Seus ajustes. Sem painel de gráficos."));
 
-        var grid = new UniformGrid { Columns = 2, Rows = 2, Margin = new Thickness(0, 3, 0, 16) };
-        grid.Children.Add(InfoTile("PROCESSADOR", _hardware.Cpu, "CPU"));
-        grid.Children.Add(InfoTile("PLACA DE VÍDEO", _hardware.Gpu, "GPU"));
-        grid.Children.Add(InfoTile("MEMÓRIA RAM", _hardware.Memory, "RAM"));
-        grid.Children.Add(InfoTile("WINDOWS", _hardware.OperatingSystem + " • Build " + _hardware.WindowsBuild, "OS"));
-        root.Children.Add(grid);
+        var hardware = new UniformGrid { Columns = 3, Margin = new Thickness(0, 2, 0, 15) };
+        hardware.Children.Add(InfoTile("CPU", _hardware.Cpu, "CPU"));
+        hardware.Children.Add(InfoTile("GPU", _hardware.Gpu, "GPU"));
+        hardware.Children.Add(InfoTile("RAM", _hardware.Memory, "RAM"));
+        root.Children.Add(hardware);
 
-        var actionsCard = MakeCard();
-        var actionsPanel = new StackPanel { Margin = new Thickness(20, 17, 20, 17) };
-        actionsPanel.Children.Add(Heading("Ações rápidas", 15));
-        var actions = new UniformGrid { Columns = 3, Margin = new Thickness(0, 8, 0, 0) };
-        var optimize = SmallAction("Otimizar para jogos", () => ShowPage("Tweaks"));
-        var debloat = SmallAction("Limpar / Debloat", () => ShowPage("Debloat"));
-        var monitor = SmallAction("Monitorar desempenho", () => ShowPage("Monitor"));
-        optimize.Margin = new Thickness(0, 0, 8, 0);
-        debloat.Margin = new Thickness(0, 0, 8, 0);
-        actions.Children.Add(optimize);
-        actions.Children.Add(debloat);
-        actions.Children.Add(monitor);
-        actionsPanel.Children.Add(actions);
-        actionsCard.Child = actionsPanel;
-        root.Children.Add(actionsCard);
+        var actions = MakeCard();
+        var actionPanel = new StackPanel { Margin = new Thickness(17, 14, 17, 14) };
+        actionPanel.Children.Add(Heading("Ações", 14));
+        var actionGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 5, 0, 0) };
+        actionGrid.Children.Add(SmallAction("Otimizações", () => ShowPage("Tweaks")));
+        actionGrid.Children.Add(SmallAction("Debloat", () => ShowPage("Debloat")));
+        actionGrid.Children.Add(SmallAction("Foco de Jogo", () => ShowPage("Foco de Jogo")));
+        actionGrid.Children.Add(SmallAction("Placa-mãe", () => ShowPage("Motherboard")));
+        actionPanel.Children.Add(actionGrid);
+        actions.Child = actionPanel;
+        root.Children.Add(actions);
 
-        var detailCard = MakeCard();
-        var detailPanel = new StackPanel { Margin = new Thickness(20, 15, 20, 15) };
-        detailPanel.Children.Add(Heading("Sistema", 13));
-        detailPanel.Children.Add(KeyValue("Placa-mãe", _hardware.BoardProduct));
-        detailPanel.Children.Add(KeyValue("Rede", _hardware.NetworkSummary));
-        var detailNote = Body("As alterações são locais e registradas. Perfis e limpeza podem ser restaurados quando houver backup.");
-        detailNote.Margin = new Thickness(0, 9, 0, 0);
-        detailPanel.Children.Add(detailNote);
-        detailCard.Child = detailPanel;
-        root.Children.Add(detailCard);
+        var system = Body(_hardware.OperatingSystem + " • " + _hardware.BoardProduct);
+        system.Margin = new Thickness(2, 11, 0, 0);
+        system.Foreground = MutedBrush;
+        root.Children.Add(system);
         return root;
+    }
+
+    private Border BuildToggleCard(
+        string title, string description, bool isChecked,
+        Func<bool, Task> onChanged, bool canChange = true, string state = "")
+    {
+        var card = MakeCard();
+        card.Margin = new Thickness(0, 0, 9, 9);
+        card.MinHeight = 112;
+        var panel = new StackPanel { Margin = new Thickness(14, 12, 14, 12) };
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var titleText = Heading(title, 12);
+        titleText.Margin = new Thickness(0, 0, 8, 0);
+        header.Children.Add(titleText);
+        var toggle = new ToggleButton
+        {
+            Style = (Style)FindResource("SwitchToggle"),
+            IsChecked = isChecked,
+            IsEnabled = canChange,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(toggle, 1);
+        header.Children.Add(toggle);
+        panel.Children.Add(header);
+
+        var detail = Body(description);
+        detail.FontSize = 9;
+        detail.Margin = new Thickness(0, 5, 0, 0);
+        detail.MaxHeight = 34;
+        panel.Children.Add(detail);
+
+        var status = Body(state);
+        status.FontSize = 8;
+        status.Foreground = MutedBrush;
+        status.Margin = new Thickness(0, 7, 0, 0);
+        panel.Children.Add(status);
+
+        var busy = false;
+        var internalChange = false;
+        async Task ChangeAsync(bool requested)
+        {
+            if (busy || internalChange) return;
+            busy = true;
+            toggle.IsEnabled = false;
+            status.Text = requested ? "APLICANDO…" : "RESTAURANDO…";
+            try
+            {
+                await onChanged(requested);
+                status.Text = requested ? "ATIVO" : "PADRÃO";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Alternância de '" + title + "' falhou: " + ex);
+                internalChange = true;
+                toggle.IsChecked = !requested;
+                internalChange = false;
+                status.Text = "FALHOU";
+                MessageBox.Show(ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                busy = false;
+                toggle.IsEnabled = canChange;
+            }
+        }
+        toggle.Checked += async (_, _) => await ChangeAsync(true);
+        toggle.Unchecked += async (_, _) => await ChangeAsync(false);
+        if (!canChange && string.IsNullOrWhiteSpace(state))
+            status.Text = isChecked ? "ATIVO NO WINDOWS" : "INDISPONÍVEL";
+
+        card.Child = panel;
+        return card;
+    }
+
+    private Border BuildToolActionCard(string title, string description, string buttonText, Func<Task> action)
+    {
+        var card = MakeCard();
+        card.Margin = new Thickness(0, 0, 9, 9);
+        card.MinHeight = 112;
+        var panel = new StackPanel { Margin = new Thickness(14, 12, 14, 12) };
+        panel.Children.Add(Heading(title, 12));
+        var detail = Body(description);
+        detail.FontSize = 9;
+        detail.Margin = new Thickness(0, 2, 0, 6);
+        detail.MaxHeight = 30;
+        panel.Children.Add(detail);
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var status = Body("PRONTO");
+        status.FontSize = 8;
+        status.Foreground = MutedBrush;
+        status.VerticalAlignment = VerticalAlignment.Center;
+        row.Children.Add(status);
+        var button = new Button
+        {
+            Content = buttonText,
+            Style = (Style)FindResource("QuietButton"),
+            Padding = new Thickness(12, 6, 12, 6)
+        };
+        Grid.SetColumn(button, 1);
+        row.Children.Add(button);
+        button.Click += async (_, _) =>
+        {
+            button.IsEnabled = false;
+            status.Text = "EXECUTANDO…";
+            try
+            {
+                await action();
+                status.Text = "CONCLUÍDO";
+            }
+            catch (Exception ex)
+            {
+                status.Text = "FALHOU";
+                AppLog.Write("Ferramenta '" + title + "' falhou: " + ex);
+                MessageBox.Show(ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally { button.IsEnabled = true; }
+        };
+        panel.Children.Add(row);
+        card.Child = panel;
+        return card;
+    }
+
+    private static async Task RunLocalProcessAsync(string executable, string arguments)
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo(executable, arguments)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            }
+        };
+        process.Start();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+            throw new TimeoutException(executable + " excedeu 30 segundos.");
+        }
+        var output = await outputTask;
+        var error = await errorTask;
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(executable + " terminou com código " + process.ExitCode + ". " + error + " " + output);
+        if (!string.IsNullOrWhiteSpace(output))
+            AppLog.Write(executable + ": " + output.Trim());
+    }
+
+    private static Task OpenAmdSoftwareAsync()
+    {
+        var path = @"C:\Program Files\AMD\CNext\CNext\RadeonSoftware.exe";
+        return File.Exists(path)
+            ? OpenTargetAsync(path)
+            : OpenTargetAsync("ms-settings:display-advancedgraphics");
     }
 
     private UIElement BuildMonitor()
@@ -631,703 +816,311 @@ public partial class MainWindow : Window
     private UIElement BuildTweaks()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Otimização", "Aplique um perfil de jogo reversível ou deixe o ynoez ajustar a energia automaticamente."));
+        root.Children.Add(PageIntro("Otimizações", "Ajustes reais do Windows. Ative o que quiser testar; cada alteração compatível guarda o valor anterior."));
 
-        var gameCard = MakeCard();
-        var gamePanel = new StackPanel { Margin = new Thickness(20, 18, 20, 18) };
-        gamePanel.Children.Add(Heading("Otimização para jogos", 16));
-        gamePanel.Children.Add(Body("Reduz a captura em segundo plano do Xbox, diminui efeitos visuais do Windows e seleciona Alto desempenho quando nenhum outro perfil de energia do ynoez já controla o plano. Cada alteração é salva para restauração."));
-        var gameStatus = Body(QuickGameOptimizationService.IsApplied
-            ? "Perfil aplicado. As alterações estão registradas para restauração."
-            : "Nenhuma otimização rápida aplicada.");
-        gameStatus.Margin = new Thickness(0, 9, 0, 10);
-        var gameButtons = new WrapPanel();
-        var applyGame = new Button
+        var tabs = new TabControl { Background = PageBrush, BorderThickness = new Thickness(0), Margin = new Thickness(0, 0, 0, 6) };
+
+        var mainGrid = new UniformGrid { Columns = 3 };
+        try
         {
-            Content = "Otimizar agora",
-            Style = (Style)FindResource("AccentButton"),
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        var restoreGame = new Button
+            var registry = new RegistryTweakService();
+            foreach (var tweak in OptimizationCatalogService.LoadRegistryTweaks())
+                mainGrid.Children.Add(BuildRegistryToggleCard(tweak, registry));
+        }
+        catch (Exception ex)
         {
-            Content = "Restaurar alterações",
-            Style = (Style)FindResource("QuietButton"),
-            IsEnabled = QuickGameOptimizationService.IsApplied
-        };
-        applyGame.IsEnabled = !QuickGameOptimizationService.IsApplied;
-        applyGame.Click += async (_, _) =>
+            AppLog.Write("Catálogo de otimizações indisponível: " + ex);
+            mainGrid.Children.Add(NoteCard("Catálogo indisponível", ex.Message));
+        }
+        tabs.Items.Add(new TabItem { Header = "Main", Content = mainGrid });
+
+        var kernelGrid = new UniformGrid { Columns = 2 };
+        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("mmcss-games"));
+        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("network-throttling"));
+        kernelGrid.Children.Add(BuildTimerResolutionCard());
+        tabs.Items.Add(new TabItem { Header = "Kernel", Content = kernelGrid });
+
+        var powerPanel = new StackPanel();
+        var powerGrid = new UniformGrid { Columns = 2 };
+        powerGrid.Children.Add(BuildToolActionCard("Alto desempenho", "Ativa o plano Alto desempenho do Windows.", "Ativar", async () =>
         {
             if (_autoProfileCts is not null)
-            {
-                gameStatus.Text = "Pause os perfis automáticos antes de aplicar o perfil rápido.";
-                return;
-            }
-            if (MessageBox.Show(
-                "Aplicar o perfil para jogos? A captura em segundo plano do Xbox será desativada, alguns efeitos visuais serão reduzidos e o plano de energia poderá mudar para Alto desempenho. NVIDIA Instant Replay, OBS, drivers e anti-cheats não serão alterados.",
-                "Confirmar otimização", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                return;
-
-            applyGame.IsEnabled = false;
-            restoreGame.IsEnabled = false;
-            gameStatus.Text = "Aplicando e verificando as configurações…";
-            try
-            {
-                gameStatus.Text = await Task.Run(QuickGameOptimizationService.Apply);
-                restoreGame.IsEnabled = QuickGameOptimizationService.IsApplied;
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Otimização rápida para jogos falhou: " + ex);
-                gameStatus.Text = "A aplicação foi interrompida: " + ex.Message;
-                restoreGame.IsEnabled = QuickGameOptimizationService.IsApplied;
-            }
-            finally
-            {
-                applyGame.IsEnabled = !QuickGameOptimizationService.IsApplied;
-            }
-        };
-        restoreGame.Click += async (_, _) =>
-        {
-            restoreGame.IsEnabled = false;
-            applyGame.IsEnabled = false;
-            gameStatus.Text = "Restaurando valores anteriores…";
-            try
-            {
-                gameStatus.Text = await Task.Run(QuickGameOptimizationService.Restore);
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Restauração da otimização rápida falhou: " + ex);
-                gameStatus.Text = "A restauração precisa de atenção: " + ex.Message;
-            }
-            finally
-            {
-                restoreGame.IsEnabled = QuickGameOptimizationService.IsApplied;
-                applyGame.IsEnabled = !QuickGameOptimizationService.IsApplied;
-            }
-        };
-        gameButtons.Children.Add(applyGame);
-        gameButtons.Children.Add(restoreGame);
-        gamePanel.Children.Add(gameStatus);
-        gamePanel.Children.Add(gameButtons);
-        gameCard.Child = gamePanel;
-        root.Children.Add(gameCard);
-
-        var focusCard = MakeCard();
-        var focusPanel = new StackPanel { Margin = new Thickness(20, 15, 20, 15) };
-        focusPanel.Children.Add(Heading("Prioridade por aplicativo", 14));
-        focusPanel.Children.Add(Body("Dê prioridade ao CS2 e reduza CPU/memória das instâncias AFK do Roblox. Uma entrada controla todas as instâncias com o mesmo executável."));
-        focusPanel.Children.Add(SmallAction("Configurar Foco de Jogo", () => ShowPage("Foco de Jogo")));
-        focusCard.Child = focusPanel;
-        root.Children.Add(focusCard);
-
-        var autoCard = MakeCard();
-        var autoPanel = new StackPanel { Margin = new Thickness(20, 15, 20, 15) };
-        autoPanel.Children.Add(Heading("Perfis automáticos", 14));
-        autoPanel.Children.Add(Body("Jogo em uso: Performance. Jogo ou automação protegida em segundo plano: Equilibrado. Sem tarefas protegidas e após 15 minutos sem atividade: economia."));
-        var autoStatus = Body(_autoProfileCts is null ? "Automação desligada." : "Automação ativa.");
-        autoStatus.Margin = new Thickness(0, 8, 0, 8);
-        var autoButtons = new WrapPanel();
-        var startAuto = new Button
-        {
-            Content = "Ativar automático",
-            Style = (Style)FindResource("AccentButton"),
-            IsEnabled = _autoProfileCts is null,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        var stopAuto = new Button
-        {
-            Content = "Parar",
-            Style = (Style)FindResource("QuietButton"),
-            IsEnabled = _autoProfileCts is not null
-        };
-        startAuto.Click += async (_, _) =>
+                throw new InvalidOperationException("Desative os perfis automáticos antes de trocar o plano manualmente.");
+            var message = await Task.Run(() => PowerProfileService.Apply(PowerProfileMode.Performance));
+            AppLog.Write(message);
+        }));
+        powerGrid.Children.Add(BuildToolActionCard("Equilibrado", "Volta ao plano Equilibrado do Windows.", "Ativar", async () =>
         {
             if (_autoProfileCts is not null)
-                return;
-            if (QuickGameOptimizationService.IsApplied)
+                throw new InvalidOperationException("Desative os perfis automáticos antes de trocar o plano manualmente.");
+            var message = await Task.Run(() => PowerProfileService.Apply(PowerProfileMode.Balanced));
+            AppLog.Write(message);
+        }));
+        if (PowerProfileService.CanRestoreOriginal())
+        {
+            powerGrid.Children.Add(BuildToolActionCard("Plano anterior", "Recupera o plano salvo pelo ynoez.", "Restaurar", async () =>
             {
-                MessageBox.Show("Restaure o perfil rápido de jogos antes de ativar a troca automática de energia.",
-                    "Perfis automáticos", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            if (MessageBox.Show("Ativar a troca automática de energia conforme jogos, automações protegidas e inatividade?",
-                "Perfis automáticos", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
+                if (_autoProfileCts is not null)
+                    throw new InvalidOperationException("Desative os perfis automáticos antes de restaurar o plano.");
+                var message = await Task.Run(PowerProfileService.RestoreOriginal);
+                AppLog.Write(message);
+            }));
+        }
+        powerPanel.Children.Add(powerGrid);
+        var autoStatus = Body(_autoProfileCts is null ? "Desligado" : "Ativo");
+        var autoCard = BuildToggleCard(
+            "Perfis automáticos",
+            "Jogo em foco = Alto desempenho. Jogo/XT protegido em segundo plano = Equilibrado. Sem atividade protegida = economia.",
+            _autoProfileCts is not null,
+            enabled => SetAutomaticProfilesAsync(enabled, autoStatus),
+            true,
+            _autoProfileCts is null ? "DESLIGADO" : "ATIVO");
+        powerPanel.Children.Add(autoCard);
+        powerPanel.Children.Add(autoStatus);
+        tabs.Items.Add(new TabItem { Header = "Power", Content = powerPanel });
 
-            _autoProfileCts = new CancellationTokenSource();
-            var token = _autoProfileCts.Token;
-            startAuto.IsEnabled = false;
-            stopAuto.IsEnabled = true;
-            autoStatus.Text = "Inicializando automação…";
-            try
-            {
-                await AutoProfileService.RunAsync(status =>
-                {
-                    if (!Dispatcher.HasShutdownStarted)
-                        Dispatcher.Invoke(() => autoStatus.Text =
-                            "Modo: " + AutoProfileService.GetModeDisplayName(status.Mode) +
-                            " • Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") + " min" +
-                            (status.ActiveGame.Length > 0 ? " • Jogo: " + status.ActiveGame : "") +
-                            (status.ActiveProtectedProcess.Length > 0 ? " • Protegido: " + status.ActiveProtectedProcess : ""));
-                }, token);
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                autoStatus.Text = "Automação parada. O plano anterior foi restaurado.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Perfis automáticos falharam: " + ex);
-                autoStatus.Text = "Falha: " + ex.Message;
-            }
-            finally
-            {
-                _autoProfileCts?.Dispose();
-                _autoProfileCts = null;
-                startAuto.IsEnabled = true;
-                stopAuto.IsEnabled = false;
-            }
-        };
-        stopAuto.Click += (_, _) => _autoProfileCts?.Cancel();
-        autoButtons.Children.Add(startAuto);
-        autoButtons.Children.Add(stopAuto);
-        autoPanel.Children.Add(autoStatus);
-        autoPanel.Children.Add(autoButtons);
-        autoCard.Child = autoPanel;
-        root.Children.Add(autoCard);
+        var gpuGrid = new UniformGrid { Columns = 2 };
+        gpuGrid.Children.Add(BuildSystemRegistryToggleCard("gpu-scheduling"));
+        gpuGrid.Children.Add(BuildToolActionCard("Preferência gráfica do jogo", "Abra o Foco de Jogo para definir a GPU de alto desempenho para o CS2.", "Configurar", () =>
+        {
+            ShowPage("Foco de Jogo");
+            return Task.CompletedTask;
+        }));
+        gpuGrid.Children.Add(BuildToolActionCard("AMD Software", "Abre o painel Radeon/Adrenalin, quando instalado pelo driver.", "Abrir", OpenAmdSoftwareAsync));
+        gpuGrid.Children.Add(BuildToolActionCard("Gráficos do Windows", "Configuração oficial de GPU por aplicativo e agendamento de GPU.", "Abrir", () => OpenTargetAsync("ms-settings:display-advancedgraphics")));
+        tabs.Items.Add(new TabItem { Header = "GPU", Content = gpuGrid });
 
+        root.Children.Add(tabs);
         return root;
+    }
+
+    private Border BuildRegistryToggleCard(RegistryTweak tweak, RegistryTweakService service)
+    {
+        var state = service.Inspect(tweak);
+        var hasBackup = service.CanRestore(tweak.Id);
+        var enabled = state == TweakState.Enabled || hasBackup;
+        var canChange = state != TweakState.Enabled || hasBackup;
+        var status = hasBackup ? "BACKUP SALVO" : enabled ? "ATIVO NO WINDOWS" : "PADRÃO";
+        return BuildToggleCard(tweak.Name, tweak.Description, enabled, async requested =>
+        {
+            await Task.Run(() =>
+            {
+                if (requested) service.Apply(tweak);
+                else service.Restore(tweak);
+            });
+        }, canChange, status);
+    }
+
+    private Border BuildSystemRegistryToggleCard(string id)
+    {
+        var status = SystemRegistryTweakService.GetStatus(id);
+        return BuildToggleCard(
+            status.Definition.Name,
+            status.Definition.Description,
+            status.IsApplied,
+            requested => Task.Run(() =>
+            {
+                if (requested) SystemRegistryTweakService.Apply(id);
+                else SystemRegistryTweakService.Restore(id);
+            }),
+            status.CanChange,
+            status.HasBackup ? "BACKUP SALVO" : status.IsApplied ? "ATIVO NO WINDOWS" : "PADRÃO");
+    }
+
+    private Border BuildTimerResolutionCard()
+    {
+        return BuildToggleCard(
+            "Temporizador 1 ms",
+            "Solicita resolução de timer apenas para o processo ynoez. Pode aumentar consumo; o Windows 11 pode ignorar quando a janela fica oculta.",
+            TimerResolutionService.IsEnabled,
+            enabled => Task.Run(() =>
+            {
+                if (enabled) TimerResolutionService.Enable();
+                else TimerResolutionService.Disable();
+            }),
+            true,
+            TimerResolutionService.IsEnabled ? "ATIVO NESTA SESSÃO" : "DESLIGADO");
+    }
+
+    private Task SetAutomaticProfilesAsync(bool enabled, TextBlock status)
+    {
+        if (enabled)
+        {
+            if (_autoProfileCts is not null) return Task.CompletedTask;
+            if (QuickGameOptimizationService.IsApplied)
+                throw new InvalidOperationException("Restaure o perfil rápido anterior antes de ativar a automação.");
+
+            var cts = new CancellationTokenSource();
+            _autoProfileCts = cts;
+            status.Text = "Iniciando…";
+            _ = RunAutomaticProfilesAsync(cts, status);
+        }
+        else
+        {
+            _autoProfileCts?.Cancel();
+            status.Text = "Parando e restaurando o plano…";
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task RunAutomaticProfilesAsync(CancellationTokenSource cts, TextBlock status)
+    {
+        try
+        {
+            await AutoProfileService.RunAsync(value =>
+            {
+                if (!Dispatcher.HasShutdownStarted)
+                    Dispatcher.Invoke(() => status.Text =
+                        AutoProfileService.GetModeDisplayName(value.Mode) +
+                        " • " + value.IdleTime.TotalMinutes.ToString("0") + " min sem atividade" +
+                        (value.ActiveGame.Length > 0 ? " • " + value.ActiveGame : "") +
+                        (value.ActiveProtectedProcess.Length > 0 ? " • " + value.ActiveProtectedProcess : ""));
+            }, cts.Token);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            if (!Dispatcher.HasShutdownStarted) status.Text = "Desligado";
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Perfis automáticos falharam: " + ex);
+            if (!Dispatcher.HasShutdownStarted) status.Text = "Falhou: " + ex.Message;
+        }
+        finally
+        {
+            if (ReferenceEquals(_autoProfileCts, cts))
+            {
+                _autoProfileCts = null;
+                cts.Dispose();
+            }
+        }
     }
 
     private UIElement BuildNetwork()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Network", "Mede latência, jitter, perda de pacotes, DNS, conectividade TCP e rota."));
-        var resultCard = MakeCard();
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(Heading("Diagnóstico de conexão", 15));
-        panel.Children.Add(Body("O teste mede ICMP no gateway e em 1.1.1.1, testa HTTPS/TCP em dois destinos, resolve DNS IPv4/IPv6 e rastreia a rota com tracert. Nenhuma configuração de rede será modificada."));
-        var output = new TextBlock
-        {
-            Text = "Pronto para testar.", Foreground = SecondaryBrush, FontFamily = new FontFamily("Consolas"),
-            FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 15, 0, 10)
-        };
-        var progressText = new TextBlock { Text = "", Foreground = AccentBrush, FontSize = 10, Margin = new Thickness(0, 0, 0, 10) };
-        var diagnosticButtons = new WrapPanel();
-        var run = new Button { Content = "Executar diagnóstico", Style = (Style)FindResource("AccentButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 8, 0) };
-        var cancelDiagnostic = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        run.Click += async (_, _) =>
-        {
-            if (_networkDiagnosticCts is not null) return;
-            _networkDiagnosticCts = new CancellationTokenSource();
-            var token = _networkDiagnosticCts.Token;
-            run.IsEnabled = false;
-            cancelDiagnostic.IsEnabled = true;
-            output.Text = "Executando…";
-            progressText.Text = "Preparando medições";
-            var progress = new Progress<string>(s => progressText.Text = s);
-            try { output.Text = await NetworkDiagnosticService.RunAsync(progress, token); }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                if (IsLoaded) output.Text = "Diagnóstico cancelado. Nenhuma configuração de rede foi alterada.";
-            }
-            catch (Exception ex)
-            {
-                output.Text = "Falha no diagnóstico: " + ex.Message;
-                AppLog.Write("Diagnóstico de rede: " + ex);
-            }
-            finally
-            {
-                _networkDiagnosticCts?.Dispose();
-                _networkDiagnosticCts = null;
-                run.IsEnabled = true;
-                cancelDiagnostic.IsEnabled = false;
-                if (IsLoaded) progressText.Text = "Concluído";
-            }
-        };
-        cancelDiagnostic.Click += (_, _) => _networkDiagnosticCts?.Cancel();
-        diagnosticButtons.Children.Add(run);
-        diagnosticButtons.Children.Add(cancelDiagnostic);
-        panel.Children.Add(progressText);
-        panel.Children.Add(output);
-        panel.Children.Add(diagnosticButtons);
-        resultCard.Child = panel;
-        root.Children.Add(resultCard);
+        root.Children.Add(PageIntro("Rede", "Ajuste de energia do adaptador e limpeza rápida de DNS."));
 
-        var monitorCard = MakeCard();
-        var monitorPanel = new StackPanel { Margin = new Thickness(20) };
-        monitorPanel.Children.Add(Heading("Monitoramento contínuo", 15));
-        monitorPanel.Children.Add(Body("Registra a cada 5 segundos os gateways IPv4/IPv6 quando reportados, dois destinos públicos (Cloudflare e Google) por ICMP e TCP/443 em IPv4 e IPv6, além de resolução DNS e contagem de respostas A/AAAA. A janela estatística móvel usa os últimos 60 segundos e gera uma hipótese de causa sem alterar a rede. O CSV fica em C:\\ynoez\\Logs. Se fechar a janela com o monitor ativo, o ynoez fica na bandeja e continua coletando; duplo clique no ícone reabre a janela e o menu contextual permite encerrar o processo. A coleta pausa enquanto o Windows estiver em suspensão/hibernação ou o computador estiver desligado."));
-        var monitorStatus = new TextBlock { Text = "Monitor parado.", Foreground = SecondaryBrush, FontSize = 11, Margin = new Thickness(0, 10, 0, 10), TextWrapping = TextWrapping.Wrap };
-        var monitorButtons = new WrapPanel();
-        var startMonitor = new Button { Content = "Iniciar monitor (5 s)", Style = (Style)FindResource("AccentButton"), MinWidth = 150, Margin = new Thickness(0, 0, 8, 0) };
-        var stopMonitor = new Button { Content = "Parar monitor", Style = (Style)FindResource("QuietButton"), MinWidth = 120, IsEnabled = false };
-        startMonitor.Click += async (_, _) =>
-        {
-            if (_networkMonitorCts is not null) return;
-            _networkMonitorCts = new CancellationTokenSource();
-            var token = _networkMonitorCts.Token;
-            startMonitor.IsEnabled = false;
-            stopMonitor.IsEnabled = true;
-            monitorStatus.Text = "Monitorando gateways IPv4/IPv6, Cloudflare, Google e DNS…";
-            try
-            {
-                var logFile = await NetworkMonitorService.RunAsync(TimeSpan.FromSeconds(5), sample =>
-                {
-                    var assessment = NetworkRootCauseService.Analyze(sample);
-                    monitorStatus.Text = sample.Timestamp.ToString("HH:mm:ss") +
-                        " | Gateway " + (string.IsNullOrWhiteSpace(sample.Gateway) ? "—" : sample.Gateway) +
-                        ": " + sample.GatewayStatus + (sample.GatewayMilliseconds.HasValue ? " " + sample.GatewayMilliseconds + " ms" : "") +
-                        " | 1.1.1.1 ICMP/TCP: " + sample.ExternalStatus + "/" + sample.ExternalTcpStatus +
-                        " | 8.8.8.8 ICMP/TCP: " + sample.SecondaryExternalStatus + "/" + sample.SecondaryExternalTcpStatus +
-                        " | DNS: " + sample.DnsStatus + (sample.DnsMilliseconds.HasValue ? " " + sample.DnsMilliseconds.Value.ToString("0.0") + " ms" : "") +
-                        " | Respostas DNS A/AAAA: " + sample.DnsIpv4AddressCount + "/" + sample.DnsIpv6AddressCount +
-                        " | IPv6 GW: " + (string.IsNullOrWhiteSpace(sample.Ipv6Gateway) ? "—" : sample.Ipv6Gateway) +
-                        " " + sample.Ipv6GatewayStatus +
-                        " | IPv6 CF ICMP/TCP: " + sample.Ipv6ExternalStatus + "/" + sample.Ipv6ExternalTcpStatus +
-                        " | IPv6 Google ICMP/TCP: " + sample.Ipv6SecondaryExternalStatus + "/" + sample.Ipv6SecondaryExternalTcpStatus +
-                        " | Perda 60s IPv6 GW/CF/Google: " + sample.Ipv6GatewayLoss60sPercent.ToString("0") + "/" +
-                            sample.Ipv6ExternalLoss60sPercent.ToString("0") + "/" + sample.Ipv6SecondaryExternalLoss60sPercent.ToString("0") + "%" +
-                        " | Falha TCP IPv6 CF/Google: " + sample.Ipv6ExternalTcpFailure60sPercent.ToString("0") + "/" +
-                            sample.Ipv6SecondaryExternalTcpFailure60sPercent.ToString("0") + "%" +
-                        " | Perda 60s GW/CF/Google: " + sample.GatewayLoss60sPercent.ToString("0") + "/" +
-                            sample.ExternalLoss60sPercent.ToString("0") + "/" + sample.SecondaryExternalLoss60sPercent.ToString("0") + "%" +
-                        " | Falha TCP CF/Google: " + sample.ExternalTcpFailure60sPercent.ToString("0") + "/" +
-                            sample.SecondaryExternalTcpFailure60sPercent.ToString("0") + "%" +
-                        " | Falha DNS: " + sample.DnsFailure60sPercent.ToString("0") + "%" +
-                        " | Jitter GW/ICMP/TCP: " +
-                            (sample.GatewayJitter60sMilliseconds.HasValue ? sample.GatewayJitter60sMilliseconds.Value.ToString("0.0") : "—") + "/" +
-                            (sample.ExternalJitter60sMilliseconds.HasValue ? sample.ExternalJitter60sMilliseconds.Value.ToString("0.0") : "—") + "/" +
-                            (sample.ExternalTcpJitter60sMilliseconds.HasValue ? sample.ExternalTcpJitter60sMilliseconds.Value.ToString("0.0") : "—") + " ms" +
-                        "\n" + assessment.Category + ": " + assessment.Assessment;
-                }, token);
-                monitorStatus.Text = "Monitor encerrado. CSV salvo em: " + logFile;
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Monitoramento de rede falhou: " + ex);
-                monitorStatus.Text = "Falha no monitoramento: " + ex.Message;
-            }
-            finally
-            {
-                _networkMonitorCts?.Dispose();
-                _networkMonitorCts = null;
-                startMonitor.IsEnabled = true;
-                stopMonitor.IsEnabled = false;
-            }
-        };
-        stopMonitor.Click += (_, _) => _networkMonitorCts?.Cancel();
-        monitorButtons.Children.Add(startMonitor);
-        monitorButtons.Children.Add(stopMonitor);
-        monitorPanel.Children.Add(monitorStatus);
-        monitorPanel.Children.Add(monitorButtons);
-        monitorCard.Child = monitorPanel;
-        root.Children.Add(monitorCard);
+        var tools = new UniformGrid { Columns = 2 };
+        tools.Children.Add(BuildToolActionCard("Limpar cache DNS", "Executa ipconfig /flushdns.", "Executar", () => RunLocalProcessAsync("ipconfig.exe", "/flushdns")));
+        tools.Children.Add(BuildToolActionCard("Conexões de rede", "Abre os adaptadores do Windows.", "Abrir", () => OpenTargetAsync("ncpa.cpl")));
+        root.Children.Add(tools);
 
         var adapterCard = MakeCard();
-        var adapterPanel = new StackPanel { Margin = new Thickness(20) };
-        adapterPanel.Children.Add(Heading("Energia dos adaptadores físicos", 15));
-        adapterPanel.Children.Add(Body("A consulta é somente leitura e não pede UAC. Se compatível, permite desativar somente Selective Suspend e Device Sleep on Disconnect, salvando os valores originais. A alteração e a restauração exigem UAC, não reiniciam o adaptador automaticamente e podem exigir reconexão/reinício para aplicar. Pode aumentar consumo e não garante corrigir quedas."));
-        var adapterResults = new StackPanel();
-        var adapterService = new AdapterPowerManagementService();
-        var scanAdapters = new Button { Content = "Analisar adaptadores", Style = (Style)FindResource("AccentButton"), MinWidth = 155, Margin = new Thickness(0, 10, 0, 10) };
-        scanAdapters.Click += async (_, _) =>
-        {
-            scanAdapters.IsEnabled = false;
-            adapterResults.Children.Clear();
-            adapterResults.Children.Add(Body("Consultando recursos do driver. O Windows pode solicitar UAC…"));
-            try
-            {
-                var adapters = await Task.Run(() => adapterService.GetPhysicalAdapters());
-                adapterResults.Children.Clear();
-                if (adapters.Count == 0)
-                    adapterResults.Children.Add(NoteCard("Nenhum adaptador compatível", "O Windows não retornou adaptadores físicos com dados de gerenciamento de energia."));
-                foreach (var adapter in adapters)
-                {
-                    var details = adapter.InterfaceDescription + "\nEstado: " + adapter.Status + " | Link: " + adapter.LinkSpeed +
-                        "\nSelective Suspend: " + adapter.SelectiveSuspend + " | Device Sleep on Disconnect: " + adapter.DeviceSleepOnDisconnect;
-                    if (adapterService.CanRestore(adapter.Name))
-                    {
-                        adapterResults.Children.Add(ActionCard(adapter.Name, details, "Restaurar energia original", async () =>
-                        {
-                            if (MessageBox.Show("Restaurar as opções originais de energia de \"" + adapter.Name + "\"?", "Confirmar restauração",
-                                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-                            await Task.Run(() => adapterService.Restore(adapter.Name));
-                            MessageBox.Show("Opções originais restauradas e verificadas.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                            ShowPage("Network");
-                        }, "BACKUP"));
-                    }
-                    else if (adapterService.CanReducePowerSaving(adapter))
-                    {
-                        adapterResults.Children.Add(ActionCard(adapter.Name, details, "Reduzir economia", async () =>
-                        {
-                            if (MessageBox.Show("Desativar apenas as opções de economia compatíveis neste adaptador? A alteração pode aumentar o consumo e pode exigir reconexão/reinício. O estado original será salvo.",
-                                "Confirmar adaptador", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-                            await Task.Run(() => adapterService.ReducePowerSaving(adapter));
-                            MessageBox.Show("Opções selecionadas desativadas e verificadas. Backup original salvo.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                            ShowPage("Network");
-                        }, "REVERSÍVEL"));
-                    }
-                    else
-                        adapterResults.Children.Add(NoteCard(adapter.Name + " — sem ajuste necessário", details + "\nNenhuma das opções suportadas está habilitada."));
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Consulta de energia dos adaptadores falhou: " + ex);
-                adapterResults.Children.Clear();
-                adapterResults.Children.Add(NoteCard("Não foi possível consultar", ex.Message));
-            }
-            finally { scanAdapters.IsEnabled = true; }
-        };
-        adapterPanel.Children.Add(scanAdapters);
-        adapterPanel.Children.Add(adapterResults);
-        adapterCard.Child = adapterPanel;
+        var panel = new StackPanel { Margin = new Thickness(16, 14, 16, 14) };
+        panel.Children.Add(Heading("Economia de energia dos adaptadores", 14));
+        var status = Body("Consultando adaptadores…");
+        panel.Children.Add(status);
+        var adapters = new UniformGrid { Columns = 2, Margin = new Thickness(0, 8, 0, 0) };
+        panel.Children.Add(adapters);
+        adapterCard.Child = panel;
         root.Children.Add(adapterCard);
-
-        var inventoryCard = MakeCard();
-        var inventoryPanel = new StackPanel { Margin = new Thickness(20) };
-        inventoryPanel.Children.Add(Heading("Inventário técnico dos adaptadores", 15));
-        inventoryPanel.Children.Add(Body("Consulta somente leitura das interfaces de rede, endereços, gateways, DNS, MTU, DHCP e informações do driver quando o Windows as fornece. Não altera propriedades, reinicia adaptadores ou substitui o diagnóstico do roteador/provedor."));
-        var inventoryStatus = Body("Inventário ainda não consultado.");
-        var inventoryGrid = new DataGrid
-        {
-            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
-            CanUserDeleteRows = false, CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"), AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft, Height = 270, Margin = new Thickness(0, 10, 0, 10)
-        };
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterInventory.Name)), Width = new DataGridLength(1.4, DataGridLengthUnitType.Star) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Tipo", Binding = new Binding(nameof(NetworkAdapterInventory.Type)), Width = new DataGridLength(85) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(NetworkAdapterInventory.Status)), Width = new DataGridLength(70) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Link", Binding = new Binding(nameof(NetworkAdapterInventory.LinkSpeedDisplay)), Width = new DataGridLength(85) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "IPv4/IPv6", Binding = new Binding(nameof(NetworkAdapterInventory.IpAddresses)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Gateway", Binding = new Binding(nameof(NetworkAdapterInventory.Gateways)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "DNS", Binding = new Binding(nameof(NetworkAdapterInventory.DnsServers)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "MTU v4/v6", Binding = new Binding(nameof(NetworkAdapterInventory.MtuDisplay)), Width = new DataGridLength(90) });
-        inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Driver", Binding = new Binding(nameof(NetworkAdapterInventory.DriverVersion)), Width = new DataGridLength(100) });
-        var inventoryButtons = new WrapPanel();
-        var refreshInventory = new Button { Content = "Analisar interfaces", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var exportInventory = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        IReadOnlyList<NetworkAdapterInventory> inventory = Array.Empty<NetworkAdapterInventory>();
-        refreshInventory.Click += async (_, _) =>
-        {
-            refreshInventory.IsEnabled = false;
-            exportInventory.IsEnabled = false;
-            inventoryStatus.Text = "Consultando interfaces e drivers pelo Windows…";
-            try
-            {
-                inventory = await Task.Run(NetworkAdapterInventoryService.Capture);
-                inventoryGrid.ItemsSource = inventory;
-                inventoryStatus.Text = inventory.Count + " interfaces consultadas • " +
-                    inventory.Count(x => string.Equals(x.Status, "Up", StringComparison.OrdinalIgnoreCase)) +
-                    " ativas • leitura somente de propriedades.";
-                exportInventory.IsEnabled = inventory.Count > 0;
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Inventário técnico de rede falhou: " + ex);
-                inventoryStatus.Text = "Não foi possível consultar as interfaces: " + ex.Message;
-            }
-            finally { refreshInventory.IsEnabled = true; }
-        };
-        exportInventory.Click += (_, _) =>
-        {
-            if (inventory.Count == 0) return;
-            var path = NetworkAdapterInventoryService.ExportCsv(inventory);
-            inventoryStatus.Text = "Relatório CSV salvo em: " + path;
-        };
-        inventoryButtons.Children.Add(refreshInventory);
-        inventoryButtons.Children.Add(exportInventory);
-        inventoryPanel.Children.Add(inventoryStatus);
-        inventoryPanel.Children.Add(inventoryGrid);
-        inventoryPanel.Children.Add(inventoryButtons);
-        inventoryPanel.Children.Add(NoteCard("Leitura de MTU e driver", "MTU e versão de driver dependem do que o Windows/WMI expõe para cada interface. Adaptadores virtuais podem aparecer no inventário; não os desative por nome sem confirmar qual VPN, hipervisor ou software os utiliza."));
-        inventoryCard.Child = inventoryPanel;
-        root.Children.Add(inventoryCard);
-
-        var advancedCard = MakeCard();
-        var advancedPanel = new StackPanel { Margin = new Thickness(20) };
-        advancedPanel.Children.Add(Heading("Propriedades avançadas do driver (somente leitura)", 15));
-        advancedPanel.Children.Add(Body("Consulta os parâmetros que o driver realmente expõe para adaptadores físicos, como EEE, Interrupt Moderation, RSS, LSO, Checksum Offload, Flow Control, Speed & Duplex e buffers. Não altera valores, não reinicia a placa e não solicita UAC."));
-        var advancedStatus = Body("Propriedades avançadas ainda não consultadas.");
-        var advancedGrid = new DataGrid
-        {
-            AutoGenerateColumns = false,
-            IsReadOnly = true,
-            CanUserAddRows = false,
-            CanUserDeleteRows = false,
-            CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"),
-            AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft,
-            Height = 330,
-            Margin = new Thickness(0, 10, 0, 10)
-        };
-        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.AdapterName)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Propriedade", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.DisplayName)), Width = new DataGridLength(1.25, DataGridLengthUnitType.Star) });
-        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Valor atual", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.DisplayValue)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Categoria", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Category)), Width = new DataGridLength(0.9, DataGridLengthUnitType.Star) });
-        advancedGrid.Columns.Add(new DataGridTextColumn { Header = "Avaliação", Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Assessment)), Width = new DataGridLength(1.25, DataGridLengthUnitType.Star) });
-        var guidanceStyle = new Style(typeof(TextBlock));
-        guidanceStyle.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap));
-        guidanceStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
-        advancedGrid.Columns.Add(new DataGridTextColumn
-        {
-            Header = "Orientação",
-            Binding = new Binding(nameof(NetworkAdapterAdvancedProperty.Guidance)),
-            ElementStyle = guidanceStyle,
-            Width = new DataGridLength(2.4, DataGridLengthUnitType.Star)
-        });
-        var advancedButtons = new WrapPanel();
-        var refreshAdvanced = new Button { Content = "Analisar propriedades", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var exportAdvanced = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        NetworkAdapterAdvancedDiagnosticsSnapshot? advancedSnapshot = null;
-        refreshAdvanced.Click += async (_, _) =>
-        {
-            refreshAdvanced.IsEnabled = false;
-            exportAdvanced.IsEnabled = false;
-            advancedStatus.Text = "Lendo propriedades publicadas pelos drivers…";
-            try
-            {
-                advancedSnapshot = await NetworkAdapterAdvancedDiagnosticsService.CaptureAsync();
-                advancedGrid.ItemsSource = advancedSnapshot.Properties;
-                advancedStatus.Text = advancedSnapshot.Properties.Count + " propriedades lidas às " +
-                    advancedSnapshot.CapturedAt.ToLocalTime().ToString("HH:mm:ss") +
-                    " • consulta somente leitura.";
-                if (advancedSnapshot.Errors.Count > 0)
-                    advancedStatus.Text += " • " + advancedSnapshot.Errors.Count + " aviso(s): " +
-                        string.Join(" | ", advancedSnapshot.Errors.Take(2));
-                exportAdvanced.IsEnabled = advancedSnapshot.Properties.Count > 0;
-                if (advancedSnapshot.Properties.Count == 0 && advancedSnapshot.Errors.Count == 0)
-                    advancedStatus.Text += " O driver não publicou propriedades avançadas para os adaptadores físicos detectados.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Auditoria de propriedades avançadas de rede falhou: " + ex);
-                advancedStatus.Text = "Não foi possível consultar os drivers: " + ex.Message;
-            }
-            finally { refreshAdvanced.IsEnabled = true; }
-        };
-        exportAdvanced.Click += (_, _) =>
-        {
-            if (advancedSnapshot is null || advancedSnapshot.Properties.Count == 0) return;
-            var path = NetworkAdapterAdvancedDiagnosticsService.ExportCsv(advancedSnapshot);
-            advancedStatus.Text = "Relatório CSV salvo em: " + path;
-        };
-        advancedButtons.Children.Add(refreshAdvanced);
-        advancedButtons.Children.Add(exportAdvanced);
-        advancedPanel.Children.Add(advancedStatus);
-        advancedPanel.Children.Add(advancedGrid);
-        advancedPanel.Children.Add(advancedButtons);
-        advancedPanel.Children.Add(NoteCard("Não existe tweak universal de rede", "EEE e Interrupt Moderation podem mudar consumo, CPU e latência; RSS e offloads normalmente devem seguir o suporte do driver; Speed & Duplex costuma ficar em negociação automática. Essas são orientações condicionais, não comandos de otimização. O ynoez não muda nenhum desses valores e não promete corrigir quedas causadas pelo roteador ou provedor."));
-        advancedCard.Child = advancedPanel;
-        root.Children.Add(advancedCard);
-
-        var statsCard = MakeCard();
-        var statsPanel = new StackPanel { Margin = new Thickness(20) };
-        statsPanel.Children.Add(Heading("Contadores dos adaptadores", 15));
-        statsPanel.Children.Add(Body("Leitura local sem UAC dos bytes, pacotes, erros e descartes acumulados por interface. Esses contadores normalmente zeram quando o adaptador é reiniciado ou o Windows reinicia; use duas leituras em momentos diferentes para comparar. Contadores acumulados não identificam sozinhos a causa de uma queda."));
-        var statsStatus = Body("Contadores ainda não consultados.");
-        var statsGrid = new DataGrid
-        {
-            AutoGenerateColumns = false,
-            IsReadOnly = true,
-            CanUserAddRows = false,
-            CanUserDeleteRows = false,
-            CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"),
-            AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft,
-            Height = 240,
-            Margin = new Thickness(0, 10, 0, 10)
-        };
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterStatistics.Name)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(NetworkAdapterStatistics.Status)), Width = new DataGridLength(75) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Link", Binding = new Binding(nameof(NetworkAdapterStatistics.LinkSpeedDisplay)), Width = new DataGridLength(85) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Recebido", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesReceivedDisplay)), Width = new DataGridLength(85) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Enviado", Binding = new Binding(nameof(NetworkAdapterStatistics.BytesSentDisplay)), Width = new DataGridLength(85) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveErrors)), Width = new DataGridLength(70) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Erros TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendErrors)), Width = new DataGridLength(70) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Descartes RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveDiscardsDisplay)), Width = new DataGridLength(85) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Descartes TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendDiscardsDisplay)), Width = new DataGridLength(85) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Problemas RX", Binding = new Binding(nameof(NetworkAdapterStatistics.ReceiveProblemPercentDisplay)), Width = new DataGridLength(90) });
-        statsGrid.Columns.Add(new DataGridTextColumn { Header = "Problemas TX", Binding = new Binding(nameof(NetworkAdapterStatistics.SendProblemPercentDisplay)), Width = new DataGridLength(90) });
-        var refreshStats = new Button { Content = "Atualizar contadores", Style = (Style)FindResource("AccentButton"), HorizontalAlignment = HorizontalAlignment.Left };
-        refreshStats.Click += async (_, _) =>
-        {
-            refreshStats.IsEnabled = false;
-            statsStatus.Text = "Lendo contadores dos adaptadores…";
-            try
-            {
-                var samples = await Task.Run(NetworkAdapterStatisticsService.Capture);
-                statsGrid.ItemsSource = samples;
-                statsStatus.Text = samples.Count + " interfaces consultadas às " +
-                    (samples.Count > 0 ? samples[0].CapturedAt.ToString("HH:mm:ss") : DateTime.Now.ToString("HH:mm:ss")) +
-                    ". Erros e descartes são contadores cumulativos do Windows.";
-                if (samples.Count == 0)
-                    statsStatus.Text += " Nenhuma interface retornou estatísticas.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Contadores de rede falharam: " + ex);
-                statsStatus.Text = "Falha ao consultar contadores: " + ex.Message;
-            }
-            finally { refreshStats.IsEnabled = true; }
-        };
-        statsPanel.Children.Add(statsStatus);
-        statsPanel.Children.Add(statsGrid);
-        statsPanel.Children.Add(refreshStats);
-        statsCard.Child = statsPanel;
-        root.Children.Add(statsCard);
-
-        root.Children.Add(NoteCard("Como interpretar", "Perda também no gateway sugere um problema dentro da rede local (Wi-Fi, cabo, adaptador ou roteador). Perda somente no destino externo pode estar na rota ou no provedor. Um teste curto não prova sozinho a causa de desconexões intermitentes."));
+        _ = LoadNetworkAdaptersAsync(adapters, status);
         return root;
+    }
+
+    private async Task LoadNetworkAdaptersAsync(UniformGrid host, TextBlock status)
+    {
+        try
+        {
+            var manager = new AdapterPowerManagementService();
+            var adapters = await Task.Run(manager.GetPhysicalAdapters);
+            host.Children.Clear();
+            var candidates = adapters.Where(x => manager.CanRestore(x.Name) || manager.CanReducePowerSaving(x)).ToArray();
+            foreach (var adapter in candidates)
+            {
+                var hasBackup = manager.CanRestore(adapter.Name);
+                var canReduce = manager.CanReducePowerSaving(adapter);
+                host.Children.Add(BuildToggleCard(
+                    adapter.Name,
+                    adapter.InterfaceDescription + " • " + adapter.LinkSpeed,
+                    hasBackup,
+                    enabled => Task.Run(() =>
+                    {
+                        if (enabled) manager.ReducePowerSaving(adapter);
+                        else manager.Restore(adapter.Name);
+                    }),
+                    hasBackup || canReduce,
+                    hasBackup ? "BACKUP SALVO" : "ECONOMIA ATIVA"));
+            }
+
+            status.Text = candidates.Length == 0
+                ? "Nenhum adaptador físico tem economia de energia que o ynoez possa alterar com segurança."
+                : candidates.Length + " adaptador(es) com opção de economia disponível.";
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Consulta de energia dos adaptadores falhou: " + ex);
+            status.Text = "Falha ao consultar adaptadores: " + ex.Message;
+        }
     }
 
     private UIElement BuildDebloat()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Debloat", "Limpe arquivos e remova aplicativos opcionais sem tocar nos componentes essenciais do Windows."));
+        root.Children.Add(PageIntro("Debloat", "Aplicativos, inicialização e serviços que você não usa."));
 
-        var cleanupCard = MakeCard();
-        var cleanupPanel = new StackPanel { Margin = new Thickness(20, 16, 20, 16) };
-        cleanupPanel.Children.Add(Heading("Limpeza rápida", 15));
-        var cleanupStatus = Body("Temporários e caches selecionados; arquivos em uso serão ignorados.");
-        cleanupStatus.Margin = new Thickness(0, 6, 0, 10);
-        var cleanupButtons = new WrapPanel();
-        var cleanTemp = new Button
+        var cleanup = new UniformGrid { Columns = 2 };
+        cleanup.Children.Add(BuildToolActionCard("Limpar temporários", "Remove arquivos temporários liberados pelo Windows.", "Limpar", async () =>
         {
-            Content = "Limpar temporários",
-            Style = (Style)FindResource("AccentButton"),
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        var cleanCaches = new Button
+            var result = await CleanupService.ClearWindowsTempAsync();
+            AppLog.Write("Limpeza de temporários: " + result.Summary);
+        }));
+        cleanup.Children.Add(BuildToolActionCard("Limpar caches", "Limpa Cache, Code Cache e GPUCache do Brave e Discord.", "Limpar", async () =>
         {
-            Content = "Limpar caches Brave + Discord",
-            Style = (Style)FindResource("QuietButton")
-        };
-        cleanTemp.Click += async (_, _) =>
-        {
-            cleanTemp.IsEnabled = false;
-            cleanCaches.IsEnabled = false;
-            cleanupStatus.Text = "Limpando arquivos temporários…";
-            try
-            {
-                var result = await CleanupService.ClearWindowsTempAsync();
-                cleanupStatus.Text = "Temporários: " + result.Summary;
-            }
-            catch (Exception ex)
-            {
-                cleanupStatus.Text = "A limpeza falhou: " + ex.Message;
-                AppLog.Write("Limpeza de temporários falhou: " + ex);
-            }
-            finally
-            {
-                cleanTemp.IsEnabled = true;
-                cleanCaches.IsEnabled = true;
-            }
-        };
-        cleanCaches.Click += async (_, _) =>
-        {
-            cleanTemp.IsEnabled = false;
-            cleanCaches.IsEnabled = false;
-            cleanupStatus.Text = "Limpando caches dos aplicativos…";
-            try
-            {
-                var results = await Task.WhenAll(
-                    CleanupService.ClearBraveCacheAsync(),
-                    CleanupService.ClearDiscordCacheAsync());
-                cleanupStatus.Text = "Brave: " + results[0].Summary + Environment.NewLine +
-                    "Discord: " + results[1].Summary;
-            }
-            catch (Exception ex)
-            {
-                cleanupStatus.Text = "A limpeza de cache falhou: " + ex.Message;
-                AppLog.Write("Limpeza de caches falhou: " + ex);
-            }
-            finally
-            {
-                cleanTemp.IsEnabled = true;
-                cleanCaches.IsEnabled = true;
-            }
-        };
-        cleanupButtons.Children.Add(cleanTemp);
-        cleanupButtons.Children.Add(cleanCaches);
-        cleanupPanel.Children.Add(cleanupStatus);
-        cleanupPanel.Children.Add(cleanupButtons);
-        cleanupCard.Child = cleanupPanel;
-        root.Children.Add(cleanupCard);
+            var results = await Task.WhenAll(
+                CleanupService.ClearBraveCacheAsync(),
+                CleanupService.ClearDiscordCacheAsync());
+            AppLog.Write("Caches: Brave " + results[0].Summary + " | Discord " + results[1].Summary);
+        }));
+        root.Children.Add(cleanup);
 
-        root.Children.Add(BuildAppxDebloatCard());
+        var tabs = new TabControl { Background = PageBrush, BorderThickness = new Thickness(0), Margin = new Thickness(0, 8, 0, 0) };
+        tabs.Items.Add(new TabItem { Header = "Apps", Content = BuildAppxDebloatCard() });
 
-        var startupManager = new StartupManagerService();
-        var startupPlaceholder = CreateDebloatLoadingCard("Inicialização", "Lendo apenas entradas do usuário que podem ser desativadas com segurança…");
-        root.Children.Add(startupPlaceholder);
-        _ = LoadDebloatStartupAsync(startupPlaceholder, startupManager);
+        var startupHost = new StackPanel();
+        var startupStatus = Body("Lendo inicialização…");
+        startupHost.Children.Add(startupStatus);
+        tabs.Items.Add(new TabItem { Header = "Inicialização", Content = startupHost });
+        _ = LoadDebloatStartupAsync(startupHost, startupStatus, new StartupManagerService());
 
-        var serviceManager = new ServiceTweakService();
-        var servicePlaceholder = CreateDebloatLoadingCard("Serviços opcionais", "Consultando somente a lista fechada de serviços opcionais…");
-        root.Children.Add(servicePlaceholder);
-        _ = LoadDebloatServicesAsync(servicePlaceholder, serviceManager);
+        var servicesHost = new StackPanel();
+        var servicesStatus = Body("Consultando serviços…");
+        servicesHost.Children.Add(servicesStatus);
+        tabs.Items.Add(new TabItem { Header = "Serviços", Content = servicesHost });
+        _ = LoadDebloatServicesAsync(servicesHost, servicesStatus, new ServiceTweakService());
 
-        var taskManager = new ScheduledTaskTweakService();
-        var taskPlaceholder = CreateDebloatLoadingCard("Tarefas opcionais", "Consultando tarefas de telemetria, feedback e mapas…");
-        root.Children.Add(taskPlaceholder);
-        _ = LoadDebloatTasksAsync(taskPlaceholder, taskManager);
+        var tasksHost = new StackPanel();
+        var tasksStatus = Body("Consultando tarefas…");
+        tasksHost.Children.Add(tasksStatus);
+        tabs.Items.Add(new TabItem { Header = "Tarefas", Content = tasksHost });
+        _ = LoadDebloatTasksAsync(tasksHost, tasksStatus, new ScheduledTaskTweakService());
 
-        root.Children.Add(ActionCard(
-            "Programas Win32",
-            "Abra o desinstalador oficial do Windows para remover programas tradicionais. O ynoez não executa comandos de desinstalação arbitrários.",
-            "Abrir programas instalados",
-            () => OpenTargetAsync("ms-settings:appsfeatures"),
-            "WINDOWS"));
-
-        root.Children.Add(NoteCard(
-            "Proteções preservadas",
-            "Store, Calculadora, Notepad, Windows Update, Defender, Firewall, drivers, runtimes, NVIDIA, Vanguard e FACEIT não entram na remoção automática."));
+        root.Children.Add(tabs);
         return root;
     }
 
     private Border BuildAppxDebloatCard()
     {
         var card = MakeCard();
-        var panel = new StackPanel { Margin = new Thickness(20, 16, 20, 16) };
-        panel.Children.Add(Heading("Aplicativos opcionais do Windows", 15));
-        panel.Children.Add(Body("O ynoez detecta aplicativos opcionais conhecidos. Tudo vem selecionado; desmarque o que deseja manter. A remoção afeta somente sua conta atual."));
-        var status = Body("Clique em Analisar para localizar aplicativos opcionais instalados.");
-        status.Margin = new Thickness(0, 8, 0, 8);
-        var list = new ListBox
-        {
-            Height = 166,
-            SelectionMode = SelectionMode.Extended,
-            Margin = new Thickness(0, 0, 0, 10)
-        };
+        var panel = new StackPanel { Margin = new Thickness(15) };
+        panel.Children.Add(Heading("Aplicativos opcionais", 13));
+        var status = Body("Analise para listar somente os aplicativos da lista permitida.");
+        status.Margin = new Thickness(0, 5, 0, 8);
+        var list = new ListBox { Height = 175, SelectionMode = SelectionMode.Extended };
         var buttons = new WrapPanel();
         var analyze = new Button
         {
-            Content = "Analisar aplicativos",
+            Content = "Analisar",
             Style = (Style)FindResource("AccentButton"),
-            Margin = new Thickness(0, 0, 8, 0)
+            Margin = new Thickness(0, 0, 7, 0)
         };
         var cancel = new Button
         {
             Content = "Cancelar",
             Style = (Style)FindResource("QuietButton"),
             IsEnabled = false,
-            Margin = new Thickness(0, 0, 8, 0)
+            Margin = new Thickness(0, 0, 7, 0)
         };
         var remove = new Button
         {
@@ -1338,34 +1131,28 @@ public partial class MainWindow : Window
 
         async Task AnalyzeAsync()
         {
-            if (_appxInventoryCts is not null)
-                return;
-
+            if (_appxInventoryCts is not null) return;
             var cts = new CancellationTokenSource();
             _appxInventoryCts = cts;
             analyze.IsEnabled = false;
-            remove.IsEnabled = false;
             cancel.IsEnabled = true;
-            status.Text = "Analisando os pacotes do usuário atual…";
+            remove.IsEnabled = false;
+            status.Text = "Analisando…";
             try
             {
                 var packages = await AppPackageInventoryService.GetCurrentUserPackagesAsync(cts.Token);
                 var candidates = AppxDebloatService.FindCandidates(packages);
                 list.Items.Clear();
-                foreach (var candidate in candidates)
-                {
+                foreach (var item in candidates)
                     list.Items.Add(new ListBoxItem
                     {
-                        Content = candidate.DisplayName + "  •  " + candidate.Version + Environment.NewLine +
-                            candidate.Description,
-                        Tag = candidate,
+                        Content = item.DisplayName + " • " + item.Version,
+                        Tag = item,
                         IsSelected = true
                     });
-                }
-
                 status.Text = candidates.Count == 0
-                    ? "Nenhum aplicativo da lista segura foi encontrado."
-                    : candidates.Count + " aplicativo(s) opcional(is) encontrado(s). Todos estão selecionados para remoção.";
+                    ? "Nenhum app opcional da lista foi encontrado."
+                    : candidates.Count + " app(s) selecionado(s). Desmarque o que deseja manter.";
                 remove.IsEnabled = candidates.Count > 0;
             }
             catch (OperationCanceledException)
@@ -1374,13 +1161,12 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
-                AppLog.Write("Análise AppX de debloat falhou: " + ex);
-                status.Text = "Não foi possível analisar os aplicativos: " + ex.Message;
+                AppLog.Write("Análise AppX falhou: " + ex);
+                status.Text = "Falha: " + ex.Message;
             }
             finally
             {
-                if (ReferenceEquals(_appxInventoryCts, cts))
-                    _appxInventoryCts = null;
+                if (ReferenceEquals(_appxInventoryCts, cts)) _appxInventoryCts = null;
                 cts.Dispose();
                 analyze.IsEnabled = true;
                 cancel.IsEnabled = false;
@@ -1392,22 +1178,14 @@ public partial class MainWindow : Window
         remove.Click += async (_, _) =>
         {
             var selected = list.SelectedItems.OfType<ListBoxItem>()
-                .Select(item => item.Tag)
-                .OfType<AppxRemovalCandidate>()
-                .ToArray();
-            if (selected.Length == 0)
-                return;
-
-            var names = string.Join(Environment.NewLine, selected.Select(item => "• " + item.DisplayName));
+                .Select(item => item.Tag).OfType<AppxRemovalCandidate>().ToArray();
+            if (selected.Length == 0) return;
             if (MessageBox.Show(
-                "Remover estes aplicativos somente da conta atual?" + Environment.NewLine + Environment.NewLine +
-                names + Environment.NewLine + Environment.NewLine +
-                "Esta ação não tem reversão automática. Os aplicativos podem ser reinstalados pela Microsoft Store quando ainda disponíveis. Nenhum pacote provisionado ou outro perfil será alterado.",
-                "Confirmar remoção de aplicativos", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                "Remover " + selected.Length + " aplicativo(s) da conta atual? Esta remoção não tem restauração automática.",
+                "Confirmar Debloat", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            if (_appxInventoryCts is not null)
-                return;
+            if (_appxInventoryCts is not null) return;
             var cts = new CancellationTokenSource();
             _appxInventoryCts = cts;
             analyze.IsEnabled = false;
@@ -1417,40 +1195,35 @@ public partial class MainWindow : Window
             var errors = new List<string>();
             try
             {
-                foreach (var candidate in selected)
+                foreach (var item in selected)
                 {
                     cts.Token.ThrowIfCancellationRequested();
-                    status.Text = "Removendo " + candidate.DisplayName + "…";
+                    status.Text = "Removendo " + item.DisplayName + "…";
                     try
                     {
-                        await AppxDebloatService.RemoveCurrentUserPackageAsync(candidate, cts.Token);
+                        await AppxDebloatService.RemoveCurrentUserPackageAsync(item, cts.Token);
                         removed++;
                     }
                     catch (Exception ex)
                     {
-                        errors.Add(candidate.DisplayName + ": " + ex.Message);
+                        errors.Add(item.DisplayName + ": " + ex.Message);
                     }
                 }
-
-                status.Text = removed + " aplicativo(s) removido(s)." +
-                    (errors.Count > 0 ? Environment.NewLine + string.Join(Environment.NewLine, errors.Take(3)) : "");
+                status.Text = removed + " removido(s)" +
+                    (errors.Count > 0 ? " • " + errors.Count + " falha(s): " + string.Join(" | ", errors.Take(2)) : "");
             }
             catch (OperationCanceledException)
             {
-                status.Text = "Operação cancelada. " + removed + " aplicativo(s) removido(s) antes do cancelamento.";
+                status.Text = "Cancelado • " + removed + " removido(s).";
             }
             finally
             {
-                if (ReferenceEquals(_appxInventoryCts, cts))
-                    _appxInventoryCts = null;
+                if (ReferenceEquals(_appxInventoryCts, cts)) _appxInventoryCts = null;
                 cts.Dispose();
                 analyze.IsEnabled = true;
                 cancel.IsEnabled = false;
-                remove.IsEnabled = false;
             }
-
-            if (removed > 0)
-                await AnalyzeAsync();
+            if (removed > 0) await AnalyzeAsync();
         };
 
         buttons.Children.Add(analyze);
@@ -1463,236 +1236,144 @@ public partial class MainWindow : Window
         return card;
     }
 
-    private Border CreateDebloatLoadingCard(string title, string status)
-    {
-        var card = MakeCard();
-        var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
-        panel.Children.Add(Heading(title, 14));
-        panel.Children.Add(Body(status));
-        card.Child = panel;
-        return card;
-    }
-
-    private async Task LoadDebloatStartupAsync(Border placeholder, StartupManagerService manager)
+    private async Task LoadDebloatStartupAsync(
+        StackPanel host, TextBlock status, StartupManagerService manager)
     {
         try
         {
             var snapshot = await Task.Run(() => new
             {
-                Active = manager.GetActiveEntries().Where(entry => entry.CanDisable).ToArray(),
+                Active = manager.GetActiveEntries().Where(entry => entry.CanDisable).Take(18).ToArray(),
                 Disabled = manager.GetDisabledEntries().ToArray()
             });
 
-            var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
-            panel.Children.Add(Heading("Inicialização", 14));
-            panel.Children.Add(Body(snapshot.Active.Length + " entrada(s) do usuário podem ser desativadas. " +
-                snapshot.Disabled.Length + " backup(s) aguardam restauração."));
-            var activeList = new ListBox { Height = 105, Margin = new Thickness(0, 8, 0, 7) };
+            host.Children.Clear();
+            status.Text = snapshot.Active.Length + " entrada(s) ativa(s) • " +
+                snapshot.Disabled.Length + " backup(s) • somente inicialização do usuário.";
+            host.Children.Add(status);
+
+            var activeGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 7, 0, 10) };
             foreach (var entry in snapshot.Active)
-                activeList.Items.Add(new ListBoxItem
-                {
-                    Content = entry.Name + "  •  " + entry.Scope,
-                    Tag = entry
-                });
-            var disable = new Button
-            {
-                Content = "Desativar selecionado",
-                Style = (Style)FindResource("QuietButton"),
-                IsEnabled = false,
-                Margin = new Thickness(0, 0, 8, 0)
-            };
-            activeList.SelectionChanged += (_, _) => disable.IsEnabled = activeList.SelectedItem is ListBoxItem;
-            disable.Click += async (_, _) =>
-            {
-                if (activeList.SelectedItem is not ListBoxItem item || item.Tag is not StartupEntry entry)
-                    return;
-                if (MessageBox.Show("Desativar " + entry.Name + " da inicialização? O backup original será salvo.",
-                    "Confirmar", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                    return;
-                disable.IsEnabled = false;
-                try
-                {
-                    await Task.Run(() => manager.Disable(entry));
-                    ShowPage("Debloat");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Não foi possível desativar a entrada: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            };
-            panel.Children.Add(activeList);
-            panel.Children.Add(disable);
+                activeGrid.Children.Add(BuildToggleCard(
+                    entry.Name,
+                    "Inicialização do usuário",
+                    false,
+                    async enabled =>
+                    {
+                        if (!enabled) return;
+                        await Task.Run(() => manager.Disable(entry));
+                        if (_currentPage == "Debloat") ShowPage("Debloat");
+                    },
+                    true,
+                    "ATIVO"));
+            host.Children.Add(activeGrid);
 
             if (snapshot.Disabled.Length > 0)
             {
-                var disabledList = new ListBox { Height = 85, Margin = new Thickness(0, 9, 0, 7) };
+                host.Children.Add(Heading("Desativados pelo ynoez", 12));
+                var restoreGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 5, 0, 0) };
                 foreach (var entry in snapshot.Disabled)
-                    disabledList.Items.Add(new ListBoxItem { Content = entry.Name, Tag = entry });
-                var restore = new Button
-                {
-                    Content = "Restaurar selecionado",
-                    Style = (Style)FindResource("QuietButton"),
-                    IsEnabled = false
-                };
-                disabledList.SelectionChanged += (_, _) => restore.IsEnabled = disabledList.SelectedItem is ListBoxItem;
-                restore.Click += async (_, _) =>
-                {
-                    if (disabledList.SelectedItem is not ListBoxItem item || item.Tag is not DisabledStartupEntry entry)
-                        return;
-                    restore.IsEnabled = false;
-                    try
-                    {
-                        await Task.Run(() => manager.Restore(entry));
-                        ShowPage("Debloat");
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Não foi possível restaurar a entrada: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                };
-                panel.Children.Add(Heading("Desativados pelo ynoez", 11));
-                panel.Children.Add(disabledList);
-                panel.Children.Add(restore);
+                    restoreGrid.Children.Add(BuildToggleCard(
+                        entry.Name,
+                        "Backup de inicialização",
+                        true,
+                        async enabled =>
+                        {
+                            if (enabled) return;
+                            await Task.Run(() => manager.Restore(entry));
+                            if (_currentPage == "Debloat") ShowPage("Debloat");
+                        },
+                        true,
+                        "BACKUP"));
+                host.Children.Add(restoreGrid);
             }
-
-            placeholder.Child = panel;
         }
         catch (Exception ex)
         {
-            AppLog.Write("Consulta de inicialização no Debloat falhou: " + ex);
-            placeholder.Child = new StackPanel
-            {
-                Margin = new Thickness(20),
-                Children =
-                {
-                    Heading("Inicialização", 14),
-                    Body("Não foi possível carregar os itens: " + ex.Message)
-                }
-            };
+            AppLog.Write("Leitura de inicialização falhou: " + ex);
+            status.Text = "Falha ao ler inicialização: " + ex.Message;
         }
     }
 
-    private async Task LoadDebloatServicesAsync(Border placeholder, ServiceTweakService manager)
+    private async Task LoadDebloatServicesAsync(
+        StackPanel host, TextBlock status, ServiceTweakService manager)
     {
         try
         {
-            var statuses = await Task.Run(manager.GetStatuses);
-            var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
-            panel.Children.Add(Heading("Serviços opcionais", 14));
-            panel.Children.Add(Body("Somente serviços de telemetria e recursos opcionais conhecidos. Serviços críticos, rede, áudio, Store, Defender, Update e anti-cheats ficam fora da lista."));
-            var list = new ListBox { Height = 132, Margin = new Thickness(0, 8, 0, 7) };
-            foreach (var status in statuses.Where(item => item.Available || item.DisabledByYnoez))
-                list.Items.Add(new ListBoxItem
-                {
-                    Content = status.Definition.DisplayName + "  •  " +
-                        (status.DisabledByYnoez ? "Desativado pelo ynoez" : status.State + " / " + status.StartMode),
-                    Tag = status
-                });
-            var action = new Button
+            var values = await Task.Run(manager.GetStatuses);
+            host.Children.Clear();
+            status.Text = values.Count + " serviço(s) opcional(is) detectado(s).";
+            host.Children.Add(status);
+            var grid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 7, 0, 0) };
+            foreach (var item in values.Where(x => x.Available || x.DisabledByYnoez))
             {
-                Content = "Aplicar / restaurar selecionado",
-                Style = (Style)FindResource("QuietButton"),
-                IsEnabled = false
-            };
-            list.SelectionChanged += (_, _) => action.IsEnabled = list.SelectedItem is ListBoxItem;
-            action.Click += async (_, _) =>
-            {
-                if (list.SelectedItem is not ListBoxItem item || item.Tag is not OptionalServiceStatus selected)
-                    return;
-                var restore = selected.DisabledByYnoez;
-                var prompt = restore
-                    ? "Restaurar o serviço " + selected.Definition.DisplayName + " ao estado anterior?"
-                    : "Desativar o serviço opcional " + selected.Definition.DisplayName + "? A função descrita ficará indisponível enquanto estiver desativado.";
-                if (MessageBox.Show(prompt, "Confirmar serviço", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                    return;
-                action.IsEnabled = false;
-                try
-                {
-                    if (restore)
-                        await Task.Run(() => manager.Restore(selected.Definition));
-                    else
-                        await Task.Run(() => manager.Disable(selected.Definition));
-                    ShowPage("Debloat");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("A operação no serviço falhou: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            };
-            panel.Children.Add(list);
-            panel.Children.Add(action);
-            placeholder.Child = panel;
+                var isOff = item.DisabledByYnoez ||
+                    string.Equals(item.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase);
+                var canChange = item.DisabledByYnoez ||
+                    (item.Available && !string.Equals(item.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase));
+                grid.Children.Add(BuildToggleCard(
+                    item.Definition.DisplayName,
+                    item.Definition.Risk + " • " + item.State,
+                    isOff,
+                    async enabled =>
+                    {
+                        await Task.Run(() =>
+                        {
+                            if (enabled) manager.Disable(item.Definition);
+                            else manager.Restore(item.Definition);
+                        });
+                        if (_currentPage == "Debloat") ShowPage("Debloat");
+                    },
+                    canChange,
+                    item.DisabledByYnoez ? "BACKUP" : isOff ? "JÁ DESATIVADO" : "ATIVO"));
+            }
+            host.Children.Add(grid);
         }
         catch (Exception ex)
         {
-            AppLog.Write("Consulta de serviços opcionais no Debloat falhou: " + ex);
-            placeholder.Child = new StackPanel
-            {
-                Margin = new Thickness(20),
-                Children = { Heading("Serviços opcionais", 14), Body("Consulta indisponível: " + ex.Message) }
-            };
+            AppLog.Write("Leitura de serviços opcionais falhou: " + ex);
+            status.Text = "Falha ao consultar serviços: " + ex.Message;
         }
     }
 
-    private async Task LoadDebloatTasksAsync(Border placeholder, ScheduledTaskTweakService manager)
+    private async Task LoadDebloatTasksAsync(
+        StackPanel host, TextBlock status, ScheduledTaskTweakService manager)
     {
         try
         {
-            var statuses = await Task.Run(manager.GetStatuses);
-            var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
-            panel.Children.Add(Heading("Tarefas opcionais", 14));
-            panel.Children.Add(Body("Tarefas de telemetria, feedback e mapas. Windows Update, Defender, manutenção e drivers não são alterados."));
-            var list = new ListBox { Height = 132, Margin = new Thickness(0, 8, 0, 7) };
-            foreach (var status in statuses.Where(item => item.Available || item.DisabledByYnoez))
-                list.Items.Add(new ListBoxItem
-                {
-                    Content = status.Definition.DisplayName + "  •  " +
-                        (status.DisabledByYnoez ? "Desativada pelo ynoez" : status.State),
-                    Tag = status
-                });
-            var action = new Button
+            var values = await Task.Run(manager.GetStatuses);
+            host.Children.Clear();
+            status.Text = values.Count + " tarefa(s) opcionais detectada(s).";
+            host.Children.Add(status);
+            var grid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 7, 0, 0) };
+            foreach (var item in values.Where(x => x.Available || x.DisabledByYnoez))
             {
-                Content = "Aplicar / restaurar selecionada",
-                Style = (Style)FindResource("QuietButton"),
-                IsEnabled = false
-            };
-            list.SelectionChanged += (_, _) => action.IsEnabled = list.SelectedItem is ListBoxItem;
-            action.Click += async (_, _) =>
-            {
-                if (list.SelectedItem is not ListBoxItem item || item.Tag is not ScheduledTaskStatus selected)
-                    return;
-                var restore = selected.DisabledByYnoez;
-                var prompt = restore
-                    ? "Reativar a tarefa " + selected.Definition.DisplayName + "?"
-                    : "Desativar a tarefa opcional " + selected.Definition.DisplayName + "? Ela deixará de executar automaticamente.";
-                if (MessageBox.Show(prompt, "Confirmar tarefa", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                    return;
-                action.IsEnabled = false;
-                try
-                {
-                    if (restore)
-                        await Task.Run(() => manager.Restore(selected.Definition));
-                    else
-                        await Task.Run(() => manager.Disable(selected.Definition));
-                    ShowPage("Debloat");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("A operação na tarefa falhou: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            };
-            panel.Children.Add(list);
-            panel.Children.Add(action);
-            placeholder.Child = panel;
+                var isOff = item.DisabledByYnoez ||
+                    string.Equals(item.State, "Disabled", StringComparison.OrdinalIgnoreCase);
+                var canChange = item.DisabledByYnoez ||
+                    (item.Available && string.Equals(item.State, "Ready", StringComparison.OrdinalIgnoreCase));
+                grid.Children.Add(BuildToggleCard(
+                    item.Definition.DisplayName,
+                    item.Definition.Risk + " • " + item.State,
+                    isOff,
+                    async enabled =>
+                    {
+                        await Task.Run(() =>
+                        {
+                            if (enabled) manager.Disable(item.Definition);
+                            else manager.Restore(item.Definition);
+                        });
+                        if (_currentPage == "Debloat") ShowPage("Debloat");
+                    },
+                    canChange,
+                    item.DisabledByYnoez ? "BACKUP" : isOff ? "JÁ DESATIVADA" : "ATIVA"));
+            }
+            host.Children.Add(grid);
         }
         catch (Exception ex)
         {
-            AppLog.Write("Consulta de tarefas opcionais no Debloat falhou: " + ex);
-            placeholder.Child = new StackPanel
-            {
-                Margin = new Thickness(20),
-                Children = { Heading("Tarefas opcionais", 14), Body("Consulta indisponível: " + ex.Message) }
-            };
+            AppLog.Write("Leitura de tarefas opcionais falhou: " + ex);
+            status.Text = "Falha ao consultar tarefas: " + ex.Message;
         }
     }
 
@@ -1700,659 +1381,90 @@ public partial class MainWindow : Window
     {
         var root = PageContainer();
         var profile = MotherboardProfileService.Find(_hardware);
-        var revisionHint = profile is null ? null : MotherboardProfileService.GetFirmwareRevisionHint(profile, _hardware.BoardVersion);
-        var recognized = profile is not null;
-        var title = recognized ? $"{profile!.Manufacturer} {profile!.Product}" : "Central da placa-mãe";
-        var desc = recognized
-            ? $"Perfil específico identificado. Indício SMBIOS: {(revisionHint?.Revision ?? "não informado")}. Esse valor não seleciona BIOS; confirme manualmente a revisão impressa no PCB."
-            : "Modelo detectado: " + _hardware.BoardManufacturer + " " + _hardware.BoardProduct + ". Nenhum perfil de fabricante será forçado sem identificação confiável.";
-        root.Children.Add(PageIntro(title, desc));
-
-        var hardware = MakeCard();
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(Heading("Identificação e firmware", 15));
-        panel.Children.Add(KeyValue("Fabricante", _hardware.BoardManufacturer));
-        panel.Children.Add(KeyValue("Modelo", _hardware.BoardProduct));
-        panel.Children.Add(KeyValue("Revisão SMBIOS", _hardware.BoardVersion));
-        panel.Children.Add(KeyValue("BIOS", _hardware.BiosVersion));
-        panel.Children.Add(KeyValue("Fabricante da BIOS", _hardware.BiosManufacturer));
-        panel.Children.Add(KeyValue("Data da BIOS", _hardware.BiosReleaseDate));
-        panel.Children.Add(KeyValue("Modelo do computador", _hardware.ComputerModel));
-        panel.Children.Add(KeyValue("Adaptadores ativos", _hardware.NetworkAdapters));
-        hardware.Child = panel;
-        root.Children.Add(hardware);
-
-        if (profile is not null)
+        if (profile is null)
         {
-            root.Children.Add(ActionCard("Página oficial de suporte", "Abre a página genérica do modelo. Ela não pré-seleciona uma revisão e permite consultar documentação sem assumir qual PCB você possui.", "Abrir suporte genérico", () => OpenTargetAsync("https://www.gigabyte.com/br/Motherboard/A520M-K-V2"), "GIGABYTE"));
-            if (!string.IsNullOrWhiteSpace(profile.ManualUrl))
-                root.Children.Add(ActionCard("Manual da placa-mãe", "Documentação oficial da série A520M K. Confirme o sufixo V2 e conectores físicos antes de seguir instruções de firmware.", "Abrir manual", () => OpenTargetAsync(profile.ManualUrl), "DOCUMENTAÇÃO"));
-
-            var revisionConfirmCard = MakeCard();
-            var revisionConfirmPanel = new StackPanel { Margin = new Thickness(20) };
-            revisionConfirmPanel.Children.Add(Heading("Confirmação manual da revisão do PCB", 15));
-            revisionConfirmPanel.Children.Add(Body("Leia a revisão impressa diretamente na placa-mãe (serigrafia no PCB). Não use a versão SMBIOS, a versão da BIOS, a caixa ou uma página de compra como confirmação. Até você confirmar, nenhum link de BIOS específico por revisão será exibido."));
-            revisionConfirmPanel.Children.Add(KeyValue("Indício reportado pelo SMBIOS (não é confirmação)", revisionHint?.Revision ?? "Não informado"));
-            var revisionPicker = new ComboBox
-            {
-                Height = 38,
-                MinWidth = 180,
-                Padding = new Thickness(8, 5, 8, 5),
-                Background = BrushFrom("#050505"),
-                Foreground = PrimaryBrush,
-                BorderBrush = BorderBrushSoft,
-                BorderThickness = new Thickness(1),
-                ItemsSource = profile.RevisionLinks,
-                DisplayMemberPath = nameof(MotherboardRevisionLink.Revision),
-                SelectedIndex = -1,
-                ToolTip = "Escolha somente a revisão que você leu na serigrafia impressa no PCB"
-            };
-            var revisionConfirmStatus = Body("Nenhuma revisão física foi confirmada. Os links de BIOS específicos permanecem ocultos.");
-            revisionConfirmStatus.TextWrapping = TextWrapping.Wrap;
-            var confirmRevisionButton = new Button
-            {
-                Content = "Confirmar revisão física",
-                Style = (Style)FindResource("AccentButton"),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                IsEnabled = false,
-                Margin = new Thickness(0, 8, 0, 10)
-            };
-            var revisionDetailsPanel = new StackPanel();
-            revisionPicker.SelectionChanged += (_, _) =>
-            {
-                revisionDetailsPanel.Children.Clear();
-                confirmRevisionButton.IsEnabled = revisionPicker.SelectedItem is MotherboardRevisionLink;
-                revisionConfirmStatus.Text = revisionPicker.SelectedItem is MotherboardRevisionLink selected
-                    ? "Selecionada " + selected.Revision + ", mas ainda não confirmada. Confira a mesma identificação impressa no PCB."
-                    : "Nenhuma revisão física foi confirmada. Os links de BIOS específicos permanecem ocultos.";
-            };
-            confirmRevisionButton.Click += (_, _) =>
-            {
-                var selected = revisionPicker.SelectedItem as MotherboardRevisionLink;
-                var confirmed = MotherboardProfileService.GetConfirmedPhysicalRevision(profile, selected?.Revision);
-                if (confirmed is null)
-                {
-                    revisionConfirmStatus.Text = "A revisão escolhida não corresponde a uma opção cadastrada. Nenhum link de BIOS foi liberado.";
-                    revisionDetailsPanel.Children.Clear();
-                    return;
-                }
-
-                revisionConfirmStatus.Text = "Revisão " + confirmed.Revision +
-                    " confirmada manualmente com base na serigrafia do PCB. Confira novamente o modelo completo antes de qualquer procedimento.";
-                revisionDetailsPanel.Children.Clear();
-
-                var biosCard = MakeCard();
-                var biosPanel = new StackPanel { Margin = new Thickness(16) };
-                biosPanel.Children.Add(Heading("BIOS específica — revisão " + confirmed.Revision, 14));
-                biosPanel.Children.Add(KeyValue("Versão mais recente listada no perfil", confirmed.LatestBiosVersion));
-                biosPanel.Children.Add(KeyValue("Data de publicação", confirmed.LatestBiosReleaseDate));
-                foreach (var note in confirmed.LatestBiosNotes) biosPanel.Children.Add(Bullet(note));
-                biosPanel.Children.Add(Body("Consulta verificada em " + confirmed.BiosCheckedAt +
-                    ". Isto não significa que a atualização seja obrigatória. Compare a BIOS instalada, CPU suportada e notas oficiais; o ynoez não grava firmware."));
-                biosCard.Child = biosPanel;
-                revisionDetailsPanel.Children.Add(biosCard);
-                revisionDetailsPanel.Children.Add(ActionCard(
-                    "Página oficial de BIOS — revisão " + confirmed.Revision,
-                    "Link liberado somente após confirmação manual da revisão física. A atualização continua manual.",
-                    "Abrir página de BIOS",
-                    () => OpenTargetAsync(confirmed.Bios),
-                    "SOMENTE CONSULTA"));
-                revisionDetailsPanel.Children.Add(ActionCard(
-                    "Suporte oficial — revisão " + confirmed.Revision,
-                    "Drivers e utilitários da revisão confirmada. Verifique versão do Windows e IDs dos dispositivos antes de instalar.",
-                    "Abrir suporte da revisão",
-                    () => OpenTargetAsync(confirmed.Support),
-                    "SOMENTE CONSULTA"));
-            };
-            revisionConfirmPanel.Children.Add(revisionPicker);
-            revisionConfirmPanel.Children.Add(confirmRevisionButton);
-            revisionConfirmPanel.Children.Add(revisionConfirmStatus);
-            revisionConfirmPanel.Children.Add(revisionDetailsPanel);
-            revisionConfirmCard.Child = revisionConfirmPanel;
-            root.Children.Add(revisionConfirmCard);
-
-            var deviceCard = MakeCard();
-            var devicePanel = new StackPanel { Margin = new Thickness(20) };
-            devicePanel.Children.Add(Heading("Dispositivos reais de rede, áudio e sistema", 15));
-            devicePanel.Children.Add(Body("Consulta o inventário PnP do Windows e associa os drivers assinados encontrados pelo Windows. Mostra ID de hardware, classe, fabricante, estado, provedor, versão, data e INF. Use os IDs para comparar com os pacotes oficiais da revisão física confirmada; o ynoez não instala nem atualiza drivers automaticamente."));
-            var deviceStatus = Body("Inventário de dispositivos ainda não consultado.");
-            var deviceDetails = Body("Selecione um dispositivo para ver seu ID de hardware e detalhes.");
-            deviceDetails.TextWrapping = TextWrapping.Wrap;
-            var deviceGrid = new DataGrid
-            {
-                AutoGenerateColumns = false,
-                IsReadOnly = true,
-                CanUserAddRows = false,
-                CanUserDeleteRows = false,
-                CanUserResizeRows = false,
-                SelectionMode = DataGridSelectionMode.Single,
-                HeadersVisibility = DataGridHeadersVisibility.Column,
-                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-                Background = BrushFrom("#050505"),
-                Foreground = PrimaryBrush,
-                RowBackground = BrushFrom("#050505"),
-                AlternatingRowBackground = BrushFrom("#171717"),
-                BorderBrush = BorderBrushSoft,
-                Height = 300,
-                Margin = new Thickness(0, 10, 0, 10)
-            };
-            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Classe", Binding = new Binding(nameof(MotherboardDeviceInfo.CategoryDisplay)), Width = new DataGridLength(100) });
-            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Dispositivo", Binding = new Binding(nameof(MotherboardDeviceInfo.Name)), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
-            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Fabricante", Binding = new Binding(nameof(MotherboardDeviceInfo.Manufacturer)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(MotherboardDeviceInfo.StateDisplay)), Width = new DataGridLength(185) });
-            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Provedor do driver", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverProviderDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverVersionDisplay)), Width = new DataGridLength(110) });
-            deviceGrid.Columns.Add(new DataGridTextColumn { Header = "Data do driver", Binding = new Binding(nameof(MotherboardDeviceInfo.DriverDateDisplay)), Width = new DataGridLength(95) });
-            IReadOnlyList<MotherboardDeviceInfo> motherboardDevices = Array.Empty<MotherboardDeviceInfo>();
-            deviceGrid.SelectionChanged += (_, _) =>
-            {
-                if (deviceGrid.SelectedItem is not MotherboardDeviceInfo selected)
-                {
-                    deviceDetails.Text = "Selecione um dispositivo para ver seu ID de hardware e detalhes.";
-                    return;
-                }
-
-                deviceDetails.Text = selected.Name +
-                    "\nCategoria: " + selected.CategoryDisplay +
-                    " • Fabricante: " + (string.IsNullOrWhiteSpace(selected.Manufacturer) ? "Não informado" : selected.Manufacturer) +
-                    "\nEstado: " + selected.StateDisplay +
-                    " • Serviço: " + (string.IsNullOrWhiteSpace(selected.ServiceName) ? "Não informado" : selected.ServiceName) +
-                    "\nDriver: " + selected.DriverProviderDisplay + " • " + selected.DriverVersionDisplay +
-                    " • " + selected.DriverDateDisplay + " • INF: " +
-                    (string.IsNullOrWhiteSpace(selected.InfName) ? "Não informado" : selected.InfName) +
-                    "\nDeviceID: " + selected.DeviceId +
-                    "\nHardware IDs:\n" + selected.HardwareIdsDisplay;
-            };
-            var deviceButtons = new WrapPanel();
-            var queryDevices = new Button { Content = "Consultar dispositivos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-            var cancelDevices = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-            var exportDevices = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-            queryDevices.Click += async (_, _) =>
-            {
-                if (_motherboardDeviceInventoryCts is not null) return;
-                var cts = new CancellationTokenSource();
-                _motherboardDeviceInventoryCts = cts;
-                queryDevices.IsEnabled = false;
-                cancelDevices.IsEnabled = true;
-                exportDevices.IsEnabled = false;
-                deviceStatus.Text = "Consultando dispositivos PnP e drivers assinados…";
-                try
-                {
-                    var snapshot = await MotherboardDeviceInventoryService.CaptureAsync(cts.Token);
-                    if (!Dispatcher.HasShutdownStarted)
-                    {
-                        motherboardDevices = snapshot.Devices;
-                        deviceGrid.ItemsSource = motherboardDevices;
-                        deviceStatus.Text = snapshot.DeviceCount + " dispositivos • " +
-                            snapshot.DevicesWithReportedErrors + " com código de configuração diferente de zero • " +
-                            snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") +
-                            "\nA data/provedor são o que Win32_PnPSignedDriver reporta; ausência de dados não prova que o driver seja inválido.";
-                        exportDevices.IsEnabled = motherboardDevices.Count > 0;
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    if (!Dispatcher.HasShutdownStarted) deviceStatus.Text = "Consulta cancelada. Nenhum driver foi alterado.";
-                }
-                catch (Exception ex)
-                {
-                    AppLog.Write("Inventário de dispositivos da placa-mãe falhou: " + ex);
-                    if (!Dispatcher.HasShutdownStarted) deviceStatus.Text = "Não foi possível consultar dispositivos: " + ex.Message;
-                }
-                finally
-                {
-                    if (ReferenceEquals(_motherboardDeviceInventoryCts, cts)) _motherboardDeviceInventoryCts = null;
-                    cts.Dispose();
-                    if (!Dispatcher.HasShutdownStarted)
-                    {
-                        queryDevices.IsEnabled = true;
-                        cancelDevices.IsEnabled = false;
-                    }
-                }
-            };
-            cancelDevices.Click += (_, _) => _motherboardDeviceInventoryCts?.Cancel();
-            exportDevices.Click += (_, _) =>
-            {
-                if (motherboardDevices.Count == 0) return;
-                var dialog = new SaveFileDialog
-                {
-                    Title = "Exportar inventário de dispositivos da placa-mãe",
-                    Filter = "CSV (*.csv)|*.csv",
-                    FileName = "ynoez-dispositivos-placa-mae.csv",
-                    AddExtension = true,
-                    DefaultExt = ".csv"
-                };
-                if (dialog.ShowDialog(this) != true) return;
-                try
-                {
-                    var snapshot = new MotherboardDeviceInventorySnapshot(DateTimeOffset.Now, motherboardDevices);
-                    File.WriteAllText(dialog.FileName, MotherboardDeviceInventoryService.BuildCsv(snapshot), new System.Text.UTF8Encoding(true));
-                    deviceStatus.Text = "Inventário de dispositivos exportado: " + dialog.FileName;
-                }
-                catch (Exception ex)
-                {
-                    AppLog.Write("Falha ao exportar inventário de dispositivos: " + ex);
-                    MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            };
-            deviceButtons.Children.Add(queryDevices);
-            deviceButtons.Children.Add(cancelDevices);
-            deviceButtons.Children.Add(exportDevices);
-            devicePanel.Children.Add(deviceStatus);
-            devicePanel.Children.Add(deviceGrid);
-            devicePanel.Children.Add(deviceDetails);
-            devicePanel.Children.Add(deviceButtons);
-            deviceCard.Child = devicePanel;
-            root.Children.Add(deviceCard);
-
-            var specs = MakeCard();
-            var specsPanel = new StackPanel { Margin = new Thickness(20) };
-            specsPanel.Children.Add(Heading("Plataforma reconhecida", 15));
-            specsPanel.Children.Add(KeyValue("Chipset", profile.Chipset));
-            specsPanel.Children.Add(KeyValue("Soquete", profile.Platform));
-            specsPanel.Children.Add(KeyValue("Memória", profile.Memory));
-            specsPanel.Children.Add(KeyValue("Rede", profile.Network));
-            specsPanel.Children.Add(KeyValue("Áudio integrado", profile.Audio));
-            specsPanel.Children.Add(Body("Recursos: " + string.Join(" • ", profile.Features)));
-            specsPanel.Children.Add(Body("Dados do perfil: " + Path.Combine(AppPaths.Toolbox, "Placas-mae", "gigabyte-a520m-k-v2.json")));
-            specs.Child = specsPanel;
-            root.Children.Add(specs);
-
-            var utilities = MakeCard();
-            var utilityPanel = new StackPanel { Margin = new Thickness(20) };
-            utilityPanel.Children.Add(Heading("Central de utilitários Gigabyte", 15));
-            foreach (var utility in profile.Utilities)
-            {
-                utilityPanel.Children.Add(Heading(utility.Name, 11));
-                utilityPanel.Children.Add(Body(utility.Purpose));
-                utilityPanel.Children.Add(Body("Cuidado: " + utility.Safety));
-                utilityPanel.Children.Add(new Border { Height = 1, Background = BorderBrushSoft, Margin = new Thickness(0, 9, 0, 9) });
-            }
-            utilities.Child = utilityPanel;
-            root.Children.Add(utilities);
-
-            var recommendations = MakeCard();
-            var recPanel = new StackPanel { Margin = new Thickness(20) };
-            recPanel.Children.Add(Heading("Configurações e otimizações seguras", 15));
-            foreach (var recommendation in profile.SafeRecommendations)
-                recPanel.Children.Add(Bullet(recommendation));
-            recPanel.Children.Add(Heading("Bloqueado para automação", 13));
-            foreach (var blocked in profile.BlockedAutomaticActions)
-                recPanel.Children.Add(Bullet(blocked, "!"));
-            recommendations.Child = recPanel;
-            root.Children.Add(recommendations);
+            root.Children.Add(PageIntro("Placa-mãe", _hardware.BoardManufacturer + " " + _hardware.BoardProduct));
+            root.Children.Add(NoteCard("Perfil não cadastrado", "O ynoez não vai aplicar ajustes de firmware em uma placa não identificada."));
+            root.Children.Add(BuildToolActionCard("Entrar na UEFI", "Abra o firmware para consultar as opções da placa.", "Reiniciar", RestartToUefiAsync));
+            return root;
         }
-        else
+
+        root.Children.Add(PageIntro(profile.Manufacturer + " " + profile.Product, "Ajustes de CPU, memória, ventoinhas e firmware para esta placa."));
+        var recommendations = new UniformGrid { Columns = 2 };
+        recommendations.Children.Add(InfoTile("MEMÓRIA • XMP/DOCP", "Ative o Profile 1 somente se o kit suportar a frequência e estiver estável.", "RAM"));
+        recommendations.Children.Add(InfoTile("CPU • CORE PERFORMANCE BOOST", "Mantenha Auto/Enabled para preservar o boost padrão do Ryzen.", "CPU"));
+        recommendations.Children.Add(InfoTile("CPU • PBO", "Deixe Auto por padrão. Não aplique tensão ou limites térmicos sem validar refrigeração.", "PBO"));
+        recommendations.Children.Add(InfoTile("VENTOINHAS • SMART FAN 5", "Use curva baseada na temperatura real do CPU; mantenha proteção térmica.", "FAN"));
+        root.Children.Add(recommendations);
+
+        var actions = new UniformGrid { Columns = 2 };
+        actions.Children.Add(BuildToolActionCard("Abrir UEFI / BIOS", "Reinicia o computador diretamente no firmware.", "Reiniciar", RestartToUefiAsync));
+        actions.Children.Add(BuildToolActionCard("Driver AMD Chipset", "Abre o suporte oficial da AMD.", "Abrir", () => OpenTargetAsync("https://www.amd.com/en/support/download/drivers.html")));
+        root.Children.Add(actions);
+
+        var biosCard = MakeCard();
+        var biosPanel = new StackPanel { Margin = new Thickness(15) };
+        biosPanel.Children.Add(Heading("BIOS da revisão correta", 13));
+        var row = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var picker = new ComboBox
         {
-            root.Children.Add(NoteCard("Perfil ainda não cadastrado", "O ynoez detectou o hardware, mas ainda não tem um perfil verificado para esse modelo. O cadastro precisa conter revisão, páginas oficiais, utilitários suportados e limites de segurança antes de habilitar recomendações específicas."));
-        }
+            MinWidth = 150,
+            Height = 34,
+            ItemsSource = profile.RevisionLinks.OrderBy(x => x.Revision, StringComparer.OrdinalIgnoreCase),
+            DisplayMemberPath = nameof(MotherboardRevisionLink.Revision),
+            SelectedIndex = -1,
+            Margin = new Thickness(0, 2, 8, 0)
+        };
+        var openBios = new Button
+        {
+            Content = "Página oficial",
+            Style = (Style)FindResource("AccentButton"),
+            IsEnabled = false,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        picker.SelectionChanged += (_, _) => openBios.IsEnabled = picker.SelectedItem is MotherboardRevisionLink;
+        openBios.Click += async (_, _) =>
+        {
+            if (picker.SelectedItem is MotherboardRevisionLink selected)
+                await OpenTargetAsync(selected.Bios);
+        };
+        row.Children.Add(picker);
+        row.Children.Add(openBios);
+        biosPanel.Children.Add(row);
+        biosCard.Child = biosPanel;
+        root.Children.Add(biosCard);
+
+        root.Children.Add(BuildToolActionCard("Manual da placa", "Abra o manual oficial da série A520M K.", "Manual", () => OpenTargetAsync(profile.ManualUrl)));
         return root;
+    }
+
+    private Task RestartToUefiAsync()
+    {
+        if (MessageBox.Show(
+            "O Windows será reiniciado diretamente na UEFI/BIOS. Salve seus arquivos antes de continuar.",
+            "Entrar na UEFI", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return Task.CompletedTask;
+
+        Process.Start(new ProcessStartInfo("shutdown.exe", "/r /fw /t 0") { UseShellExecute = true });
+        return Task.CompletedTask;
     }
 
     private UIElement BuildToolbox()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Toolbox", "Pesquise configurações, serviços e ferramentas do Windows. Abra o destino oficial sem alterar nada."));
-        var search = new TextBox
-        {
-            Height = 42, FontSize = 13, Padding = new Thickness(13, 10, 13, 10),
-            Background = CardBrush, Foreground = PrimaryBrush, BorderBrush = BorderBrushSoft,
-            BorderThickness = new Thickness(1), CaretBrush = AccentBrush,
-            ToolTip = "Pesquisar Windows Update, Search, impressora, Defender…"
-        };
-        var results = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
-        void RenderResults()
-        {
-            results.Children.Clear();
-            var query = search.Text.Trim();
-            var hits = string.IsNullOrWhiteSpace(query)
-                ? ToolboxCatalog.Take(6).ToArray()
-                : ToolboxCatalog.Where(x => x.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || x.Description.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || x.Keywords.Any(k => k.Contains(query, StringComparison.OrdinalIgnoreCase))).ToArray();
-            if (hits.Length == 0)
-            {
-                results.Children.Add(NoteCard("Nenhum resultado", "Não encontrei uma entrada correspondente. Experimente pesquisar pelo nome do recurso ou pelo serviço do Windows."));
-                return;
-            }
-            foreach (var hit in hits)
-            {
-                var target = hit.Target;
-                var description = hit.Description;
-                if (!string.IsNullOrWhiteSpace(hit.ServiceName))
-                    description += "\n" + ReadServiceState(hit.ServiceName);
-                results.Children.Add(ActionCard(hit.Name, description, "Abrir", () => OpenTargetAsync(target), hit.Kind.ToUpperInvariant()));
-            }
-        }
-        search.TextChanged += (_, _) => RenderResults();
-        root.Children.Add(search);
-        root.Children.Add(results);
-
-        var serviceCard = MakeCard();
-        var servicePanel = new StackPanel { Margin = new Thickness(20) };
-        servicePanel.Children.Add(Heading("Inventário ao vivo de serviços", 15));
-        servicePanel.Children.Add(Body("Consulta todos os serviços registrados no Windows, incluindo nome interno, descrição, estado, tipo de inicialização e PID. A classificação é apenas informativa: protegidos, opcionais que já constam na whitelist de Debloat e serviços sem política de alteração. Esta tela não altera nem encerra serviços."));
-        var serviceSearch = new TextBox
-        {
-            Height = 38,
-            FontSize = 12,
-            Padding = new Thickness(11, 8, 11, 8),
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            BorderBrush = BorderBrushSoft,
-            BorderThickness = new Thickness(1),
-            CaretBrush = AccentBrush,
-            ToolTip = "Pesquisar pelo nome, serviço, descrição, estado ou classificação"
-        };
-        var serviceStatus = Body("A consulta ainda não foi executada.");
-        var serviceDetails = Body("Selecione um serviço para ver a explicação da classificação.");
-        serviceDetails.TextWrapping = TextWrapping.Wrap;
-        var serviceGrid = new DataGrid
-        {
-            AutoGenerateColumns = false,
-            IsReadOnly = true,
-            CanUserAddRows = false,
-            CanUserDeleteRows = false,
-            CanUserResizeRows = false,
-            SelectionMode = DataGridSelectionMode.Single,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"),
-            AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft,
-            Height = 330,
-            Margin = new Thickness(0, 10, 0, 10)
-        };
-        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Serviço", Binding = new Binding(nameof(WindowsServiceInfo.Name)), Width = new DataGridLength(1.0, DataGridLengthUnitType.Star) });
-        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Nome de exibição", Binding = new Binding(nameof(WindowsServiceInfo.DisplayName)), Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
-        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsServiceInfo.StateDisplay)), Width = new DataGridLength(100) });
-        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Inicialização", Binding = new Binding(nameof(WindowsServiceInfo.StartModeDisplay)), Width = new DataGridLength(105) });
-        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "PID", Binding = new Binding(nameof(WindowsServiceInfo.ProcessIdDisplay)), Width = new DataGridLength(55) });
-        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Política", Binding = new Binding(nameof(WindowsServiceInfo.SafetyDisplay)), Width = new DataGridLength(150) });
-        serviceGrid.Columns.Add(new DataGridTextColumn { Header = "Descrição", Binding = new Binding(nameof(WindowsServiceInfo.Description)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        IReadOnlyList<WindowsServiceInfo> allServices = Array.Empty<WindowsServiceInfo>();
-        void RenderServices()
-        {
-            var query = serviceSearch.Text.Trim();
-            var filtered = string.IsNullOrWhiteSpace(query)
-                ? allServices
-                : allServices.Where(x =>
-                    x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.StateDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.StartModeDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.Safety.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.Safety.Explanation.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
-            serviceGrid.ItemsSource = filtered;
-            serviceStatus.Text = allServices.Count == 0
-                ? "Nenhum inventário carregado."
-                : filtered.Count + " de " + allServices.Count + " serviços • somente leitura";
-        }
-        serviceSearch.TextChanged += (_, _) => RenderServices();
-        serviceGrid.SelectionChanged += (_, _) =>
-        {
-            if (serviceGrid.SelectedItem is not WindowsServiceInfo selected)
-            {
-                serviceDetails.Text = "Selecione um serviço para ver a explicação da classificação.";
-                return;
-            }
-            serviceDetails.Text = selected.DisplayName + " (" + selected.Name + ")" +
-                "\nEstado: " + selected.StateDisplay +
-                " • Inicialização: " + selected.StartModeDisplay +
-                " • PID: " + selected.ProcessIdDisplay +
-                "\nPolítica: " + selected.Safety.Explanation +
-                (string.IsNullOrWhiteSpace(selected.Description) ? "" : "\nDescrição: " + selected.Description);
-        };
-        var serviceButtons = new WrapPanel();
-        var refreshServices = new Button { Content = "Consultar serviços", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var cancelServices = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var exportServices = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var openServicesConsole = new Button { Content = "Abrir services.msc", Style = (Style)FindResource("QuietButton") };
-        refreshServices.Click += async (_, _) =>
-        {
-            if (_serviceInventoryCts is not null) return;
-            var cts = new CancellationTokenSource();
-            _serviceInventoryCts = cts;
-            refreshServices.IsEnabled = false;
-            cancelServices.IsEnabled = true;
-            exportServices.IsEnabled = false;
-            serviceStatus.Text = "Consultando Win32_Service. A operação pode levar alguns segundos…";
-            try
-            {
-                var captured = await WindowsServiceInventoryService.CaptureAsync(cts.Token);
-                if (!Dispatcher.HasShutdownStarted)
-                {
-                    allServices = captured;
-                    RenderServices();
-                    exportServices.IsEnabled = allServices.Count > 0;
-                    serviceStatus.Text = allServices.Count + " serviços inventariados • nenhum serviço foi alterado";
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                if (!Dispatcher.HasShutdownStarted) serviceStatus.Text = "Consulta cancelada. Nenhuma alteração foi feita.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Inventário de serviços do Windows falhou: " + ex);
-                if (!Dispatcher.HasShutdownStarted) serviceStatus.Text = "Falha na consulta: " + ex.Message;
-            }
-            finally
-            {
-                if (ReferenceEquals(_serviceInventoryCts, cts)) _serviceInventoryCts = null;
-                cts.Dispose();
-                if (!Dispatcher.HasShutdownStarted)
-                {
-                    refreshServices.IsEnabled = true;
-                    cancelServices.IsEnabled = false;
-                }
-            }
-        };
-        cancelServices.Click += (_, _) => _serviceInventoryCts?.Cancel();
-        exportServices.Click += (_, _) =>
-        {
-            if (allServices.Count == 0) return;
-            var dialog = new SaveFileDialog
-            {
-                Title = "Exportar inventário de serviços",
-                Filter = "CSV (*.csv)|*.csv",
-                FileName = "ynoez-servicos-windows.csv",
-                AddExtension = true,
-                DefaultExt = ".csv"
-            };
-            if (dialog.ShowDialog(this) != true) return;
-            try
-            {
-                File.WriteAllText(dialog.FileName, WindowsServiceInventoryService.BuildCsv(allServices), new System.Text.UTF8Encoding(true));
-                serviceStatus.Text = "Inventário completo exportado: " + dialog.FileName;
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Falha ao exportar inventário de serviços: " + ex);
-                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        };
-        openServicesConsole.Click += async (_, _) => await OpenTargetAsync("services.msc");
-        serviceButtons.Children.Add(refreshServices);
-        serviceButtons.Children.Add(cancelServices);
-        serviceButtons.Children.Add(exportServices);
-        serviceButtons.Children.Add(openServicesConsole);
-        servicePanel.Children.Add(serviceSearch);
-        servicePanel.Children.Add(serviceStatus);
-        servicePanel.Children.Add(serviceGrid);
-        servicePanel.Children.Add(serviceDetails);
-        servicePanel.Children.Add(serviceButtons);
-        serviceCard.Child = servicePanel;
-        root.Children.Add(serviceCard);
-
-        var taskCard = MakeCard();
-        var taskPanel = new StackPanel { Margin = new Thickness(20) };
-        taskPanel.Children.Add(Heading("Inventário ao vivo de tarefas agendadas", 15));
-        taskPanel.Children.Add(Body("Consulta as tarefas registradas no Agendador do Windows: nome, caminho, estado, autor, descrição, última execução, próxima execução e último resultado. A classificação separa tarefas protegidas, seis tarefas opcionais avaliadas pelo Debloat e todo o restante como somente leitura. Esta tela não habilita, desabilita, inicia ou encerra tarefas."));
-        var taskSearch = new TextBox
-        {
-            Height = 38,
-            FontSize = 12,
-            Padding = new Thickness(11, 8, 11, 8),
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            BorderBrush = BorderBrushSoft,
-            BorderThickness = new Thickness(1),
-            CaretBrush = AccentBrush,
-            ToolTip = "Pesquisar nome, caminho, estado, autor, descrição ou classificação"
-        };
-        var taskStatus = Body("A consulta ainda não foi executada.");
-        var taskDetails = Body("Selecione uma tarefa para ver sua classificação e descrição.");
-        taskDetails.TextWrapping = TextWrapping.Wrap;
-        var taskGrid = new DataGrid
-        {
-            AutoGenerateColumns = false,
-            IsReadOnly = true,
-            CanUserAddRows = false,
-            CanUserDeleteRows = false,
-            CanUserResizeRows = false,
-            SelectionMode = DataGridSelectionMode.Single,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"),
-            AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft,
-            Height = 330,
-            Margin = new Thickness(0, 10, 0, 10)
-        };
-        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Tarefa", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskName)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
-        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Caminho", Binding = new Binding(nameof(WindowsScheduledTaskInfo.TaskPath)), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
-        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsScheduledTaskInfo.StateDisplay)), Width = new DataGridLength(105) });
-        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Política", Binding = new Binding(nameof(WindowsScheduledTaskInfo.SafetyDisplay)), Width = new DataGridLength(150) });
-        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Última execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.LastRunDisplay)), Width = new DataGridLength(135) });
-        taskGrid.Columns.Add(new DataGridTextColumn { Header = "Próxima execução", Binding = new Binding(nameof(WindowsScheduledTaskInfo.NextRunDisplay)), Width = new DataGridLength(135) });
-        IReadOnlyList<WindowsScheduledTaskInfo> allTasks = Array.Empty<WindowsScheduledTaskInfo>();
-        void RenderTasks()
-        {
-            var query = taskSearch.Text.Trim();
-            var filtered = string.IsNullOrWhiteSpace(query)
-                ? allTasks
-                : allTasks.Where(x =>
-                    x.TaskName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.TaskPath.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.StateDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.Author.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.Safety.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    x.Safety.Explanation.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
-            taskGrid.ItemsSource = filtered;
-            taskStatus.Text = allTasks.Count == 0
-                ? "Nenhum inventário carregado."
-                : filtered.Count + " de " + allTasks.Count + " tarefas • " +
-                  allTasks.Count(x => x.Safety.IsProtected) + " protegidas • " +
-                  allTasks.Count(x => x.Safety.IsOptional) + " opcionais avaliadas • somente leitura";
-        }
-        taskSearch.TextChanged += (_, _) => RenderTasks();
-        taskGrid.SelectionChanged += (_, _) =>
-        {
-            if (taskGrid.SelectedItem is not WindowsScheduledTaskInfo selected)
-            {
-                taskDetails.Text = "Selecione uma tarefa para ver sua classificação e descrição.";
-                return;
-            }
-            taskDetails.Text = selected.FullName +
-                "\nEstado: " + selected.StateDisplay +
-                " • Autor: " + (string.IsNullOrWhiteSpace(selected.Author) ? "Não informado" : selected.Author) +
-                " • Último resultado: " + selected.LastResultDisplay +
-                "\nÚltima execução: " + selected.LastRunDisplay +
-                " • Próxima execução: " + selected.NextRunDisplay +
-                "\nPolítica: " + selected.Safety.Explanation +
-                (string.IsNullOrWhiteSpace(selected.Description) ? "" : "\nDescrição: " + selected.Description);
-        };
-        var taskButtons = new WrapPanel();
-        var refreshTasks = new Button { Content = "Consultar tarefas", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var cancelTasks = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var exportTasks = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var openTaskScheduler = new Button { Content = "Abrir taskschd.msc", Style = (Style)FindResource("QuietButton") };
-        refreshTasks.Click += async (_, _) =>
-        {
-            if (_scheduledTaskInventoryCts is not null) return;
-            var cts = new CancellationTokenSource();
-            _scheduledTaskInventoryCts = cts;
-            refreshTasks.IsEnabled = false;
-            cancelTasks.IsEnabled = true;
-            exportTasks.IsEnabled = false;
-            taskStatus.Text = "Consultando o Agendador de Tarefas. A primeira leitura pode levar alguns segundos…";
-            try
-            {
-                var captured = await WindowsScheduledTaskInventoryService.CaptureAsync(cts.Token);
-                if (!Dispatcher.HasShutdownStarted)
-                {
-                    allTasks = captured;
-                    RenderTasks();
-                    exportTasks.IsEnabled = allTasks.Count > 0;
-                    taskStatus.Text = allTasks.Count + " tarefas inventariadas • consulta somente leitura; nenhuma tarefa foi alterada.";
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Consulta cancelada. Nenhuma tarefa foi alterada.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Inventário de tarefas agendadas falhou: " + ex);
-                if (!Dispatcher.HasShutdownStarted) taskStatus.Text = "Falha na consulta: " + ex.Message;
-            }
-            finally
-            {
-                if (ReferenceEquals(_scheduledTaskInventoryCts, cts)) _scheduledTaskInventoryCts = null;
-                cts.Dispose();
-                if (!Dispatcher.HasShutdownStarted)
-                {
-                    refreshTasks.IsEnabled = true;
-                    cancelTasks.IsEnabled = false;
-                }
-            }
-        };
-        cancelTasks.Click += (_, _) => _scheduledTaskInventoryCts?.Cancel();
-        exportTasks.Click += (_, _) =>
-        {
-            if (allTasks.Count == 0) return;
-            var dialog = new SaveFileDialog
-            {
-                Title = "Exportar inventário de tarefas agendadas",
-                Filter = "CSV (*.csv)|*.csv",
-                FileName = "ynoez-tarefas-agendadas.csv",
-                AddExtension = true,
-                DefaultExt = ".csv"
-            };
-            if (dialog.ShowDialog(this) != true) return;
-            try
-            {
-                File.WriteAllText(dialog.FileName, WindowsScheduledTaskInventoryService.BuildCsv(allTasks), new System.Text.UTF8Encoding(true));
-                taskStatus.Text = "Inventário de tarefas exportado: " + dialog.FileName;
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Falha ao exportar inventário de tarefas: " + ex);
-                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        };
-        openTaskScheduler.Click += async (_, _) => await OpenTargetAsync("taskschd.msc");
-        taskButtons.Children.Add(refreshTasks);
-        taskButtons.Children.Add(cancelTasks);
-        taskButtons.Children.Add(exportTasks);
-        taskButtons.Children.Add(openTaskScheduler);
-        taskPanel.Children.Add(taskSearch);
-        taskPanel.Children.Add(taskStatus);
-        taskPanel.Children.Add(taskGrid);
-        taskPanel.Children.Add(taskDetails);
-        taskPanel.Children.Add(taskButtons);
-        taskCard.Child = taskPanel;
-        root.Children.Add(taskCard);
-
-        root.Children.Add(NoteCard("Ações de serviço e tarefas", "A Toolbox é somente leitura. A página Debloat contém listas curtas de seis serviços e seis tarefas opcionais, com backup, confirmação, verificação e restauração; não há desligamento em massa. Windows Search, impressão, Store, Defender, Firewall, Windows Update, manutenção, rede, áudio e anti-cheats permanecem protegidos."));
-        RenderResults();
+        root.Children.Add(PageIntro("Toolbox", "Atalhos diretos para as ferramentas do Windows e do driver."));
+        var grid = new UniformGrid { Columns = 3 };
+        grid.Children.Add(BuildToolActionCard("Limpar DNS", "Executa ipconfig /flushdns.", "Executar", () =>
+            RunLocalProcessAsync("ipconfig.exe", "/flushdns")));
+        grid.Children.Add(BuildToolActionCard("Serviços", "Abre services.msc.", "Abrir", () => OpenTargetAsync("services.msc")));
+        grid.Children.Add(BuildToolActionCard("Gerenciador de tarefas", "Abre Task Manager.", "Abrir", () => OpenTargetAsync("taskmgr.exe")));
+        grid.Children.Add(BuildToolActionCard("Gerenciador de dispositivos", "Abre drivers e hardware instalados.", "Abrir", () => OpenTargetAsync("devmgmt.msc")));
+        grid.Children.Add(BuildToolActionCard("Editor do Registro", "Abre o Regedit do Windows.", "Abrir", () => OpenTargetAsync("regedit.exe")));
+        grid.Children.Add(BuildToolActionCard("AMD Adrenalin", "Abre o painel Radeon quando instalado.", "Abrir", OpenAmdSoftwareAsync));
+        grid.Children.Add(BuildToolActionCard("Conexões de rede", "Abre adaptadores Ethernet e Wi-Fi.", "Abrir", () => OpenTargetAsync("ncpa.cpl")));
+        grid.Children.Add(BuildToolActionCard("Opções de energia", "Abre os planos e configurações de energia.", "Abrir", () => OpenTargetAsync("powercfg.cpl")));
+        grid.Children.Add(BuildToolActionCard("Configurações gráficas", "GPU por aplicativo e HAGS no Windows.", "Abrir", () => OpenTargetAsync("ms-settings:display-advancedgraphics")));
+        root.Children.Add(grid);
         return root;
     }
 
