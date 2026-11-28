@@ -133,6 +133,52 @@ public static class FirmwareCompatibilityService
             firmwareSettings);
     }
 
+    public static string BuildManualGuidance(
+        FirmwareCompatibilitySnapshot snapshot,
+        IEnumerable<string> selectedProfiles,
+        IReadOnlyList<string>? requiredSettings = null)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(selectedProfiles);
+        var required = requiredSettings ?? GetRequiredSettingIds(selectedProfiles);
+        var labels = required.Select(id => id switch
+        {
+            "secureboot" => "Secure Boot",
+            "tpm" => "TPM 2.0 / AMD fTPM",
+            "iommu" => "IOMMU / DMA Remapping",
+            "virtualization" => "SVM / Intel VT-x",
+            "cpu-boost" => "Core Performance Boost / Intel Turbo Boost",
+            _ => id
+        }).ToArray();
+
+        var board = Normalize(snapshot.BoardManufacturer + " " + snapshot.BoardProduct);
+        var lines = new List<string>();
+        if (board.Contains("GIGABYTEA520MKV2", StringComparison.Ordinal))
+        {
+            lines.Add("GIGABYTE A520M K V2 — entre em Advanced Mode:");
+            if (required.Contains("tpm", StringComparer.Ordinal))
+                lines.Add("Settings > AMD CPU fTPM: Enabled.");
+            if (required.Contains("virtualization", StringComparer.Ordinal))
+                lines.Add("SVM Mode: Enabled (localize em AMD CBS/CPU Common Options; o menu varia por BIOS).");
+            if (required.Contains("iommu", StringComparer.Ordinal))
+                lines.Add("IOMMU: Enabled, se a BIOS/CPU expuser essa opção.");
+            if (required.Contains("secureboot", StringComparer.Ordinal))
+            {
+                lines.Add(snapshot.BiosMode.Equals("UEFI", StringComparison.OrdinalIgnoreCase)
+                    ? "Boot > CSM Support: Disabled; depois Secure Boot > Custom > Restore Factory Keys; confirme Secure Boot Active."
+                    : "Secure Boot bloqueado: o Windows iniciou em Legacy. Não desative CSM; converta o disco do sistema para GPT e valide UEFI antes.");
+            }
+            lines.Add("CPU: Core Performance Boost em Auto/Enabled. PBO, tensão, clocks e limites térmicos ficam no padrão.");
+        }
+        else
+        {
+            lines.Add("Esta BIOS não oferece uma API de gravação suportada pelo ynoez.");
+            lines.Add("Recursos necessários: " + string.Join(", ", labels) + ".");
+        }
+        lines.Add("Nenhum valor foi gravado. O ynoez não usa offsets UEFI genéricos, não altera tensão/overclock e não desativa proteções.");
+        return string.Join("\n", lines);
+    }
+
     public static IReadOnlyList<string> GetRequiredSettingIds(IEnumerable<string> selectedProfiles)
     {
         ArgumentNullException.ThrowIfNull(selectedProfiles);
@@ -191,8 +237,7 @@ public static class FirmwareCompatibilityService
 
         if (!snapshot.LenovoWmiAvailable && !snapshot.AsusActAvailable)
             return new FirmwareApplyResult(false, false, 0, [],
-                "Esta placa não oferece uma interface documentada compatível de gravação de BIOS. A análise foi feita; nenhum offset UEFI genérico será escrito. Requisitos encontrados: " +
-                string.Join(", ", targets) + ". Use Entrar na BIOS para aplicar apenas os itens necessários.");
+                BuildManualGuidance(snapshot, selected, targets));
         if (!snapshot.CanWriteBios)
         {
             var reason = snapshot.LenovoWmiAvailable && !snapshot.LenovoPasswordStateKnown
