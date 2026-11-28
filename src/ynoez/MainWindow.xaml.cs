@@ -234,273 +234,39 @@ public partial class MainWindow : Window
     private UIElement BuildHome()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("System Info", "Visão geral do hardware e do Windows detectados neste computador."));
+        root.Children.Add(PageIntro("Visão geral", "Seu hardware e os atalhos que realmente importam."));
 
-        var grid = new UniformGrid { Columns = 3, Rows = 2, Margin = new Thickness(0, 3, 0, 18) };
-        grid.Children.Add(InfoTile("CPU", _hardware.Cpu, "◉"));
-        grid.Children.Add(InfoTile("RAM", _hardware.Memory, "▤"));
-        grid.Children.Add(InfoTile("Graphics Card", _hardware.Gpu, "▧"));
-        grid.Children.Add(InfoTile("Network", _hardware.NetworkSummary, "⌁"));
-        grid.Children.Add(InfoTile("Motherboard", _hardware.BoardProduct, "▦"));
-        grid.Children.Add(InfoTile("Windows Version", _hardware.OperatingSystem + "\nBuild " + _hardware.WindowsBuild, "▣"));
+        var grid = new UniformGrid { Columns = 2, Rows = 2, Margin = new Thickness(0, 3, 0, 16) };
+        grid.Children.Add(InfoTile("PROCESSADOR", _hardware.Cpu, "CPU"));
+        grid.Children.Add(InfoTile("PLACA DE VÍDEO", _hardware.Gpu, "GPU"));
+        grid.Children.Add(InfoTile("MEMÓRIA RAM", _hardware.Memory, "RAM"));
+        grid.Children.Add(InfoTile("WINDOWS", _hardware.OperatingSystem + " • Build " + _hardware.WindowsBuild, "OS"));
         root.Children.Add(grid);
 
-        var memoryCard = MakeCard();
-        var memoryPanel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
-        memoryPanel.Children.Add(Heading("Módulos de memória RAM", 15));
-        memoryPanel.Children.Add(Body("Consulte os módulos que o firmware disponibiliza ao WMI: slot, capacidade, tipo DDR, velocidade reportada e configurada, formato físico, ECC e part number. A consulta é somente leitura e não altera XMP/DOCP, frequência, tensão ou BIOS."));
-        var memoryStatus = Body("Inventário de módulos ainda não consultado.");
-        var memoryNotice = Body("A consulta usa dados WMI/SMBIOS; não é uma leitura SPD completa e não determina com segurança o modo single/dual channel.");
-        memoryNotice.TextWrapping = TextWrapping.Wrap;
-        var memoryGrid = new DataGrid
-        {
-            AutoGenerateColumns = false,
-            IsReadOnly = true,
-            CanUserAddRows = false,
-            CanUserDeleteRows = false,
-            CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"),
-            AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft,
-            Height = 210,
-            Margin = new Thickness(0, 10, 0, 10)
-        };
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Slot", Binding = new Binding(nameof(MemoryModuleInfo.SlotDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Capacidade", Binding = new Binding(nameof(MemoryModuleInfo.CapacityDisplay)), Width = new DataGridLength(95) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Tipo", Binding = new Binding(nameof(MemoryModuleInfo.TypeDisplay)), Width = new DataGridLength(75) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Velocidade", Binding = new Binding(nameof(MemoryModuleInfo.SpeedDisplay)), Width = new DataGridLength(95) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Configurada", Binding = new Binding(nameof(MemoryModuleInfo.ConfiguredSpeedDisplay)), Width = new DataGridLength(105) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Formato", Binding = new Binding(nameof(MemoryModuleInfo.FormFactorDisplay)), Width = new DataGridLength(90) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "ECC", Binding = new Binding(nameof(MemoryModuleInfo.EccDisplay)), Width = new DataGridLength(85) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Fabricante", Binding = new Binding(nameof(MemoryModuleInfo.ManufacturerDisplay)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        memoryGrid.Columns.Add(new DataGridTextColumn { Header = "Part number", Binding = new Binding(nameof(MemoryModuleInfo.PartNumberDisplay)), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
-        var memoryButtons = new WrapPanel();
-        var inspectMemory = new Button { Content = "Consultar módulos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var cancelMemory = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var exportMemory = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        MemoryModuleInventorySnapshot? memorySnapshot = null;
-        inspectMemory.Click += async (_, _) =>
-        {
-            if (_memoryInventoryCts is not null) return;
-            var cts = new CancellationTokenSource();
-            _memoryInventoryCts = cts;
-            inspectMemory.IsEnabled = false;
-            cancelMemory.IsEnabled = true;
-            exportMemory.IsEnabled = false;
-            memoryStatus.Text = "Consultando Win32_PhysicalMemory e o firmware…";
-            try
-            {
-                var snapshot = await MemoryModuleInventoryService.CaptureAsync(cts.Token);
-                if (!Dispatcher.HasShutdownStarted)
-                {
-                    memorySnapshot = snapshot;
-                    memoryGrid.ItemsSource = snapshot.Modules;
-                    memoryStatus.Text = snapshot.SlotSummary + " • capacidade total: " + snapshot.TotalCapacityDisplay +
-                        " • " + snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss");
-                    memoryNotice.Text = snapshot.Notice;
-                    exportMemory.IsEnabled = snapshot.Modules.Count > 0;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                if (!Dispatcher.HasShutdownStarted) memoryStatus.Text = "Consulta cancelada. Nenhuma configuração foi alterada.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Inventário de módulos de memória falhou: " + ex);
-                if (!Dispatcher.HasShutdownStarted) memoryStatus.Text = "Não foi possível consultar a memória: " + ex.Message;
-            }
-            finally
-            {
-                if (ReferenceEquals(_memoryInventoryCts, cts)) _memoryInventoryCts = null;
-                cts.Dispose();
-                if (!Dispatcher.HasShutdownStarted)
-                {
-                    inspectMemory.IsEnabled = true;
-                    cancelMemory.IsEnabled = false;
-                }
-            }
-        };
-        cancelMemory.Click += (_, _) => _memoryInventoryCts?.Cancel();
-        exportMemory.Click += (_, _) =>
-        {
-            if (memorySnapshot is null) return;
-            var dialog = new SaveFileDialog
-            {
-                Title = "Exportar inventário de módulos de memória",
-                Filter = "CSV (*.csv)|*.csv",
-                FileName = "ynoez-memoria-modulos.csv",
-                AddExtension = true,
-                DefaultExt = ".csv"
-            };
-            if (dialog.ShowDialog(this) != true) return;
-            try
-            {
-                File.WriteAllText(dialog.FileName, MemoryModuleInventoryService.BuildCsv(memorySnapshot), new System.Text.UTF8Encoding(true));
-                memoryStatus.Text = "Inventário de memória exportado: " + dialog.FileName;
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Falha ao exportar inventário de memória: " + ex);
-                MessageBox.Show("Não foi possível exportar o CSV: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        };
-        memoryButtons.Children.Add(inspectMemory);
-        memoryButtons.Children.Add(cancelMemory);
-        memoryButtons.Children.Add(exportMemory);
-        memoryPanel.Children.Add(memoryStatus);
-        memoryPanel.Children.Add(memoryGrid);
-        memoryPanel.Children.Add(memoryNotice);
-        memoryPanel.Children.Add(memoryButtons);
-        memoryCard.Child = memoryPanel;
-        root.Children.Add(memoryCard);
+        var actionsCard = MakeCard();
+        var actionsPanel = new StackPanel { Margin = new Thickness(20, 17, 20, 17) };
+        actionsPanel.Children.Add(Heading("Ações rápidas", 15));
+        var actions = new UniformGrid { Columns = 3, Margin = new Thickness(0, 8, 0, 0) };
+        var optimize = SmallAction("Otimizar para jogos", () => ShowPage("Tweaks"));
+        var debloat = SmallAction("Limpar / Debloat", () => ShowPage("Debloat"));
+        var monitor = SmallAction("Monitorar desempenho", () => ShowPage("Monitor"));
+        optimize.Margin = new Thickness(0, 0, 8, 0);
+        debloat.Margin = new Thickness(0, 0, 8, 0);
+        actions.Children.Add(optimize);
+        actions.Children.Add(debloat);
+        actions.Children.Add(monitor);
+        actionsPanel.Children.Add(actions);
+        actionsCard.Child = actionsPanel;
+        root.Children.Add(actionsCard);
 
-        var info = MakeCard();
-        var panel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
-        panel.Children.Add(Heading("Information", 17));
-        panel.Children.Add(Body("O ynoez funciona localmente. Nenhum ajuste é aplicado em segundo plano. Cada alteração disponível fica identificada, exige ação explícita e registra o que foi feito."));
-        var row = new WrapPanel { Margin = new Thickness(0, 13, 0, 0) };
-        row.Children.Add(Badge("BACKUP ANTES DE AJUSTAR", "#FFFFFF"));
-        row.Children.Add(Badge("RESTAURAÇÃO", "#FFFFFF"));
-        row.Children.Add(Badge("VANGUARD / FACEIT: PROTEÇÕES PRESERVADAS", "#D2D2D2"));
-        panel.Children.Add(row);
-        info.Child = panel;
-        root.Children.Add(info);
-
-        var updateCard = MakeCard();
-        var updatePanel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
-        updatePanel.Children.Add(Heading("Atualizações", 15));
-        updatePanel.Children.Add(Body("A verificação consulta a release estável do repositório oficial somente quando você clica. O ynoez não envia inventário nem instala atualização em segundo plano."));
-        var updateStatus = Body("Última verificação ainda não realizada.");
-        var updateButtonRow = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
-        var checkUpdate = new Button { Content = "Verificar atualização", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var openRelease = new Button { Content = "Abrir release oficial", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        UpdateCheckResult? latestUpdate = null;
-        checkUpdate.Click += async (_, _) =>
-        {
-            checkUpdate.IsEnabled = false;
-            openRelease.IsEnabled = false;
-            updateStatus.Text = "Consultando a release estável do GitHub…";
-            try
-            {
-                latestUpdate = await UpdateService.CheckLatestAsync();
-                if (latestUpdate is null)
-                {
-                    updateStatus.Text = "Nenhuma release estável foi publicada ainda.";
-                }
-                else if (latestUpdate.IsUpdateAvailable)
-                {
-                    updateStatus.Text = "Atualização disponível: " + latestUpdate.CurrentVersion + " → " + latestUpdate.LatestVersion +
-                        (latestUpdate.PublishedAt.HasValue ? " • publicada em " + latestUpdate.PublishedAt.Value.ToLocalTime().ToString("dd/MM/yyyy") : "") +
-                        "\nO download é manual pela página oficial. Confira a versão e o arquivo antes de instalar.";
-                    openRelease.IsEnabled = true;
-                }
-                else
-                {
-                    updateStatus.Text = "Você já está usando a versão mais recente (" + latestUpdate.CurrentVersion + ").";
-                }
-                AppLog.Write("Verificação manual de atualização concluída: " +
-                    (latestUpdate?.LatestVersion ?? "sem release estável") + ".");
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Verificação de atualização falhou: " + ex);
-                updateStatus.Text = "Não foi possível consultar o GitHub: " + ex.Message;
-            }
-            finally { checkUpdate.IsEnabled = true; }
-        };
-        openRelease.Click += (_, _) =>
-        {
-            if (latestUpdate is null || !latestUpdate.IsUpdateAvailable) return;
-            try { UpdateService.OpenOfficialRelease(latestUpdate); }
-            catch (Exception ex)
-            {
-                AppLog.Write("Abertura da release oficial falhou: " + ex);
-                MessageBox.Show("Não foi possível abrir a página oficial: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        };
-        updateButtonRow.Children.Add(checkUpdate);
-        updateButtonRow.Children.Add(openRelease);
-        updatePanel.Children.Add(updateStatus);
-        updatePanel.Children.Add(updateButtonRow);
-        updateCard.Child = updatePanel;
-        root.Children.Add(updateCard);
-
-        var integrityCard = MakeCard();
-        var integrityPanel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
-        integrityPanel.Children.Add(Heading("Integridade do Windows e anti-cheats", 15));
-        integrityPanel.Children.Add(Body("Auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI, Windows Search, impressão, Store, Windows Update, Vanguard e FACEIT. Não altera configurações e não garante compatibilidade por si só; apenas registra o estado reportado pelo Windows."));
-        var integrityStatus = Body("Auditoria ainda não executada.");
-        var integrityGrid = new DataGrid
-        {
-            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
-            CanUserDeleteRows = false, CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"), AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft, Height = 280, Margin = new Thickness(0, 10, 0, 10)
-        };
-        integrityGrid.Columns.Add(new DataGridTextColumn { Header = "Área", Binding = new Binding(nameof(WindowsIntegrityAuditRow.Area)), Width = new DataGridLength(1.1, DataGridLengthUnitType.Star) });
-        integrityGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(WindowsIntegrityAuditRow.Status)), Width = new DataGridLength(125) });
-        integrityGrid.Columns.Add(new DataGridTextColumn { Header = "Detalhes", Binding = new Binding(nameof(WindowsIntegrityAuditRow.Details)), Width = new DataGridLength(2.2, DataGridLengthUnitType.Star) });
-        var integrityButtons = new WrapPanel();
-        var runIntegrity = new Button { Content = "Executar auditoria", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var cancelIntegrity = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        runIntegrity.Click += async (_, _) =>
-        {
-            if (_integrityAuditCts is not null) return;
-            _integrityAuditCts = new CancellationTokenSource();
-            var token = _integrityAuditCts.Token;
-            runIntegrity.IsEnabled = false;
-            cancelIntegrity.IsEnabled = true;
-            integrityStatus.Text = "Consultando recursos de segurança e serviços protegidos…";
-            try
-            {
-                var snapshot = await WindowsIntegrityAuditService.CaptureAsync(token);
-                var rows = WindowsIntegrityAuditService.BuildRows(snapshot);
-                integrityGrid.ItemsSource = rows;
-                var issues = rows.Count(x => x.Status is "Desativado" or "Parado" or "Configurado, não ativo");
-                integrityStatus.Text = "Consulta concluída em " + snapshot.CapturedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") +
-                    " • " + rows.Count + " verificações • " + issues + " estados que merecem revisão." +
-                    "\nEstados 'Indisponível' ou 'Não instalado' não são tratados como prova de falha. Nenhuma alteração foi feita.";
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                integrityStatus.Text = "Auditoria cancelada. Nenhuma configuração foi alterada.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Auditoria de integridade do Windows falhou: " + ex);
-                integrityStatus.Text = "Não foi possível concluir a auditoria: " + ex.Message;
-            }
-            finally
-            {
-                _integrityAuditCts?.Dispose();
-                _integrityAuditCts = null;
-                runIntegrity.IsEnabled = true;
-                cancelIntegrity.IsEnabled = false;
-            }
-        };
-        cancelIntegrity.Click += (_, _) => _integrityAuditCts?.Cancel();
-        integrityButtons.Children.Add(runIntegrity);
-        integrityButtons.Children.Add(cancelIntegrity);
-        integrityPanel.Children.Add(integrityStatus);
-        integrityPanel.Children.Add(integrityGrid);
-        integrityPanel.Children.Add(integrityButtons);
-        integrityPanel.Children.Add(NoteCard("Interpretação correta", "TPM, Secure Boot e VBS podem variar conforme firmware e política do Windows. Vanguard/FACEIT podem exigir configurações específicas da versão do jogo/anti-cheat. O ynoez não desativa nem reconfigura essas proteções e não declara compatibilidade sem teste no PC real."));
-        integrityCard.Child = integrityPanel;
-        root.Children.Add(integrityCard);
-
-        var actions = new WrapPanel { Margin = new Thickness(0, 15, 0, 0) };
-        actions.Children.Add(SmallAction("Abrir Toolbox", () => ShowPage("Toolbox")));
-        actions.Children.Add(SmallAction("Diagnosticar Rede", () => ShowPage("Network")));
-        actions.Children.Add(SmallAction("Central A520M K V2", () => ShowPage("Motherboard")));
-        root.Children.Add(actions);
+        var detailCard = MakeCard();
+        var detailPanel = new StackPanel { Margin = new Thickness(20, 15, 20, 15) };
+        detailPanel.Children.Add(Heading("Sistema", 13));
+        detailPanel.Children.Add(KeyValue("Placa-mãe", _hardware.BoardProduct));
+        detailPanel.Children.Add(KeyValue("Rede", _hardware.NetworkSummary));
+        detailPanel.Children.Add(Body("As alterações são locais e registradas. Perfis e limpeza podem ser restaurados quando houver backup.", new Thickness(0, 9, 0, 0)));
+        detailCard.Child = detailPanel;
+        root.Children.Add(detailCard);
         return root;
     }
 
@@ -863,223 +629,144 @@ public partial class MainWindow : Window
     private UIElement BuildTweaks()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Tweaks", "Ajustes de acesso controlado. Nada é aplicado automaticamente ao abrir o aplicativo."));
-        root.Children.Add(ActionCard("Performance", "Ativa Alto desempenho para reduzir economia agressiva de energia. Pode elevar consumo, temperatura e ruído.", "Ativar Performance", () =>
-        {
-            if (_autoProfileCts is not null)
-            {
-                MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                return Task.CompletedTask;
-            }
-            if (MessageBox.Show("Ativar o perfil Performance? O plano original será salvo para restauração.", "Confirmar perfil", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
-            MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Performance), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-            return Task.CompletedTask;
-        }, "JOGOS"));
-        root.Children.Add(ActionCard("Equilibrado", "Usa o plano equilibrado do Windows para tarefas comuns, sem encerrar processos ou alterar serviços.", "Ativar Equilibrado", () =>
-        {
-            if (_autoProfileCts is not null)
-            {
-                MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                return Task.CompletedTask;
-            }
-            if (MessageBox.Show("Ativar o perfil Equilibrado?", "Confirmar perfil", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return Task.CompletedTask;
-            MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Balanced), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-            return Task.CompletedTask;
-        }, "PADRÃO"));
-        root.Children.Add(ActionCard("AFK / Economia", "Ativa o plano de economia e bloqueia a suspensão automática enquanto o ynoez estiver aberto, permitindo que Roblox, XT e downloads continuem ativos. A tela pode apagar normalmente; desligar, fechar a tampa ou faltar energia ainda interrompe tudo.", "Ativar AFK", () =>
-        {
-            if (_autoProfileCts is not null)
-            {
-                MessageBox.Show("Pare os perfis automáticos antes de alterar o perfil manualmente.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                return Task.CompletedTask;
-            }
-            if (MessageBox.Show("Ativar AFK / Economia manualmente? Este perfil pode reduzir o desempenho de jogos, bots e automações que continuarem abertos. Para deixar tarefas importantes em execução sem usar a economia agressiva, configure-as como processos protegidos e use Perfis automáticos.", "Confirmar perfil AFK", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
-            MessageBox.Show(PowerProfileService.Apply(PowerProfileMode.Afk), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-            return Task.CompletedTask;
-        }, "ECONOMIA"));
-        root.Children.Add(ActionCard("Restaurar plano original", "Restaura o GUID do plano que estava ativo antes do primeiro perfil ynoez e verifica o resultado.", "Restaurar original", () =>
-        {
-            if (_autoProfileCts is not null)
-            {
-                MessageBox.Show("Pare os perfis automáticos antes de restaurar o plano original.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                return Task.CompletedTask;
-            }
-            MessageBox.Show(PowerProfileService.RestoreOriginal(), "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-            return Task.CompletedTask;
-        }, "RESTAURAÇÃO"));
+        root.Children.Add(PageIntro("Otimização", "Aplique um perfil de jogo reversível ou deixe o ynoez ajustar a energia automaticamente."));
 
-        var autoCard = MakeCard();
-        var autoPanel = new StackPanel { Margin = new Thickness(20) };
-        autoPanel.Children.Add(Heading("Perfis automáticos", 15));
-        autoPanel.Children.Add(Body("Jogo com atividade recente = Performance. Jogo ou processo protegido durante inatividade = AFK protegido: plano Equilibrado + bloqueio de suspensão, sem usar o plano Economia agressiva. Somente quando nenhum jogo/processo protegido estiver rodando e houver 15 minutos sem entrada o ynoez usa AFK / Economia. Não encerra processos; o plano original é salvo e restaurado ao parar."));
-        autoPanel.Children.Add(Heading("Processos que devem permanecer protegidos", 13));
-        autoPanel.Children.Add(Body("Jogos conhecidos, incluindo Roblox, são protegidos automaticamente. Também ficam protegidos por padrão os ambientes comuns de scripts e automações: cmd, PowerShell, Python, Node.js, Java, Windows Script Host e AutoHotkey. Esses padrões não podem ser removidos. Adicione o nome exato do processo de outras ferramentas (inclusive XT, caso execute em um processo separado) usando ponto e vírgula. Use apenas o nome simples, sem espaços, caminho ou argumentos; .exe é opcional."));
-        var protectedInput = new TextBox
+        var gameCard = MakeCard();
+        var gamePanel = new StackPanel { Margin = new Thickness(20, 18, 20, 18) };
+        gamePanel.Children.Add(Heading("Otimização para jogos", 16));
+        gamePanel.Children.Add(Body("Reduz a captura em segundo plano do Xbox, diminui efeitos visuais do Windows e seleciona Alto desempenho quando nenhum outro perfil de energia do ynoez já controla o plano. Cada alteração é salva para restauração."));
+        var gameStatus = Body(QuickGameOptimizationService.IsApplied
+            ? "Perfil aplicado. As alterações estão registradas para restauração."
+            : "Nenhuma otimização rápida aplicada.");
+        gameStatus.Margin = new Thickness(0, 9, 0, 10);
+        var gameButtons = new WrapPanel();
+        var applyGame = new Button
         {
-            Text = string.Join("; ", AutoProfileService.GetCustomProtectedProcessNames()),
-            MinHeight = 36,
-            Padding = new Thickness(10, 8, 10, 8),
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            BorderBrush = BorderBrushSoft,
-            BorderThickness = new Thickness(1),
-            Margin = new Thickness(0, 4, 0, 8)
+            Content = "Otimizar agora",
+            Style = (Style)FindResource("AccentButton"),
+            Margin = new Thickness(0, 0, 8, 0)
         };
-        var protectionWarning = AutoProfileService.GetProtectionConfigurationWarning();
-        var autoStatus = new TextBlock
+        var restoreGame = new Button
         {
-            Text = protectionWarning ?? "Automação desligada.",
-            Foreground = protectionWarning is null ? SecondaryBrush : BrushFrom("#FFFFFF"),
-            FontSize = 11,
-            Margin = new Thickness(0, 10, 0, 10),
-            TextWrapping = TextWrapping.Wrap
-        };
-        var processPicker = new ComboBox
-        {
-            MinWidth = 320,
-            MinHeight = 34,
-            Margin = new Thickness(0, 4, 8, 8),
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            BorderBrush = BorderBrushSoft,
-            BorderThickness = new Thickness(1),
-            IsEnabled = true
-        };
-        var refreshProcesses = new Button
-        {
-            Content = "Atualizar processos em execução",
+            Content = "Restaurar alterações",
             Style = (Style)FindResource("QuietButton"),
-            Margin = new Thickness(0, 4, 8, 8)
+            IsEnabled = QuickGameOptimizationService.IsApplied
         };
-        var addSelectedProcess = new Button
+        applyGame.IsEnabled = !QuickGameOptimizationService.IsApplied;
+        applyGame.Click += async (_, _) =>
         {
-            Content = "Adicionar à proteção",
-            Style = (Style)FindResource("QuietButton"),
-            Margin = new Thickness(0, 4, 0, 8),
-            IsEnabled = false
-        };
-        processPicker.SelectionChanged += (_, _) =>
-            addSelectedProcess.IsEnabled = processPicker.SelectedItem is ComboBoxItem;
-        refreshProcesses.Click += async (_, _) =>
-        {
-            refreshProcesses.IsEnabled = false;
-            addSelectedProcess.IsEnabled = false;
-            processPicker.Items.Clear();
-            autoStatus.Text = "Lendo processos em execução (somente leitura)…";
+            if (MessageBox.Show(
+                "Aplicar o perfil para jogos? A captura em segundo plano do Xbox será desativada, alguns efeitos visuais serão reduzidos e o plano de energia poderá mudar para Alto desempenho. NVIDIA Instant Replay, OBS, drivers e anti-cheats não serão alterados.",
+                "Confirmar otimização", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            applyGame.IsEnabled = false;
+            restoreGame.IsEnabled = false;
+            gameStatus.Text = "Aplicando e verificando as configurações…";
             try
             {
-                var snapshot = await RunningProcessInventoryService.GetSnapshotAsync();
-                foreach (var process in snapshot)
-                {
-                    var item = new ComboBoxItem
-                    {
-                        Content = $"{process.ProcessName} • PID {process.ProcessId} • {process.WorkingSetMb:N0} MB",
-                        Tag = process.ProcessName
-                    };
-                    processPicker.Items.Add(item);
-                }
-                if (processPicker.Items.Count > 0)
-                    processPicker.SelectedIndex = 0;
-                autoStatus.Text = snapshot.Count == 0
-                    ? "Nenhum processo acessível foi encontrado."
-                    : $"Encontrados {snapshot.Count} processos. Selecione um nome e adicione-o à lista; nada será encerrado ou modificado.";
+                gameStatus.Text = await Task.Run(QuickGameOptimizationService.Apply);
+                restoreGame.IsEnabled = QuickGameOptimizationService.IsApplied;
             }
             catch (Exception ex)
             {
-                AppLog.Write("Falha ao inventariar processos em execução: " + ex);
-                autoStatus.Text = "Não foi possível listar os processos: " + ex.Message;
+                AppLog.Write("Otimização rápida para jogos falhou: " + ex);
+                gameStatus.Text = "A aplicação foi interrompida: " + ex.Message;
+                restoreGame.IsEnabled = QuickGameOptimizationService.IsApplied;
             }
             finally
             {
-                refreshProcesses.IsEnabled = true;
-                addSelectedProcess.IsEnabled = processPicker.SelectedItem is ComboBoxItem;
+                applyGame.IsEnabled = !QuickGameOptimizationService.IsApplied;
             }
         };
-        addSelectedProcess.Click += (_, _) =>
+        restoreGame.Click += async (_, _) =>
         {
-            if (processPicker.SelectedItem is not ComboBoxItem selected ||
-                selected.Tag is not string processName)
-                return;
+            restoreGame.IsEnabled = false;
+            applyGame.IsEnabled = false;
+            gameStatus.Text = "Restaurando valores anteriores…";
+            try
+            {
+                gameStatus.Text = await Task.Run(QuickGameOptimizationService.Restore);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Restauração da otimização rápida falhou: " + ex);
+                gameStatus.Text = "A restauração precisa de atenção: " + ex.Message;
+            }
+            finally
+            {
+                restoreGame.IsEnabled = QuickGameOptimizationService.IsApplied;
+                applyGame.IsEnabled = !QuickGameOptimizationService.IsApplied;
+            }
+        };
+        gameButtons.Children.Add(applyGame);
+        gameButtons.Children.Add(restoreGame);
+        gamePanel.Children.Add(gameStatus);
+        gamePanel.Children.Add(gameButtons);
+        gameCard.Child = gamePanel;
+        root.Children.Add(gameCard);
 
-            try
-            {
-                _ = AutoProfileService.NormalizeProtectedProcessNames(new[] { processName });
-                var names = protectedInput.Text.Split(';',
-                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-                if (!names.Contains(processName, StringComparer.OrdinalIgnoreCase))
-                    names.Add(processName);
-                protectedInput.Text = string.Join("; ", names);
-                autoStatus.Text = $"'{processName}' foi adicionado ao campo. Clique em Salvar processos protegidos para gravar a alteração.";
-            }
-            catch (Exception ex)
-            {
-                autoStatus.Text = "Esse nome não pode ser salvo na lista protegida: " + ex.Message;
-            }
-        };
-        var processPickerPanel = new WrapPanel();
-        processPickerPanel.Children.Add(processPicker);
-        processPickerPanel.Children.Add(refreshProcesses);
-        processPickerPanel.Children.Add(addSelectedProcess);
-        var saveProtected = new Button
-        {
-            Content = "Salvar processos protegidos",
-            Style = (Style)FindResource("QuietButton"),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 0, 0, 10)
-        };
-        saveProtected.Click += (_, _) =>
-        {
-            try
-            {
-                var names = AutoProfileService.SaveProtectedProcessNames(
-                    protectedInput.Text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-                autoStatus.Text = names.Count == 0
-                    ? "Nenhum processo adicional cadastrado. Os jogos e ambientes de script protegidos por padrão continuam ativos."
-                    : "Processos adicionais salvos: " + string.Join(", ", names) +
-                      ". Os padrões de proteção continuam ativos; a lista será carregada na próxima ativação.";
-            }
-            catch (Exception ex)
-            {
-                autoStatus.Text = "Não foi possível salvar a lista: " + ex.Message;
-            }
-        };
-        autoPanel.Children.Add(protectedInput);
-        autoPanel.Children.Add(processPickerPanel);
-        autoPanel.Children.Add(saveProtected);
-        autoPanel.Children.Add(autoStatus);
+        var focusCard = MakeCard();
+        var focusPanel = new StackPanel { Margin = new Thickness(20, 15, 20, 15) };
+        focusPanel.Children.Add(Heading("Prioridade por aplicativo", 14));
+        focusPanel.Children.Add(Body("Dê prioridade ao CS2 e reduza CPU/memória das instâncias AFK do Roblox. Uma entrada controla todas as instâncias com o mesmo executável."));
+        focusPanel.Children.Add(SmallAction("Configurar Foco de Jogo", () => ShowPage("Foco de Jogo")));
+        focusCard.Child = focusPanel;
+        root.Children.Add(focusCard);
+
+        var autoCard = MakeCard();
+        var autoPanel = new StackPanel { Margin = new Thickness(20, 15, 20, 15) };
+        autoPanel.Children.Add(Heading("Perfis automáticos", 14));
+        autoPanel.Children.Add(Body("Jogo em uso: Performance. Jogo ou automação protegida em segundo plano: Equilibrado. Sem tarefas protegidas e após 15 minutos sem atividade: economia."));
+        var autoStatus = Body(_autoProfileCts is null ? "Automação desligada." : "Automação ativa.");
+        autoStatus.Margin = new Thickness(0, 8, 0, 8);
         var autoButtons = new WrapPanel();
-        var startAuto = new Button { Content = "Ativar automático", Style = (Style)FindResource("AccentButton"), MinWidth = 140, Margin = new Thickness(0, 0, 8, 0) };
-        var stopAuto = new Button { Content = "Parar", Style = (Style)FindResource("QuietButton"), MinWidth = 90, IsEnabled = false };
+        var startAuto = new Button
+        {
+            Content = "Ativar automático",
+            Style = (Style)FindResource("AccentButton"),
+            IsEnabled = _autoProfileCts is null,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var stopAuto = new Button
+        {
+            Content = "Parar",
+            Style = (Style)FindResource("QuietButton"),
+            IsEnabled = _autoProfileCts is not null
+        };
         startAuto.Click += async (_, _) =>
         {
-            if (_autoProfileCts is not null) return;
-            if (MessageBox.Show("Permitir que o ynoez alterne os planos de energia automaticamente conforme jogo e inatividade? Nenhum processo será encerrado.", "Ativar perfis automáticos", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (_autoProfileCts is not null)
                 return;
+            if (MessageBox.Show("Ativar a troca automática de energia conforme jogos, automações protegidas e inatividade?",
+                "Perfis automáticos", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
             _autoProfileCts = new CancellationTokenSource();
             var token = _autoProfileCts.Token;
             startAuto.IsEnabled = false;
             stopAuto.IsEnabled = true;
-            autoStatus.Text = "Automação ativa.";
+            autoStatus.Text = "Inicializando automação…";
             try
             {
                 await AutoProfileService.RunAsync(status =>
                 {
                     if (!Dispatcher.HasShutdownStarted)
-                        Dispatcher.Invoke(() => autoStatus.Text = "Modo: " + AutoProfileService.GetModeDisplayName(status.Mode) +
-                            (status.UsedFallback ? " (plano efetivo: " + AutoProfileService.GetModeDisplayName(status.AppliedMode) + ")" : "") +
-                            " | Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") + " min" +
-                            (status.ActiveGame.Length > 0 ? " | Jogo: " + status.ActiveGame : "") +
-                            (status.ActiveProtectedProcess.Length > 0 ? " | Processo protegido: " + status.ActiveProtectedProcess : ""));
+                        Dispatcher.Invoke(() => autoStatus.Text =
+                            "Modo: " + AutoProfileService.GetModeDisplayName(status.Mode) +
+                            " • Inatividade: " + status.IdleTime.TotalMinutes.ToString("0") + " min" +
+                            (status.ActiveGame.Length > 0 ? " • Jogo: " + status.ActiveGame : "") +
+                            (status.ActiveProtectedProcess.Length > 0 ? " • Protegido: " + status.ActiveProtectedProcess : ""));
                 }, token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                autoStatus.Text = "Automação parada. O plano anterior à sessão foi restaurado e verificado.";
+                autoStatus.Text = "Automação parada. O plano anterior foi restaurado.";
             }
             catch (Exception ex)
             {
                 AppLog.Write("Perfis automáticos falharam: " + ex);
-                autoStatus.Text = "Falha na automação: " + ex.Message;
+                autoStatus.Text = "Falha: " + ex.Message;
             }
             finally
             {
@@ -1092,68 +779,11 @@ public partial class MainWindow : Window
         stopAuto.Click += (_, _) => _autoProfileCts?.Cancel();
         autoButtons.Children.Add(startAuto);
         autoButtons.Children.Add(stopAuto);
+        autoPanel.Children.Add(autoStatus);
         autoPanel.Children.Add(autoButtons);
         autoCard.Child = autoPanel;
         root.Children.Add(autoCard);
-        root.Children.Add(ActionCard("Modo de Jogo do Windows", "Abre a configuração oficial. O ynoez não remove Xbox, Game Bar, capturas ou overlays.", "Abrir configuração", () => OpenTargetAsync("ms-settings:gaming-gamemode"), "SEM ALTERAÇÃO"));
-        root.Children.Add(ActionCard("Energia do adaptador de rede", "Abre o painel de energia do Windows. O comportamento de economia do adaptador será avaliado no diagnóstico, sem forçar valores desconhecidos.", "Abrir energia", () => OpenTargetAsync("ms-settings:powersleep"), "SEM ALTERAÇÃO"));
-        root.Children.Add(ActionCard("Windows Update e Segurança", "Atalhos oficiais para revisar atualizações e as proteções que devem continuar disponíveis para os anti-cheats.", "Abrir Windows Update", () => OpenTargetAsync("ms-settings:windowsupdate"), "PROTEGIDO"));
-        root.Children.Add(Heading("Catálogo de otimizações reversíveis", 15));
-        root.Children.Add(Body("Cada ajuste mostra o estado atual. Aplicar exige confirmação e cria backup individual; restaurar recupera o estado anterior. Nenhum ajuste é executado em lote."));
-        try
-        {
-            var catalog = OptimizationCatalogService.LoadRegistryTweaks();
-            var service = new RegistryTweakService();
-            foreach (var tweak in catalog)
-            {
-                var state = service.Inspect(tweak);
-                var stateText = state switch
-                {
-                    TweakState.Enabled => "ATIVADO",
-                    TweakState.Disabled => "DESATIVADO",
-                    _ => "PADRÃO / NÃO CONFIGURADO"
-                };
-                root.Children.Add(ActionCard(
-                    tweak.Name,
-                    tweak.Description + "\nCategoria: " + tweak.Category + " | Risco: " + tweak.Risk + " | Estado: " + stateText,
-                    "Aplicar",
-                    () =>
-                    {
-                        if (MessageBox.Show("Aplicar \"" + tweak.Name + "\"?\n\nO ynoez salvará o valor original antes de alterar o Registro. Você poderá restaurá-lo depois.",
-                            "Confirmar otimização", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                            return Task.CompletedTask;
-                        service.Apply(tweak);
-                        MessageBox.Show("Ajuste aplicado e verificado. O backup original foi preservado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                        ShowPage("Tweaks");
-                        return Task.CompletedTask;
-                    },
-                    tweak.Risk.ToUpperInvariant()));
-                if (service.CanRestore(tweak.Id))
-                {
-                    root.Children.Add(ActionCard(
-                        "Restaurar — " + tweak.Name,
-                        "Recupera o valor original salvo antes da primeira aplicação deste ajuste.",
-                        "Restaurar original",
-                        () =>
-                        {
-                            if (MessageBox.Show("Restaurar o estado original de \"" + tweak.Name + "\"?", "Confirmar restauração",
-                                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                                return Task.CompletedTask;
-                            service.Restore(tweak);
-                            MessageBox.Show("Estado original restaurado e verificado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                            ShowPage("Tweaks");
-                            return Task.CompletedTask;
-                        },
-                        "REVERSÃO"));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write("Falha ao carregar catálogo de otimizações: " + ex);
-            root.Children.Add(NoteCard("Catálogo indisponível", "Não foi possível carregar ou validar o catálogo. Nenhuma alteração foi aplicada. Detalhe: " + ex.Message));
-        }
-        root.Children.Add(NoteCard("Ajustes experimentais protegidos", "Timers BCD, HPET, MMCSS, VBS/HVCI, IOMMU/DMA, TPM, Secure Boot, desativação de Defender e remoção de serviços críticos não são aplicados por este painel. Não existe um ganho universal que justifique desativá-los indiscriminadamente."));
+
         return root;
     }
 
@@ -1557,427 +1187,500 @@ public partial class MainWindow : Window
     private UIElement BuildDebloat()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Debloat", "Limpeza seletiva de temporários e caches. Dados pessoais, perfis e credenciais são preservados."));
-        root.Children.Add(ActionCard("Limpar temporários do usuário", "Remove arquivos em uso que puderem ser apagados da pasta Temp. Itens bloqueados são ignorados; Downloads, documentos e dados de aplicativos não são tocados.", "Limpar temporários", async () =>
-        {
-            if (MessageBox.Show("Limpar arquivos temporários do usuário? Arquivos bloqueados serão ignorados.", "Confirmar limpeza", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            var result = await CleanupService.ClearWindowsTempAsync();
-            AppLog.Write("Temp: " + result.Summary);
-            MessageBox.Show(result.Summary, "Limpeza concluída", MessageBoxButton.OK, MessageBoxImage.Information);
-        }, "SELETIVO"));
-        root.Children.Add(ActionCard("Limpar cache do Brave", "Limpa somente Cache, Code Cache e GPUCache dos perfis encontrados. Não apaga senhas, cookies, favoritos, extensões ou histórico. Feche o Brave antes para obter melhor resultado.", "Limpar cache Brave", async () =>
-        {
-            if (MessageBox.Show("Limpar apenas os caches do Brave? Senhas, cookies e perfis serão preservados.", "Confirmar limpeza", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            var result = await CleanupService.ClearBraveCacheAsync();
-            MessageBox.Show(result.Summary, "Brave", MessageBoxButton.OK, MessageBoxImage.Information);
-        }, "PERFIL PRESERVADO"));
-        root.Children.Add(ActionCard("Limpar cache do Discord", "Limpa somente Cache, Code Cache e GPUCache no perfil local do Discord. Não apaga login, dados de conta, configurações ou servidores.", "Limpar cache Discord", async () =>
-        {
-            if (MessageBox.Show("Limpar apenas os caches do Discord? O perfil e os dados de conta serão preservados.", "Confirmar limpeza", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            var result = await CleanupService.ClearDiscordCacheAsync();
-            MessageBox.Show(result.Summary, "Discord", MessageBoxButton.OK, MessageBoxImage.Information);
-        }, "PERFIL PRESERVADO"));
-        root.Children.Add(Heading("Gerenciador de inicialização", 15));
-        root.Children.Add(Body("Mostra entradas HKCU, pastas de inicialização do usuário e do sistema e chaves HKLM 32/64 bits. É possível desativar entradas HKCU não protegidas e mover arquivos da pasta pessoal para backup reversível. Pastas compartilhadas e entradas de máquina são somente leitura. Drivers, segurança, NVIDIA, áudio, rede, jogos, downloads e anti-cheats ficam protegidos."));
-        var startupManager = new StartupManagerService();
-        foreach (var entry in startupManager.GetActiveEntries())
-        {
-            var detail = (entry.FilePath is null ? "Comando: " + entry.Command : "Arquivo: " + entry.FilePath) + "\nOrigem: " + entry.Scope;
-            if (entry.CanDisable)
-            {
-                var actionText = entry.FilePath is null ? "Desativar inicialização" : "Mover para backup";
-                root.Children.Add(ActionCard(entry.Name, detail, actionText, () =>
-                {
-                    if (MessageBox.Show("Desativar \"" + entry.Name + "\" na inicialização? O estado original será salvo para restauração.",
-                        "Confirmar", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                        return Task.CompletedTask;
-                    startupManager.Disable(entry);
-                    MessageBox.Show(entry.FilePath is null
-                        ? "Entrada removida da inicialização e backup criado."
-                        : "Arquivo movido para a pasta de backup do ynoez; ele pode ser restaurado depois.",
-                        "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                    ShowPage("Debloat");
-                    return Task.CompletedTask;
-                }, "USUÁRIO"));
-            }
-            else
-                root.Children.Add(NoteCard(entry.Name + " — preservado", detail + "\n" + entry.ProtectionReason));
-        }
+        root.Children.Add(PageIntro("Debloat", "Limpe arquivos e remova aplicativos opcionais sem tocar nos componentes essenciais do Windows."));
 
-        try
+        var cleanupCard = MakeCard();
+        var cleanupPanel = new StackPanel { Margin = new Thickness(20, 16, 20, 16) };
+        cleanupPanel.Children.Add(Heading("Limpeza rápida", 15));
+        var cleanupStatus = Body("Temporários e caches selecionados; arquivos em uso serão ignorados.");
+        cleanupStatus.Margin = new Thickness(0, 6, 0, 10);
+        var cleanupButtons = new WrapPanel();
+        var cleanTemp = new Button
         {
-            var disabledStartup = startupManager.GetDisabledEntries();
-            if (disabledStartup.Count > 0)
-            {
-                root.Children.Add(Heading("Entradas desativadas pelo ynoez", 15));
-                foreach (var entry in disabledStartup)
-                {
-                    root.Children.Add(ActionCard(entry.Name, entry.IsFile ? entry.OriginalFilePath ?? entry.Command : entry.Command, "Restaurar inicialização", () =>
-                    {
-                        if (MessageBox.Show("Restaurar \"" + entry.Name + "\" à inicialização? O destino será verificado antes da recuperação.", "Confirmar restauração",
-                            MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                            return Task.CompletedTask;
-                        startupManager.Restore(entry);
-                        MessageBox.Show("Entrada restaurada e verificada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                        ShowPage("Debloat");
-                        return Task.CompletedTask;
-                    }, "REVERSÍVEL"));
-                }
-            }
-            else
-                root.Children.Add(NoteCard("Inicialização", "Nenhuma entrada desativada pelo ynoez."));
-        }
-        catch (InvalidDataException ex)
-        {
-            AppLog.Write("Manifesto de inicialização requer recuperação: " + ex);
-            root.Children.Add(NoteCard("Manifesto de inicialização requer atenção", ex.Message));
-        }
-
-        root.Children.Add(Heading("Serviços opcionais do Windows", 15));
-        root.Children.Add(Body("Somente serviços previamente avaliados como opcionais aparecem aqui. Desativar exige UAC, salva o tipo de inicialização e tenta parar o serviço sem forçar o encerramento de dependências. Windows Search, impressão, Store, Defender, Windows Update, rede, áudio, NVIDIA, Vanguard e FACEIT não fazem parte do catálogo."));
-        var serviceManager = new ServiceTweakService();
-        foreach (var service in serviceManager.GetStatuses())
-        {
-            var details = service.Definition.Description +
-                "\nEstado: " + service.State + " | Inicialização: " + service.StartMode +
-                (service.DelayedAutoStart ? " (atrasada)" : "");
-            if (service.DisabledByYnoez && !service.Available)
-            {
-                root.Children.Add(NoteCard(service.Definition.DisplayName + " — backup preservado",
-                    details + "\nO serviço não pode ser consultado neste momento. O ynoez mantém o backup e não tentará uma alteração sem confirmar que o serviço existe."));
-            }
-            else if (service.DisabledByYnoez)
-            {
-                root.Children.Add(ActionCard(service.Definition.DisplayName, details,
-                    "Restaurar serviço", async () =>
-                    {
-                        if (MessageBox.Show("Restaurar o serviço \"" + service.Definition.Name + "\" ao estado anterior? Pode ser solicitado UAC.",
-                            "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                            return;
-                        await Task.Run(() => serviceManager.Restore(service.Definition));
-                        MessageBox.Show("Serviço restaurado e verificado.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                        ShowPage("Debloat");
-                    }, "BACKUP"));
-            }
-            else if (string.Equals(service.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase))
-                root.Children.Add(NoteCard(service.Definition.DisplayName + " — já desativado", details + "\nO Windows já mantém este serviço desativado."));
-            else
-            {
-                root.Children.Add(ActionCard(service.Definition.DisplayName, details,
-                    "Desativar serviço", async () =>
-                    {
-                        if (MessageBox.Show("Desativar \"" + service.Definition.Name + "\"? Se estiver em execução, o ynoez tentará pará-lo sem encerrar serviços dependentes. A alteração é reversível, mas pode remover a função descrita. Pode ser solicitado UAC.",
-                            "Confirmar serviço opcional", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                            return;
-                        await Task.Run(() => serviceManager.Disable(service.Definition));
-                        MessageBox.Show("Serviço desativado. Backup do estado original salvo.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                        ShowPage("Debloat");
-                    }, service.Definition.Risk.ToUpperInvariant()));
-            }
-        }
-        root.Children.Add(Heading("Tarefas agendadas opcionais", 15));
-        root.Children.Add(Body("O ynoez mostra somente tarefas opcionais pré-avaliadas de telemetria/feedback e atualização de mapas offline. Não toca em Windows Update, Defender, manutenção, diagnóstico de falhas, indexação, drivers ou anti-cheat. Desativar impede execuções futuras; não encerra tarefas que já estejam em execução."));
-        var taskManager = new ScheduledTaskTweakService();
-        foreach (var task in taskManager.GetStatuses())
-        {
-            var details = task.Definition.Description + "\nEstado: " + task.State +
-                (task.DisabledByYnoez ? "\nBackup do estado original disponível." : "");
-            if (!task.Available)
-                root.Children.Add(NoteCard(task.Definition.DisplayName + " — " +
-                    (task.State == "Não encontrada" ? "não encontrada" : "consulta indisponível"), details));
-            else if (task.DisabledByYnoez)
-                root.Children.Add(ActionCard(task.Definition.DisplayName, details, "Restaurar tarefa", async () =>
-                {
-                    if (MessageBox.Show("Reativar a tarefa original \"" + task.Definition.TaskName + "\"? Pode ser solicitado UAC.",
-                        "Confirmar restauração", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-                    await Task.Run(() => taskManager.Restore(task.Definition));
-                    MessageBox.Show("Tarefa restaurada e verificada.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                    ShowPage("Debloat");
-                }, "BACKUP"));
-            else if (string.Equals(task.State, "Disabled", StringComparison.OrdinalIgnoreCase))
-                root.Children.Add(NoteCard(task.Definition.DisplayName + " — já desativada", details + "\nO Windows já mantém esta tarefa desativada; o ynoez não assumirá a autoria."));
-            else
-                root.Children.Add(ActionCard(task.Definition.DisplayName, details, "Desativar tarefa", async () =>
-                {
-                    if (MessageBox.Show("Desativar \"" + task.Definition.TaskName + "\"? O backup do estado atual será salvo antes da alteração. Pode ser solicitado UAC.",
-                        "Confirmar tarefa opcional", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-                    await Task.Run(() => taskManager.Disable(task.Definition));
-                    MessageBox.Show("Tarefa desativada. O estado anterior foi salvo para restauração.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
-                    ShowPage("Debloat");
-                }, task.Definition.Risk.ToUpperInvariant()));
-        }
-        var programsCard = MakeCard();
-        var programsPanel = new StackPanel { Margin = new Thickness(20) };
-        programsPanel.Children.Add(Heading("Programas Win32 instalados", 15));
-        programsPanel.Children.Add(Body("Inventário somente leitura das entradas de desinstalação do Registro HKLM/HKCU, nas visões 32 e 64 bits. O ynoez não executa UninstallString nem remove programas. Drivers, runtimes, atualizações e anti-cheats conhecidos são sinalizados como protegidos; revise manualmente antes de remover qualquer aplicativo."));
-        var programsStatus = Body("Programas ainda não consultados.");
-        var programsSearch = new TextBox
-        {
-            Height = 32, MinWidth = 230, Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
-            BorderBrush = BorderBrushSoft, Padding = new Thickness(8, 5, 8, 5),
-            Margin = new Thickness(0, 8, 0, 8), ToolTip = "Filtrar por nome, versão, editor ou classificação"
+            Content = "Limpar temporários",
+            Style = (Style)FindResource("AccentButton"),
+            Margin = new Thickness(0, 0, 8, 0)
         };
-        var programsGrid = new DataGrid
+        var cleanCaches = new Button
         {
-            AutoGenerateColumns = false,
-            IsReadOnly = true,
-            CanUserAddRows = false,
-            CanUserDeleteRows = false,
-            CanUserReorderColumns = true,
-            CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"),
-            AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft,
-            Height = 280,
+            Content = "Limpar caches Brave + Discord",
+            Style = (Style)FindResource("QuietButton")
+        };
+        cleanTemp.Click += async (_, _) =>
+        {
+            cleanTemp.IsEnabled = false;
+            cleanCaches.IsEnabled = false;
+            cleanupStatus.Text = "Limpando arquivos temporários…";
+            try
+            {
+                var result = await CleanupService.ClearWindowsTempAsync();
+                cleanupStatus.Text = "Temporários: " + result.Summary;
+            }
+            catch (Exception ex)
+            {
+                cleanupStatus.Text = "A limpeza falhou: " + ex.Message;
+                AppLog.Write("Limpeza de temporários falhou: " + ex);
+            }
+            finally
+            {
+                cleanTemp.IsEnabled = true;
+                cleanCaches.IsEnabled = true;
+            }
+        };
+        cleanCaches.Click += async (_, _) =>
+        {
+            cleanTemp.IsEnabled = false;
+            cleanCaches.IsEnabled = false;
+            cleanupStatus.Text = "Limpando caches dos aplicativos…";
+            try
+            {
+                var results = await Task.WhenAll(
+                    CleanupService.ClearBraveCacheAsync(),
+                    CleanupService.ClearDiscordCacheAsync());
+                cleanupStatus.Text = "Brave: " + results[0].Summary + Environment.NewLine +
+                    "Discord: " + results[1].Summary;
+            }
+            catch (Exception ex)
+            {
+                cleanupStatus.Text = "A limpeza de cache falhou: " + ex.Message;
+                AppLog.Write("Limpeza de caches falhou: " + ex);
+            }
+            finally
+            {
+                cleanTemp.IsEnabled = true;
+                cleanCaches.IsEnabled = true;
+            }
+        };
+        cleanupButtons.Children.Add(cleanTemp);
+        cleanupButtons.Children.Add(cleanCaches);
+        cleanupPanel.Children.Add(cleanupStatus);
+        cleanupPanel.Children.Add(cleanupButtons);
+        cleanupCard.Child = cleanupPanel;
+        root.Children.Add(cleanupCard);
+
+        root.Children.Add(BuildAppxDebloatCard());
+
+        var startupManager = new StartupManagerService();
+        var startupPlaceholder = CreateDebloatLoadingCard("Inicialização", "Lendo apenas entradas do usuário que podem ser desativadas com segurança…");
+        root.Children.Add(startupPlaceholder);
+        _ = LoadDebloatStartupAsync(startupPlaceholder, startupManager);
+
+        var serviceManager = new ServiceTweakService();
+        var servicePlaceholder = CreateDebloatLoadingCard("Serviços opcionais", "Consultando somente a lista fechada de serviços opcionais…");
+        root.Children.Add(servicePlaceholder);
+        _ = LoadDebloatServicesAsync(servicePlaceholder, serviceManager);
+
+        var taskManager = new ScheduledTaskTweakService();
+        var taskPlaceholder = CreateDebloatLoadingCard("Tarefas opcionais", "Consultando tarefas de telemetria, feedback e mapas…");
+        root.Children.Add(taskPlaceholder);
+        _ = LoadDebloatTasksAsync(taskPlaceholder, taskManager);
+
+        root.Children.Add(ActionCard(
+            "Programas Win32",
+            "Abra o desinstalador oficial do Windows para remover programas tradicionais. O ynoez não executa comandos de desinstalação arbitrários.",
+            "Abrir programas instalados",
+            () => OpenTargetAsync("ms-settings:appsfeatures"),
+            "WINDOWS"));
+
+        root.Children.Add(NoteCard(
+            "Proteções preservadas",
+            "Store, Calculadora, Notepad, Windows Update, Defender, Firewall, drivers, runtimes, NVIDIA, Vanguard e FACEIT não entram na remoção automática."));
+        return root;
+    }
+
+    private Border BuildAppxDebloatCard()
+    {
+        var card = MakeCard();
+        var panel = new StackPanel { Margin = new Thickness(20, 16, 20, 16) };
+        panel.Children.Add(Heading("Aplicativos opcionais do Windows", 15));
+        panel.Children.Add(Body("O ynoez detecta aplicativos opcionais conhecidos. Tudo vem selecionado; desmarque o que deseja manter. A remoção afeta somente sua conta atual."));
+        var status = Body("Clique em Analisar para localizar aplicativos opcionais instalados.");
+        status.Margin = new Thickness(0, 8, 0, 8);
+        var list = new ListBox
+        {
+            Height = 166,
+            SelectionMode = SelectionMode.Extended,
             Margin = new Thickness(0, 0, 0, 10)
         };
-        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Programa", Binding = new Binding(nameof(InstalledProgramInfo.Name)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(InstalledProgramInfo.Version)), Width = new DataGridLength(85) });
-        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Editor", Binding = new Binding(nameof(InstalledProgramInfo.Publisher)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Escopo", Binding = new Binding(nameof(InstalledProgramInfo.Scope)), Width = new DataGridLength(85) });
-        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Arquitetura", Binding = new Binding(nameof(InstalledProgramInfo.Architecture)), Width = new DataGridLength(75) });
-        programsGrid.Columns.Add(new DataGridTextColumn { Header = "Classificação", Binding = new Binding(nameof(InstalledProgramInfo.Classification)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        IReadOnlyList<InstalledProgramInfo> installedPrograms = Array.Empty<InstalledProgramInfo>();
-        var programButtons = new WrapPanel();
-        var loadPrograms = new Button { Content = "Analisar programas", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var cancelPrograms = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var exportPrograms = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var openProgramsSettings = new Button { Content = "Abrir programas instalados", Style = (Style)FindResource("QuietButton") };
-        void ApplyProgramFilter()
+        var buttons = new WrapPanel();
+        var analyze = new Button
         {
-            var query = programsSearch.Text.Trim();
-            programsGrid.ItemsSource = string.IsNullOrWhiteSpace(query)
-                ? installedPrograms
-                : installedPrograms.Where(x =>
-                    x.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
-                    x.Version.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
-                    x.Publisher.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
-                    x.Classification.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToArray();
+            Content = "Analisar aplicativos",
+            Style = (Style)FindResource("AccentButton"),
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var cancel = new Button
+        {
+            Content = "Cancelar",
+            Style = (Style)FindResource("QuietButton"),
+            IsEnabled = false,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var remove = new Button
+        {
+            Content = "Remover selecionados",
+            Style = (Style)FindResource("QuietButton"),
+            IsEnabled = false
+        };
+
+        async Task AnalyzeAsync()
+        {
+            if (_appxInventoryCts is not null)
+                return;
+
+            var cts = new CancellationTokenSource();
+            _appxInventoryCts = cts;
+            analyze.IsEnabled = false;
+            remove.IsEnabled = false;
+            cancel.IsEnabled = true;
+            status.Text = "Analisando os pacotes do usuário atual…";
+            try
+            {
+                var packages = await AppPackageInventoryService.GetCurrentUserPackagesAsync(cts.Token);
+                var candidates = AppxDebloatService.FindCandidates(packages);
+                list.Items.Clear();
+                foreach (var candidate in candidates)
+                {
+                    list.Items.Add(new ListBoxItem
+                    {
+                        Content = candidate.DisplayName + "  •  " + candidate.Version + Environment.NewLine +
+                            candidate.Description,
+                        Tag = candidate,
+                        IsSelected = true
+                    });
+                }
+
+                status.Text = candidates.Count == 0
+                    ? "Nenhum aplicativo da lista segura foi encontrado."
+                    : candidates.Count + " aplicativo(s) opcional(is) encontrado(s). Todos estão selecionados para remoção.";
+                remove.IsEnabled = candidates.Count > 0;
+            }
+            catch (OperationCanceledException)
+            {
+                status.Text = "Análise cancelada.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Análise AppX de debloat falhou: " + ex);
+                status.Text = "Não foi possível analisar os aplicativos: " + ex.Message;
+            }
+            finally
+            {
+                if (ReferenceEquals(_appxInventoryCts, cts))
+                    _appxInventoryCts = null;
+                cts.Dispose();
+                analyze.IsEnabled = true;
+                cancel.IsEnabled = false;
+            }
         }
-        programsSearch.TextChanged += (_, _) => ApplyProgramFilter();
-        loadPrograms.Click += async (_, _) =>
+
+        analyze.Click += async (_, _) => await AnalyzeAsync();
+        cancel.Click += (_, _) => _appxInventoryCts?.Cancel();
+        remove.Click += async (_, _) =>
         {
-            if (_programInventoryCts is not null) return;
-            _programInventoryCts = new CancellationTokenSource();
-            var token = _programInventoryCts.Token;
-            loadPrograms.IsEnabled = false;
-            cancelPrograms.IsEnabled = true;
-            exportPrograms.IsEnabled = false;
-            programsStatus.Text = "Consultando entradas HKLM/HKCU 32/64 bits…";
+            var selected = list.SelectedItems.OfType<ListBoxItem>()
+                .Select(item => item.Tag)
+                .OfType<AppxRemovalCandidate>()
+                .ToArray();
+            if (selected.Length == 0)
+                return;
+
+            var names = string.Join(Environment.NewLine, selected.Select(item => "• " + item.DisplayName));
+            if (MessageBox.Show(
+                "Remover estes aplicativos somente da conta atual?" + Environment.NewLine + Environment.NewLine +
+                names + Environment.NewLine + Environment.NewLine +
+                "Esta ação não tem reversão automática. Os aplicativos podem ser reinstalados pela Microsoft Store quando ainda disponíveis. Nenhum pacote provisionado ou outro perfil será alterado.",
+                "Confirmar remoção de aplicativos", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            if (_appxInventoryCts is not null)
+                return;
+            var cts = new CancellationTokenSource();
+            _appxInventoryCts = cts;
+            analyze.IsEnabled = false;
+            cancel.IsEnabled = true;
+            remove.IsEnabled = false;
+            var removed = 0;
+            var errors = new List<string>();
             try
             {
-                installedPrograms = await Task.Run(() =>
-                    InstalledProgramInventoryService.GetInstalledPrograms(token), token);
-                ApplyProgramFilter();
-                var protectedCount = installedPrograms.Count(x => x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
-                programsStatus.Text = installedPrograms.Count + " entradas encontradas • " + protectedCount +
-                    " sinalizadas como componentes/atualizações/drivers/runtimes/anti-cheats • somente leitura.";
-                exportPrograms.IsEnabled = installedPrograms.Count > 0;
+                foreach (var candidate in selected)
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    status.Text = "Removendo " + candidate.DisplayName + "…";
+                    try
+                    {
+                        await AppxDebloatService.RemoveCurrentUserPackageAsync(candidate, cts.Token);
+                        removed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add(candidate.DisplayName + ": " + ex.Message);
+                    }
+                }
+
+                status.Text = removed + " aplicativo(s) removido(s)." +
+                    (errors.Count > 0 ? Environment.NewLine + string.Join(Environment.NewLine, errors.Take(3)) : "");
             }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
-                programsStatus.Text = "Inventário cancelado.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Inventário Win32 falhou: " + ex);
-                programsStatus.Text = "Não foi possível consultar programas: " + ex.Message;
+                status.Text = "Operação cancelada. " + removed + " aplicativo(s) removido(s) antes do cancelamento.";
             }
             finally
             {
-                _programInventoryCts?.Dispose();
-                _programInventoryCts = null;
-                loadPrograms.IsEnabled = true;
-                cancelPrograms.IsEnabled = false;
+                if (ReferenceEquals(_appxInventoryCts, cts))
+                    _appxInventoryCts = null;
+                cts.Dispose();
+                analyze.IsEnabled = true;
+                cancel.IsEnabled = false;
+                remove.IsEnabled = false;
             }
-        };
-        cancelPrograms.Click += (_, _) => _programInventoryCts?.Cancel();
-        exportPrograms.Click += (_, _) =>
-        {
-            if (installedPrograms.Count == 0) return;
-            var path = InstalledProgramInventoryService.ExportCsv(installedPrograms);
-            programsStatus.Text = "CSV completo salvo em: " + path;
-        };
-        openProgramsSettings.Click += async (_, _) =>
-            await OpenTargetAsync("ms-settings:appsfeatures");
-        programButtons.Children.Add(loadPrograms);
-        programButtons.Children.Add(cancelPrograms);
-        programButtons.Children.Add(exportPrograms);
-        programButtons.Children.Add(openProgramsSettings);
-        programsPanel.Children.Add(programsStatus);
-        programsPanel.Children.Add(programsSearch);
-        programsPanel.Children.Add(programsGrid);
-        programsPanel.Children.Add(programButtons);
-        programsPanel.Children.Add(NoteCard("Remoção protegida", "Nenhum comando de desinstalação é executado pelo ynoez. Use a tela oficial do Windows, confirme o nome e o editor do aplicativo e não remova drivers, runtimes, bibliotecas compartilhadas ou componentes que você não reconheça."));
-        programsCard.Child = programsPanel;
-        root.Children.Add(programsCard);
 
-        var appxCard = MakeCard();
-        var appxPanel = new StackPanel { Margin = new Thickness(20) };
-        appxPanel.Children.Add(Heading("Inventário de aplicativos AppX", 15));
-        appxPanel.Children.Add(Body("Lista pacotes principais, frameworks, recursos, bundles e opcionais AppX/MSIX instalados para o usuário atual, com versão, editor, estado e sinalizadores de pacote. Esta tela é somente leitura: não oferece remoção em massa nem presume que um pacote seja seguro de remover. Store, Calculadora, Bloco de Notas e componentes de shell ficam identificados como protegidos."));
-        var appxStatus = Body("Inventário ainda não consultado.");
-        var appxGrid = new DataGrid
-        {
-            AutoGenerateColumns = false,
-            IsReadOnly = true,
-            CanUserAddRows = false,
-            CanUserDeleteRows = false,
-            CanUserReorderColumns = true,
-            CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"),
-            Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"),
-            AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft,
-            Height = 260,
-            Margin = new Thickness(0, 10, 0, 10)
+            if (removed > 0)
+                await AnalyzeAsync();
         };
-        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Pacote", Binding = new Binding(nameof(AppxPackageInfo.Name)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(AppxPackageInfo.Version)), Width = new DataGridLength(95) });
-        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Editor", Binding = new Binding(nameof(AppxPackageInfo.Publisher)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Estado", Binding = new Binding(nameof(AppxPackageInfo.Status)), Width = new DataGridLength(85) });
-        appxGrid.Columns.Add(new DataGridTextColumn { Header = "Classificação", Binding = new Binding(nameof(AppxPackageInfo.Classification)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        var appxButtons = new WrapPanel();
-        var loadAppx = new Button { Content = "Consultar aplicativos", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var exportAppx = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        IReadOnlyList<AppxPackageInfo> appxPackages = Array.Empty<AppxPackageInfo>();
-        loadAppx.Click += async (_, _) =>
-        {
-            if (_appxInventoryCts is not null) return;
-            _appxInventoryCts = new CancellationTokenSource();
-            var token = _appxInventoryCts.Token;
-            loadAppx.IsEnabled = false;
-            exportAppx.IsEnabled = false;
-            appxStatus.Text = "Consultando pacotes AppX do usuário atual…";
-            try
-            {
-                appxPackages = await AppPackageInventoryService.GetCurrentUserPackagesAsync(token);
-                appxGrid.ItemsSource = appxPackages;
-                var protectedCount = appxPackages.Count(x => x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
-                appxStatus.Text = appxPackages.Count + " pacotes encontrados • " + protectedCount +
-                    " protegidos/classificados como componentes do Windows • consulta somente leitura.";
-                exportAppx.IsEnabled = appxPackages.Count > 0;
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                appxStatus.Text = "Consulta cancelada.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Inventário AppX falhou: " + ex);
-                appxStatus.Text = "Não foi possível consultar os pacotes: " + ex.Message;
-            }
-            finally
-            {
-                _appxInventoryCts?.Dispose();
-                _appxInventoryCts = null;
-                loadAppx.IsEnabled = true;
-            }
-        };
-        exportAppx.Click += (_, _) =>
-        {
-            if (appxPackages.Count == 0) return;
-            var path = AppPackageInventoryService.ExportCsv(appxPackages);
-            appxStatus.Text = "CSV salvo: " + path;
-        };
-        appxButtons.Children.Add(loadAppx);
-        appxButtons.Children.Add(exportAppx);
-        appxPanel.Children.Add(appxStatus);
-        appxPanel.Children.Add(appxGrid);
-        appxPanel.Children.Add(appxButtons);
-        appxPanel.Children.Add(NoteCard("Por que não há botão de remover?", "Remover pacotes provisionados/AppX pode afetar dependências, atualizações e outros usuários. O ynoez só habilitará remoção quando existir um mecanismo de backup/reinstalação e verificação adequado para cada pacote; este inventário não altera nada."));
-        appxCard.Child = appxPanel;
-        root.Children.Add(appxCard);
 
-        var systemAppxCard = MakeCard();
-        var systemAppxPanel = new StackPanel { Margin = new Thickness(20) };
-        systemAppxPanel.Children.Add(Heading("Pacotes AppX de todos os perfis e provisionados", 15));
-        systemAppxPanel.Children.Add(Body("Inventário somente leitura dos pacotes AppX/MSIX instalados para todos os usuários e dos pacotes provisionados para novos perfis do Windows. A consulta exige elevação UAC porque usa os cmdlets administrativos oficiais do Windows. Nenhum pacote é removido, alterado ou provisionado pelo ynoez."));
-        var systemAppxStatus = Body("Inventário do sistema ainda não consultado.");
-        var systemAppxGrid = new DataGrid
-        {
-            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
-            CanUserDeleteRows = false, CanUserResizeRows = false,
-            HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#050505"), AlternatingRowBackground = BrushFrom("#171717"),
-            BorderBrush = BorderBrushSoft, Height = 250, Margin = new Thickness(0, 10, 0, 10)
-        };
-        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Pacote", Binding = new Binding(nameof(AppxSystemPackageInfo.Name)), Width = new DataGridLength(1.6, DataGridLengthUnitType.Star) });
-        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Escopo", Binding = new Binding(nameof(AppxSystemPackageInfo.Scope)), Width = new DataGridLength(140) });
-        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Versão", Binding = new Binding(nameof(AppxSystemPackageInfo.Version)), Width = new DataGridLength(90) });
-        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Arquitetura", Binding = new Binding(nameof(AppxSystemPackageInfo.Architecture)), Width = new DataGridLength(90) });
-        systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Classificação", Binding = new Binding(nameof(AppxSystemPackageInfo.Classification)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        var systemAppxButtons = new WrapPanel();
-        var loadSystemAppx = new Button { Content = "Consultar inventário do sistema", Style = (Style)FindResource("AccentButton"), Margin = new Thickness(0, 0, 8, 0) };
-        var cancelSystemAppx = new Button { Content = "Cancelar", Style = (Style)FindResource("QuietButton"), IsEnabled = false, Margin = new Thickness(0, 0, 8, 0) };
-        var exportSystemAppx = new Button { Content = "Exportar CSV", Style = (Style)FindResource("QuietButton"), IsEnabled = false };
-        IReadOnlyList<AppxSystemPackageInfo> systemPackages = Array.Empty<AppxSystemPackageInfo>();
-        loadSystemAppx.Click += async (_, _) =>
-        {
-            if (_systemAppxInventoryCts is not null) return;
-            if (MessageBox.Show("Consultar pacotes de todos os usuários e pacotes provisionados? O Windows solicitará UAC. A consulta é somente leitura.",
-                "Permissão administrativa", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            _systemAppxInventoryCts = new CancellationTokenSource();
-            var token = _systemAppxInventoryCts.Token;
-            loadSystemAppx.IsEnabled = false;
-            cancelSystemAppx.IsEnabled = true;
-            exportSystemAppx.IsEnabled = false;
-            systemAppxStatus.Text = "Aguardando UAC e consultando pacotes…";
-            try
-            {
-                systemPackages = await AppxSystemInventoryService.GetAllUsersAndProvisionedAsync(token);
-                systemAppxGrid.ItemsSource = systemPackages;
-                var protectedCount = systemPackages.Count(x => x.Classification.StartsWith("Protegido", StringComparison.Ordinal));
-                var provisionedCount = systemPackages.Count(x => x.Scope == "Provisionado");
-                systemAppxStatus.Text = systemPackages.Count + " registros • " + protectedCount +
-                    " protegidos/componentes • " + provisionedCount + " provisionados • somente leitura.";
-                exportSystemAppx.IsEnabled = systemPackages.Count > 0;
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                systemAppxStatus.Text = "Consulta cancelada. Nenhum pacote foi alterado.";
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("Inventário AppX de sistema falhou: " + ex);
-                systemAppxStatus.Text = "Não foi possível consultar os pacotes: " + ex.Message;
-            }
-            finally
-            {
-                _systemAppxInventoryCts?.Dispose();
-                _systemAppxInventoryCts = null;
-                loadSystemAppx.IsEnabled = true;
-                cancelSystemAppx.IsEnabled = false;
-            }
-        };
-        cancelSystemAppx.Click += (_, _) => _systemAppxInventoryCts?.Cancel();
-        exportSystemAppx.Click += (_, _) =>
-        {
-            if (systemPackages.Count == 0) return;
-            var path = AppxSystemInventoryService.ExportCsv(systemPackages);
-            systemAppxStatus.Text = "CSV completo salvo em: " + path;
-        };
-        systemAppxButtons.Children.Add(loadSystemAppx);
-        systemAppxButtons.Children.Add(cancelSystemAppx);
-        systemAppxButtons.Children.Add(exportSystemAppx);
-        systemAppxPanel.Children.Add(systemAppxStatus);
-        systemAppxPanel.Children.Add(systemAppxGrid);
-        systemAppxPanel.Children.Add(systemAppxButtons);
-        systemAppxPanel.Children.Add(NoteCard("Política de remoção", "Pacotes provisionados afetam novos perfis e a recuperação do Windows; pacotes de outros usuários podem pertencer a contas diferentes. Este relatório não oferece remoção automática. Store, Calculator, Notepad, shell, frameworks, recursos, segurança e componentes essenciais continuam protegidos."));
-        systemAppxCard.Child = systemAppxPanel;
-        root.Children.Add(systemAppxCard);
+        buttons.Children.Add(analyze);
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(remove);
+        panel.Children.Add(status);
+        panel.Children.Add(list);
+        panel.Children.Add(buttons);
+        card.Child = panel;
+        return card;
+    }
 
-        root.Children.Add(ProtectedItemsCard());
-        return root;
+    private Border CreateDebloatLoadingCard(string title, string status)
+    {
+        var card = MakeCard();
+        var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
+        panel.Children.Add(Heading(title, 14));
+        panel.Children.Add(Body(status));
+        card.Child = panel;
+        return card;
+    }
+
+    private async Task LoadDebloatStartupAsync(Border placeholder, StartupManagerService manager)
+    {
+        try
+        {
+            var snapshot = await Task.Run(() => new
+            {
+                Active = manager.GetActiveEntries().Where(entry => entry.CanDisable).ToArray(),
+                Disabled = manager.GetDisabledEntries().ToArray()
+            });
+
+            var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
+            panel.Children.Add(Heading("Inicialização", 14));
+            panel.Children.Add(Body(snapshot.Active.Length + " entrada(s) do usuário podem ser desativadas. " +
+                snapshot.Disabled.Length + " backup(s) aguardam restauração."));
+            var activeList = new ListBox { Height = 105, Margin = new Thickness(0, 8, 0, 7) };
+            foreach (var entry in snapshot.Active)
+                activeList.Items.Add(new ListBoxItem
+                {
+                    Content = entry.Name + "  •  " + entry.Scope,
+                    Tag = entry
+                });
+            var disable = new Button
+            {
+                Content = "Desativar selecionado",
+                Style = (Style)FindResource("QuietButton"),
+                IsEnabled = false,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            activeList.SelectionChanged += (_, _) => disable.IsEnabled = activeList.SelectedItem is ListBoxItem;
+            disable.Click += async (_, _) =>
+            {
+                if (activeList.SelectedItem is not ListBoxItem item || item.Tag is not StartupEntry entry)
+                    return;
+                if (MessageBox.Show("Desativar " + entry.Name + " da inicialização? O backup original será salvo.",
+                    "Confirmar", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+                disable.IsEnabled = false;
+                try
+                {
+                    await Task.Run(() => manager.Disable(entry));
+                    ShowPage("Debloat");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Não foi possível desativar a entrada: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+            panel.Children.Add(activeList);
+            panel.Children.Add(disable);
+
+            if (snapshot.Disabled.Length > 0)
+            {
+                var disabledList = new ListBox { Height = 85, Margin = new Thickness(0, 9, 0, 7) };
+                foreach (var entry in snapshot.Disabled)
+                    disabledList.Items.Add(new ListBoxItem { Content = entry.Name, Tag = entry });
+                var restore = new Button
+                {
+                    Content = "Restaurar selecionado",
+                    Style = (Style)FindResource("QuietButton"),
+                    IsEnabled = false
+                };
+                disabledList.SelectionChanged += (_, _) => restore.IsEnabled = disabledList.SelectedItem is ListBoxItem;
+                restore.Click += async (_, _) =>
+                {
+                    if (disabledList.SelectedItem is not ListBoxItem item || item.Tag is not DisabledStartupEntry entry)
+                        return;
+                    restore.IsEnabled = false;
+                    try
+                    {
+                        await Task.Run(() => manager.Restore(entry));
+                        ShowPage("Debloat");
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Não foi possível restaurar a entrada: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                };
+                panel.Children.Add(Heading("Desativados pelo ynoez", 11));
+                panel.Children.Add(disabledList);
+                panel.Children.Add(restore);
+            }
+
+            placeholder.Child = panel;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Consulta de inicialização no Debloat falhou: " + ex);
+            placeholder.Child = new StackPanel
+            {
+                Margin = new Thickness(20),
+                Children =
+                {
+                    Heading("Inicialização", 14),
+                    Body("Não foi possível carregar os itens: " + ex.Message)
+                }
+            };
+        }
+    }
+
+    private async Task LoadDebloatServicesAsync(Border placeholder, ServiceTweakService manager)
+    {
+        try
+        {
+            var statuses = await Task.Run(manager.GetStatuses);
+            var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
+            panel.Children.Add(Heading("Serviços opcionais", 14));
+            panel.Children.Add(Body("Somente serviços de telemetria e recursos opcionais conhecidos. Serviços críticos, rede, áudio, Store, Defender, Update e anti-cheats ficam fora da lista."));
+            var list = new ListBox { Height = 132, Margin = new Thickness(0, 8, 0, 7) };
+            foreach (var status in statuses.Where(item => item.Available || item.DisabledByYnoez))
+                list.Items.Add(new ListBoxItem
+                {
+                    Content = status.Definition.DisplayName + "  •  " +
+                        (status.DisabledByYnoez ? "Desativado pelo ynoez" : status.State + " / " + status.StartMode),
+                    Tag = status
+                });
+            var action = new Button
+            {
+                Content = "Aplicar / restaurar selecionado",
+                Style = (Style)FindResource("QuietButton"),
+                IsEnabled = false
+            };
+            list.SelectionChanged += (_, _) => action.IsEnabled = list.SelectedItem is ListBoxItem;
+            action.Click += async (_, _) =>
+            {
+                if (list.SelectedItem is not ListBoxItem item || item.Tag is not OptionalServiceStatus selected)
+                    return;
+                var restore = selected.DisabledByYnoez;
+                var prompt = restore
+                    ? "Restaurar o serviço " + selected.Definition.DisplayName + " ao estado anterior?"
+                    : "Desativar o serviço opcional " + selected.Definition.DisplayName + "? A função descrita ficará indisponível enquanto estiver desativado.";
+                if (MessageBox.Show(prompt, "Confirmar serviço", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+                action.IsEnabled = false;
+                try
+                {
+                    if (restore)
+                        await Task.Run(() => manager.Restore(selected.Definition));
+                    else
+                        await Task.Run(() => manager.Disable(selected.Definition));
+                    ShowPage("Debloat");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("A operação no serviço falhou: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+            panel.Children.Add(list);
+            panel.Children.Add(action);
+            placeholder.Child = panel;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Consulta de serviços opcionais no Debloat falhou: " + ex);
+            placeholder.Child = new StackPanel
+            {
+                Margin = new Thickness(20),
+                Children = { Heading("Serviços opcionais", 14), Body("Consulta indisponível: " + ex.Message) }
+            };
+        }
+    }
+
+    private async Task LoadDebloatTasksAsync(Border placeholder, ScheduledTaskTweakService manager)
+    {
+        try
+        {
+            var statuses = await Task.Run(manager.GetStatuses);
+            var panel = new StackPanel { Margin = new Thickness(20, 13, 20, 13) };
+            panel.Children.Add(Heading("Tarefas opcionais", 14));
+            panel.Children.Add(Body("Tarefas de telemetria, feedback e mapas. Windows Update, Defender, manutenção e drivers não são alterados."));
+            var list = new ListBox { Height = 132, Margin = new Thickness(0, 8, 0, 7) };
+            foreach (var status in statuses.Where(item => item.Available || item.DisabledByYnoez))
+                list.Items.Add(new ListBoxItem
+                {
+                    Content = status.Definition.DisplayName + "  •  " +
+                        (status.DisabledByYnoez ? "Desativada pelo ynoez" : status.State),
+                    Tag = status
+                });
+            var action = new Button
+            {
+                Content = "Aplicar / restaurar selecionada",
+                Style = (Style)FindResource("QuietButton"),
+                IsEnabled = false
+            };
+            list.SelectionChanged += (_, _) => action.IsEnabled = list.SelectedItem is ListBoxItem;
+            action.Click += async (_, _) =>
+            {
+                if (list.SelectedItem is not ListBoxItem item || item.Tag is not ScheduledTaskStatus selected)
+                    return;
+                var restore = selected.DisabledByYnoez;
+                var prompt = restore
+                    ? "Reativar a tarefa " + selected.Definition.DisplayName + "?"
+                    : "Desativar a tarefa opcional " + selected.Definition.DisplayName + "? Ela deixará de executar automaticamente.";
+                if (MessageBox.Show(prompt, "Confirmar tarefa", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+                action.IsEnabled = false;
+                try
+                {
+                    if (restore)
+                        await Task.Run(() => manager.Restore(selected.Definition));
+                    else
+                        await Task.Run(() => manager.Disable(selected.Definition));
+                    ShowPage("Debloat");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("A operação na tarefa falhou: " + ex.Message, "ynoez", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+            panel.Children.Add(list);
+            panel.Children.Add(action);
+            placeholder.Child = panel;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Consulta de tarefas opcionais no Debloat falhou: " + ex);
+            placeholder.Child = new StackPanel
+            {
+                Margin = new Thickness(20),
+                Children = { Heading("Tarefas opcionais", 14), Body("Consulta indisponível: " + ex.Message) }
+            };
+        }
     }
 
     private UIElement BuildMotherboard()
