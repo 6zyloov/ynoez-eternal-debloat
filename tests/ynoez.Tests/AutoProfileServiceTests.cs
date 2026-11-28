@@ -132,4 +132,16 @@ public sealed class AutoProfileServiceTests
         Assert.Throws<InvalidDataException>(() =>
             AutoProfileService.ParseUserSettings(json));
     }
+
+    [Fact]
+    public void MergeProtectedProcessNames_UserSettingsCannotRemoveShippedScriptRuntimes()
+    {
+        var shipped = new[] { "python", "AutoHotkey64", "powershell" };
+        var user = new[] { "XTExecutor.exe", "PYTHON.exe" };
+
+        var result = AutoProfileService.MergeProtectedProcessNames(shipped, user);
+
+        Assert.Equal(new[] { "python", "AutoHotkey64", "powershell", "XTExecutor" }, result);
+    }
+
 }

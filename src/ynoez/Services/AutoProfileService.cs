@@ -37,6 +37,17 @@ public static class AutoProfileService
     public static IReadOnlyList<string> GetProtectedProcessNames() =>
         LoadSettings().ProtectedProcessNames;
 
+    public static IReadOnlyList<string> GetCustomProtectedProcessNames()
+    {
+        if (!File.Exists(UserSettingsPath)) return Array.Empty<string>();
+        try { return ParseUserSettings(File.ReadAllText(UserSettingsPath)); }
+        catch (Exception ex)
+        {
+            AppLog.Write("Não foi possível carregar a lista personalizada de processos protegidos para exibição: " + ex.Message);
+            return Array.Empty<string>();
+        }
+    }
+
     /// <summary>
     /// Saves extra process names that must not enter the aggressive AFK power plan.
     /// Values are process image names, not paths or command lines.
@@ -61,6 +72,15 @@ public static class AutoProfileService
             try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
         }
         return normalized;
+    }
+
+    internal static string[] MergeProtectedProcessNames(
+        IEnumerable<string> shippedProcessNames,
+        IEnumerable<string> userProcessNames)
+    {
+        ArgumentNullException.ThrowIfNull(shippedProcessNames);
+        ArgumentNullException.ThrowIfNull(userProcessNames);
+        return NormalizeProtectedProcessNames(shippedProcessNames.Concat(userProcessNames));
     }
 
     internal static string[] NormalizeProtectedProcessNames(IEnumerable<string> processNames)
@@ -244,7 +264,7 @@ public static class AutoProfileService
             if (File.Exists(UserSettingsPath))
             {
                 var userSettings = ParseUserSettings(File.ReadAllText(UserSettingsPath));
-                protectedNames = NormalizeProtectedProcessNames(userSettings);
+                protectedNames = MergeProtectedProcessNames(shippedProtected, userSettings);
             }
         }
         catch (Exception ex)

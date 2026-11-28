@@ -910,10 +910,10 @@ public partial class MainWindow : Window
         autoPanel.Children.Add(Heading("Perfis automáticos", 15));
         autoPanel.Children.Add(Body("Jogo com atividade recente = Performance. Jogo ou processo protegido durante inatividade = AFK protegido: plano Equilibrado + bloqueio de suspensão, sem usar o plano Economia agressiva. Somente quando nenhum jogo/processo protegido estiver rodando e houver 15 minutos sem entrada o ynoez usa AFK / Economia. Não encerra processos; o plano original é salvo e restaurado ao parar."));
         autoPanel.Children.Add(Heading("Processos que devem permanecer protegidos", 13));
-        autoPanel.Children.Add(Body("Jogos conhecidos já são protegidos automaticamente. Adicione outros processos importantes (por exemplo, o executável do seu bot/automação) separados por ponto e vírgula. Use apenas o nome simples do processo, sem espaços, caminho ou argumentos; o sufixo .exe é opcional."));
+        autoPanel.Children.Add(Body("Jogos conhecidos, incluindo Roblox, são protegidos automaticamente. Também ficam protegidos por padrão os ambientes comuns de scripts e automações: cmd, PowerShell, Python, Node.js, Java, Windows Script Host e AutoHotkey. Esses padrões não podem ser removidos. Adicione o nome exato do processo de outras ferramentas (inclusive XT, caso execute em um processo separado) usando ponto e vírgula. Use apenas o nome simples, sem espaços, caminho ou argumentos; .exe é opcional."));
         var protectedInput = new TextBox
         {
-            Text = string.Join("; ", AutoProfileService.GetProtectedProcessNames()),
+            Text = string.Join("; ", AutoProfileService.GetCustomProtectedProcessNames()),
             MinHeight = 36,
             Padding = new Thickness(10, 8, 10, 8),
             Background = BrushFrom("#171717"),
@@ -937,9 +937,9 @@ public partial class MainWindow : Window
                 var names = AutoProfileService.SaveProtectedProcessNames(
                     protectedInput.Text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                 autoStatus.Text = names.Count == 0
-                    ? "Nenhum processo extra cadastrado. Jogos conhecidos continuam protegidos."
-                    : "Processos protegidos salvos: " + string.Join(", ", names) +
-                      ". A lista será carregada na próxima ativação da automação.";
+                    ? "Nenhum processo adicional cadastrado. Os jogos e ambientes de script protegidos por padrão continuam ativos."
+                    : "Processos adicionais salvos: " + string.Join(", ", names) +
+                      ". Os padrões de proteção continuam ativos; a lista será carregada na próxima ativação.";
             }
             catch (Exception ex)
             {
