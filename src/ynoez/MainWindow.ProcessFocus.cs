@@ -16,6 +16,7 @@ public partial class MainWindow
 
     private TextBox? _focusExecutableTextBox;
     private ComboBox? _focusCpuPriorityCombo;
+    private ComboBox? _backgroundCpuPriorityCombo;
     private ListBox? _backgroundExecutableList;
     private TextBlock? _processFocusStatus;
     private DispatcherTimer? _processFocusTimer;
@@ -45,7 +46,7 @@ public partial class MainWindow
         var focusCard = CreateFocusCard();
         var focusPanel = new StackPanel();
         focusPanel.Children.Add(FocusHeading("JOGO PRINCIPAL"));
-        focusPanel.Children.Add(FocusDescription("Este aplicativo recebe prioridade de CPU acima do normal ou alta e prioridade de memória normal. A preferência do Windows para a GPU de alto desempenho também é configurada para o próximo início."));
+        focusPanel.Children.Add(FocusDescription("Este aplicativo recebe prioridade de CPU Alta (padrão, com confirmação) ou Acima do normal e prioridade de memória normal. A preferência do Windows para a GPU de alto desempenho também é configurada para o próximo início."));
         var focusPathTextBox = CreateFocusTextBox();
         focusPathTextBox.Text = settings.FocusExecutablePath ?? string.Empty;
         _focusExecutableTextBox = focusPathTextBox;
@@ -89,7 +90,7 @@ public partial class MainWindow
         var backgroundCard = CreateFocusCard();
         var backgroundPanel = new StackPanel();
         backgroundPanel.Children.Add(FocusHeading("SEGUNDO PLANO / AFK"));
-        backgroundPanel.Children.Add(FocusDescription("Os executáveis desta lista recebem prioridade de CPU Idle (a menor classe normal de processo) e prioridade de memória Very Low. Eles continuam executando, mas só recebem CPU quando processos de prioridade maior deixam capacidade disponível."));
+        backgroundPanel.Children.Add(FocusDescription("Os executáveis desta lista recebem prioridade de CPU Idle (a menor classe normal de processo) e prioridade de memória Very Low. No modo extremo, recebem CPU na classe Idle, abaixo de todas as classes normais; no modo alternativo, ficam Abaixo do normal. A memória recebe prioridade Very Low."));
         _backgroundExecutableList = new ListBox
         {
             Height = 112,
@@ -104,6 +105,22 @@ public partial class MainWindow
         foreach (var path in settings.BackgroundExecutablePaths)
             _backgroundExecutableList.Items.Add(new FocusExecutableItem(path));
         backgroundPanel.Children.Add(_backgroundExecutableList);
+        backgroundPanel.Children.Add(FocusHeading("PRIORIDADE DE CPU DOS BOTS"));
+        _backgroundCpuPriorityCombo = new ComboBox
+        {
+            Height = 36,
+            MinWidth = 300,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Background = BrushFrom("#292329"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            Padding = new Thickness(8, 5, 8, 5),
+            Margin = new Thickness(0, 7, 0, 10)
+        };
+        _backgroundCpuPriorityCombo.Items.Add("Extremamente baixa — Idle (recomendado para AFK)");
+        _backgroundCpuPriorityCombo.Items.Add("Baixa — abaixo do normal (se Roblox desconectar)");
+        _backgroundCpuPriorityCombo.SelectedIndex = settings.UseLowestBackgroundCpuPriority ? 0 : 1;
+        backgroundPanel.Children.Add(_backgroundCpuPriorityCombo);
 
         var backgroundButtons = new StackPanel { Orientation = Orientation.Horizontal };
         var addBackground = CreateFocusButton("Adicionar executável", false);
@@ -186,7 +203,7 @@ public partial class MainWindow
 
     private void ActivateProcessFocusProfile()
     {
-        if (_focusExecutableTextBox is null || _backgroundExecutableList is null || _focusCpuPriorityCombo is null)
+        if (_focusExecutableTextBox is null || _backgroundExecutableList is null || _focusCpuPriorityCombo is null || _backgroundCpuPriorityCombo is null)
             return;
 
         var focusPath = _focusExecutableTextBox.Text.Trim();
@@ -213,7 +230,8 @@ public partial class MainWindow
             Enabled = true,
             FocusExecutablePath = focusPath,
             BackgroundExecutablePaths = backgroundPaths,
-            UseHighCpuPriority = _focusCpuPriorityCombo.SelectedIndex == 1
+            UseHighCpuPriority = _focusCpuPriorityCombo.SelectedIndex == 1,
+            UseLowestBackgroundCpuPriority = _backgroundCpuPriorityCombo.SelectedIndex == 0
         });
 
         if (settings.BackgroundExecutablePaths.Count != backgroundPaths.Count)
