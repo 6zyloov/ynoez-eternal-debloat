@@ -83,7 +83,7 @@ public partial class MainWindow
                     ? (snapshot.TpmReady ? "TPM " + snapshot.TpmVersion + " OK" : "TPM detectado, não pronto")
                     : "TPM não detectado";
                 var secure = snapshot.SecureBootEnabled ? "Secure Boot ON" : "Secure Boot OFF/não confirmado";
-                var virtual = snapshot.CpuVirtualizationEnabled ? "virtualização ON" : "virtualização OFF";
+                var virtualizationText = snapshot.CpuVirtualizationEnabled ? "virtualização ON" : "virtualização OFF";
                 var vbs = snapshot.VbsEnabled ? "VBS ON" : "VBS OFF";
                 var hvci = snapshot.MemoryIntegrityEnabled ? "HVCI ON" : "HVCI OFF";
                 var iommu = snapshot.DmaProtectionAvailable ? "proteção DMA disponível" : "proteção DMA não confirmada";
@@ -93,7 +93,7 @@ public partial class MainWindow
                         ? (snapshot.CanWriteBios ? "BIOS Lenovo com gravação disponível" : "gravação Lenovo bloqueada por segurança")
                         : "BIOS analisada; ajuste automático não disponível neste modelo";
                 status.Text = snapshot.BiosMode + " • " + tpm + " • " + secure + "\n" +
-                    virtual + " • " + iommu + " • " + vbs + " • " + hvci + "\n" + writer;
+                    virtualizationText + " • " + iommu + " • " + vbs + " • " + hvci + "\n" + writer;
                 if (!preCheckSupported)
                     status.Text += "\nVanguard Pre-Check requer Windows 11 25H2 ou mais recente.";
                 if (!snapshot.LenovoWmiAvailable)
