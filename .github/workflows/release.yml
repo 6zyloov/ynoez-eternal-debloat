@@ -49,18 +49,24 @@ jobs:
       - name: Publish self-contained app
         shell: pwsh
         run: ./scripts/publish.ps1
+      - name: Sign app executable with Authenticode
+        shell: pwsh
+        env:
+          YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
+          YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
+        run: ./scripts/sign-artifacts.ps1 -Target Application
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
       - name: Build installer
         shell: pwsh
         run: ./scripts/build-installer.ps1
-      - name: Sign Authenticode when a certificate is configured
+      - name: Sign installer and verify both Authenticode signatures
         shell: pwsh
         env:
           YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
           YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
-        run: ./scripts/sign-artifacts.ps1
+        run: ./scripts/sign-artifacts.ps1 -Target Installer
       - name: Generate and validate SPDX SBOM
         shell: pwsh
         run: ./scripts/generate-sbom.ps1
