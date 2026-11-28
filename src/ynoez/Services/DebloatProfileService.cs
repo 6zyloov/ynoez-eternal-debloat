@@ -48,7 +48,7 @@ public static class DebloatProfileService
         progress?.Invoke("Removendo aplicativos Windows opcionais…");
         try
         {
-            var packages = AppPackageInventoryService.GetCurrentUserPackagesAsync()
+            var packages = AppPackageInventoryService.GetCurrentUserPackagesAsync(CancellationToken.None)
                 .GetAwaiter().GetResult();
             var candidates = AppxDebloatService.FindCandidates(packages);
             foreach (var candidate in candidates)
