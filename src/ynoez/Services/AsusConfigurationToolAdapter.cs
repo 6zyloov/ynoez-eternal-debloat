@@ -100,6 +100,11 @@ public static class AsusConfigurationToolAdapter
             }
 
             var targetValue = NodeText(target["#text"]);
+            if (string.IsNullOrWhiteSpace(targetValue))
+            {
+                missing.Add(requirement);
+                continue;
+            }
             var alreadyEnabled = IsAlreadyEnabled(setting, requirement, targetValue);
             if (alreadyEnabled) continue;
 
