@@ -227,7 +227,6 @@ public partial class MainWindow : Window
         {
             "Home" => BuildHome(),
             "Foco de Jogo" => BuildProcessFocusPage(),
-            "Backup" => BuildBackup(),
             "Tweaks" => BuildTweaks(),
             "Debloat" => BuildDebloat(),
             "Motherboard" => BuildMotherboard(),
