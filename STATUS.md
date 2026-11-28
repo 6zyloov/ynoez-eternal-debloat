@@ -1,6 +1,6 @@
 # Desenvolvimento — ynoez 0.3.1 (candidato integrado)
 
-> **Estado desta branch:** integração em validação. O painel completo da linha principal foi preservado; a abertura vetorial com sigilo e os atalhos de Otimização, Debloat, Foco de Jogo e BIOS/Anti-cheat foram acrescentados. A compilação Windows e os testes desta integração ainda precisam passar na CI antes de disponibilizar o instalador.
+> **Estado da versão 0.3.1:** integrada à `main`. CI Windows aprovada em 28/11/2026: 107/107 testes, publish self-contained, instalador Inno Setup e validação de SHA-256 concluídos. A validação física de firmware, anti-cheats, prioridades de processo e ganhos de desempenho continua pendente no hardware de destino.
 
 ## Integração Stix + Oneclick + ynoez
 - Mantém a navegação e os módulos de Home, Monitor, Backup, Tweaks, Network, Debloat, Motherboard, Toolbox, Restore e Logs já existentes no ynoez; acrescenta atalhos rápidos sem remover páginas.
