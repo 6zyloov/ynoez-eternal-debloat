@@ -1,88 +1,79 @@
-# ynoez — Windows tuning, debloat seletivo e perfis de hardware
+# ynoez — Performance Tuner para Windows
 
-Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A interface usa uma identidade monocromática: preto absoluto, texto branco de alto contraste, cartões pretos discretos e destaque branco, com implementação própria do ynoez.
+Aplicativo nativo em C# / WPF / .NET 10, Windows x64. Interface minimalista em preto absoluto e branco, com cartões compactos e interruptores.
 
-## Sistemas operacionais e ciclo de suporte
+## Painel
 
-O aplicativo é x64 e usa .NET 10 LTS. Conforme a matriz oficial do .NET 10 para Windows, Windows 11 deve estar em uma versão atualmente suportada; Windows 10 aparece como suportado apenas nas edições Enterprise/LTSC listadas pela Microsoft. Windows 10 Home/Pro não faz parte da matriz de suporte do .NET 10, e o suporte geral dessas edições terminou em 14 de outubro de 2025. Não prometemos compatibilidade oficial nessas edições.
+- Home: CPU, GPU, RAM e atalhos rápidos. Sem gráficos ou inventários na página inicial.
+- Otimizações: abas Main, Power, Kernel e GPU.
+- Debloat: Apps, Win32, Inicialização, Serviços e Tarefas.
+- Rede: DNS, economia de energia e propriedades avançadas disponíveis no driver.
+- Foco de Jogo: prioridade do CS2 e das instâncias Roblox AFK.
+- Placa-mãe: recomendações da placa reconhecida e acesso à UEFI.
+- Toolbox: atalhos diretos para as ferramentas do Windows e do driver.
+- Backup: snapshot local e ponto de restauração.
 
-O .NET 10 é LTS e, na política publicada em 10 de novembro de 2026, está previsto para permanecer em suporte até 14 de novembro de 2028. A CI do projeto roda em Windows Server 2025; isso valida o ambiente de build/teste, mas não substitui testes em Windows 11 cliente nem em hardware físico.
+## Otimizações
 
-## Aplicativo
+### Main
 
-- Projeto: src/ynoez/
-- Compilação Windows: build.bat ou scripts/publish.ps1
-- Instalação local: scripts/install.ps1
-- Publicação de builds: .github/workflows/build.yml (artefatos win-x64); releases estáveis por tag vX.Y.Z em .github/workflows/release.yml
-- Instalação: C:\ynoez\, com Toolbox\, Data\, Backups\, Logs\ e Downloads\ na mesma raiz.
+Game Mode, Game DVR/captura em segundo plano, efeitos visuais, animações, transparência, atraso de menus e hover do mouse. Os valores de Registro por usuário têm backup e restauração individual.
 
-## Estado do aplicativo — 0.3.0 (candidato integrado)
+### Power
 
-- **Home:** painel compacto com CPU, GPU, RAM e Windows, além de atalhos para as operações principais; consulta sob demanda dos módulos RAM reportados por WMI/SMBIOS (posição, capacidade, DDR, velocidades, formato, ECC e part number), sem afirmar single/dual channel nem ler SPD diretamente. Mantém auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI e Search/impressão/Store/Update/Vanguard/FACEIT; verificação manual de atualização estável sem download automático.
-- **Monitor:** CPU/RAM em tempo real; GPU 3D via NVIDIA SMI ou contadores do Windows; temperatura/VRAM/potência quando o driver NVIDIA oferece esses dados.
-- **Benchmark:** PresentMon 2.6.0 oficial, baixado somente quando solicitado e validado por SHA-256. Captura de 30–180 segundos, FPS médio, 1% low calculado pelo inverso do P99 de frametime, frametime médio e contagem de frames lentos. CSV salvo em Logs\. A captura pode solicitar UAC.
-- **Tweaks:** perfis Performance/Equilibrado/AFK e AFK protegido. Jogos conhecidos e runtimes comuns de scripts/automação (cmd, PowerShell, Python, Node.js, Java, WSH e AutoHotkey) ficam protegidos por padrão; a lista personalizada é somada aos padrões e não os apaga. Um seletor consulta processos em execução em modo somente leitura (nome, PID e memória) para ajudar a cadastrar o processo XT correto sem ler argumentos/caminhos. O catálogo embarcado exige schema válido e listas não vazias; configuração ausente/corrompida falha com segurança para AFK protegido. Nenhum processo é encerrado; sessão de energia exportada/restaurada; 11 ajustes HKCU reversíveis.
-- **Execução em segundo plano:** fechar a janela com uma operação longa ativa oculta o ynoez na bandeja do sistema em vez de encerrar o monitor de rede, o perfil automático, o benchmark ou a manutenção do Windows; duplo clique no ícone reabre a janela e o menu da bandeja permite encerrar explicitamente.
-- **Otimização:** ação rápida aplica ajustes reversíveis de Game DVR/captura do Windows e efeitos visuais, e seleciona Alto desempenho quando nenhum outro perfil do ynoez já controla o plano. O Foco de Jogo fica em uma página própria. O alvo principal usa prioridade de CPU Alta (padrão com confirmação) ou Acima do normal, prioridade de memória Normal e preferência de adaptador gráfico de alto desempenho do Windows. Os alvos AFK usam CPU Idle (extremamente baixa) ou Abaixo do normal, prioridade de memória Very Low e preferência gráfica de economia. A regra é aplicada a todas as instâncias com o mesmo nome de executável, então um único cadastro de RobloxPlayerBeta.exe abrange os dois clientes e instâncias futuras. O ynoez reaplica o perfil a cada dois segundos, permanece na bandeja enquanto o perfil estiver ativo e registra os estados originais para restauração/recovery. O perfil salvo exige ativação explícita em cada execução do ynoez; ao sair normalmente, o programa restaura as prioridades e não o reativa automaticamente na próxima abertura.
-- **Network:** inventário somente leitura de interfaces, drivers, endereços, gateways, DNS e MTU; diagnóstico cancelável ICMP/TCP/DNS IPv4/IPv6/tracert; monitoramento contínuo a cada 5 segundos de gateways IPv4/IPv6, Cloudflare e Google por ICMP/TCP/443 nas duas famílias, DNS com contagem A/AAAA e janela móvel de 60 segundos com perda/jitter separados por família/protocolo. Distingue ausência/filtragem IPv6, rede local, DNS, ICMP e TCP; exporta CSV completo. Contadores RX/TX e energia de NIC reversível.
-- **Debloat:** limpa Temp e caches Brave/Discord; consulta inicialização, serviços e tarefas em segundo plano sem travar a navegação; oferece remoção de uma lista fechada de apps AppX opcionais para o usuário atual; inventários de programas Win32 (HKLM/HKCU 32/64 bits) e AppX/MSIX somente leitura para usuário atual, todos os perfis e pacotes provisionados, com busca e exportação CSV; gerenciador de inicialização HKCU + arquivos da pasta pessoal com backup e reversão (HKLM e pasta Startup compartilhada somente leitura); whitelist de seis serviços opcionais e seis tarefas agendadas opcionais com backup, verificação e restauração.
-- **Motherboard:** perfil GIGABYTE A520M K V2; revisão SMBIOS aparece só como indício e links de BIOS específicos exigem confirmação manual da serigrafia no PCB. Inventário sob demanda de dispositivos PnP de rede/áudio/sistema com hardware IDs e metadados do driver assinado (provedor, versão, data e INF), sem instalação automática.
-- **Toolbox:** pesquisa de configurações e atalhos Windows; inventário sob demanda somente leitura de serviços Win32 e tarefas agendadas com busca, classificação de componentes protegidos/whitelist opcional, estado, horários/descrições e CSV. Tarefas desconhecidas e serviços não avaliados permanecem somente leitura; alterações continuam nas whitelists reversíveis de Debloat.
-- **Reparo do Windows:** DISM CheckHealth/ScanHealth/RestoreHealth e SFC VerifyOnly/Scannow em comandos allowlisted; verificações separadas de reparos, confirmação explícita, UAC, timeout/cancelamento, logs individuais e sem reinicialização automática.
-- **Backup, Restore e Logs:** central de recuperação para Registro, plano base, sessão AFK interrompida, serviços, adaptadores, tarefas e inicialização; snapshots locais com nomes únicos, manifesto SHA-256 e descarte de snapshots incompletos; ponto de restauração opcional.
-- **Interface:** Poppins incorporada ao executável (Regular, Medium, SemiBold e Bold) com licença SIL Open Font License.
+Planos Alto desempenho e Equilibrado, perfis automáticos baseados em jogo/inatividade e recuperação do plano anterior. Os perfis protegem jogos e runtimes comuns de automação; não encerram processos.
 
-## Instalação, SBOM e integridade
+### Kernel
 
-A versão do app e do instalador vem de um único campo Version em src/ynoez/ynoez.csproj. O builder gera um script Inno Setup temporário com valores literais e verifica os metadados PE antes do upload.
+- MMCSS Games: prioridade e categoria apenas na tarefa Games.
+- NetworkThrottlingIndex: ajuste multimídia legado; exige comparação A/B.
+- Power Throttling: desativa a política global de economia de CPU; pode aumentar consumo e temperatura.
+- Win32 Priority Separation: perfil Programs 0x26. É política do escalonador, não multiplicador ou clock de CPU.
+- Temporizador 1 ms: solicitação apenas ao processo ynoez, pareada com timeEndPeriod ao sair. Não altera HPET ou BCD.
 
-O pipeline gera e valida uma SBOM SPDX 2.2, publica o manifesto e inclui seu SHA-256 junto ao instalador e pacote portátil. Na SBOM desta build, os pacotes foram identificados, mas os campos de licença estão como NOASSERTION; a revisão formal de licenças continua pendente. O ciclo de assinatura aceita certificado PFX em secrets do GitHub Actions: o executável é assinado antes de ser empacotado e o instalador é assinado depois. Sem certificado, a distribuição declara explicitamente Authenticode NOT SIGNED; não simula uma assinatura. Consulte docs/SBOM-AND-SIGNING.md.
+### GPU
 
-A revisão de código `8c5664d420b90f6813f6263f443059c970829be9`, incluindo o Foco de Jogo, passou na CI do GitHub Actions em Windows Server 2025 ([run 46095777614](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46095777614)). Foram aprovados auditoria NuGet, xUnit, build self-contained, instalador, SBOM, assinatura/status, instalação limpa, reinstalação, desinstalação preservando Data/Backups/Logs/Downloads, upgrade do baseline atual de main, rollback, re-upgrade, hashes e upload dos artefatos. O teste de baseline não substitui a migração de uma futura versão estável já publicada.
+HAGS com backup, preferência gráfica por aplicativo no Foco de Jogo, AMD Adrenalin e Configurações gráficas do Windows. HAGS depende de GPU/driver/Windows e exige reinicialização.
+
+## Rede
+
+Para cada NIC, o painel usa os valores válidos anunciados pelo driver. Pode habilitar RSS e testar Interrupt Moderation/EEE desligados quando essas propriedades existem. Também controla economia de energia do adaptador e limpa o cache DNS. Cada mudança guarda o valor original e evita sobrescrever uma alteração externa posterior.
+
+Interrupt Moderation e EEE podem aumentar consumo de CPU/energia; teste ping e frametime A/B. NetworkThrottlingIndex é legado e pode não produzir efeito em Windows recente.
+
+## Debloat
+
+- Temporários do usuário e caches Brave/Discord.
+- AppX: lista fechada de aplicativos opcionais; remove somente na conta atual. Frameworks, recursos, bundles, pacotes não removíveis, componentes essenciais e pacotes provisionados ficam fora. A remoção AppX não tem rollback automático.
+- Win32: identifica desinstaladores diretos válidos. MSI usa ProductCode; outros usam o executável registrado e existente. Interpretadores/command hosts, componentes Windows, drivers, runtimes e anti-cheats são bloqueados. O próprio desinstalador do fabricante conduz a remoção.
+- Inicialização do usuário: desativação com backup e restauração.
+- Serviços opcionais e tarefas de telemetria/feedback/mapas/Xbox: listas allowlist, confirmação, UAC, backup e verificação. Serviços Xbox podem afetar autenticação, multiplayer e saves Xbox/Game Pass.
+
+Consultas de inicialização, serviços e tarefas executam fora da thread da interface para a navegação continuar responsiva.
+
+## Foco de Jogo
+
+Detecção automática do CS2 em execução/bibliotecas Steam e do Roblox mais recente. Uma entrada RobloxPlayerBeta.exe abrange as duas instâncias e futuras instâncias. CS2 usa CPU Alta (com confirmação) ou Acima do normal; Roblox AFK usa Idle ou Abaixo do normal. Prioridade de memória não reserva RAM; preferência gráfica escolhe adaptador, não reserva VRAM.
+
+## Placa-mãe e BIOS
+
+Para GIGABYTE A520M K V2, o painel apresenta recomendações de XMP/DOCP, Core Performance Boost, PBO, Smart Fan 5 e Smart Access Memory/Re-Size BAR, além de abrir a UEFI e links oficiais por revisão física. O ynoez não grava variáveis UEFI, não faz flash de BIOS e não aplica overclock de tensão. Confirme a revisão impressa no PCB antes de usar links de BIOS.
 
 ## Segurança e limites
 
-A remoção AppX é limitada a nomes opcionais em allowlist, somente no perfil atual e sem rollback automático; Store, licenciamento e componentes essenciais permanecem protegidos. O ynoez não desativa Microsoft Store/licenciamento, impressão, Calculadora, Clipboard, Bloco de Notas, Windows Search, Windows Update, Defender, Firewall, SmartScreen, UAC, drivers essenciais, NVIDIA Instant Replay/Alt+Z, Vanguard ou FACEIT. Preserva TPM, Secure Boot, VBS/HVCI e IOMMU/DMA.
+- Registro HKCU/HKLM apenas por allowlist explícita, backup antes da alteração e verificação posterior.
+- Não desativa Defender, Firewall, Windows Update, TPM, Secure Boot, VBS/HVCI, Vanguard ou FACEIT.
+- Não usa REALTIME_PRIORITY_CLASS, HPET/BCD hacks, alteração de tensão, limites térmicos, afinidade, prioridades de thread ou working set.
+- Win32PrioritySeparation 0x26 não promete FPS; o perfil padrão do Windows cliente pode ser equivalente.
+- HAGS, MMCSS, RSS, EEE e Interrupt Moderation dependem do sistema/driver e exigem comparação A/B. Nenhum ganho de FPS ou ping é prometido.
+- Authenticode fica NOT SIGNED se nenhum certificado Code Signing estiver configurado.
 
-O catálogo de serviços opcionais é restrito a DiagTrack, dmwappushservice, MapsBroker, Fax, RetailDemo e WMPNetworkSvc; não há desligamento em massa. Cada operação exige confirmação, e alterações administrativas solicitam UAC. A opção de energia de NIC altera somente recursos compatíveis e não reinicia o adaptador automaticamente.
+## Build e instalação
 
-O benchmark PresentMon não instala driver de sensor. O executável oficial é baixado sob demanda de GameTechDev/PresentMon v2.6.0, validado pelo hash SHA-256 fixado no código e acompanhado dos avisos MIT/terceiros. A medição exige permissão ETW e pode solicitar UAC.
+- Projeto: src/ynoez/
+- Publicação Windows x64: build.bat ou scripts/publish.ps1
+- Instalação local: scripts/install.ps1
+- Pasta prevista: C:\ynoez\
+- CI: .github/workflows/build.yml
 
-O projeto não automatiza flash de BIOS, overclock, tensão, PBO, BCD/HPET/timer tweaks ou desligamento em massa de serviços. O Foco de Jogo não reserva RAM/VRAM nem divide uma porcentagem fixa da GPU: prioridade de memória é apenas uma dica ao gerenciador de memória para decidir quais páginas remover primeiro, e a preferência gráfica seleciona adaptador de alto desempenho/economia quando o hardware oferece essa escolha. A prioridade Alta de CPU pode consumir quase todo o tempo de processador disponível; use com confirmação e prefira Acima do normal se houver falhas de áudio ou perda de responsividade. Realtime nunca é usado. Nenhuma ferramenta consegue garantir FPS, estabilidade de Wi-Fi ou impedir quedas causadas pelo roteador/ISP.
-
-## Build e testes
-
-O GitHub Actions compila em Windows x64, audita dependências NuGet diretas e transitivas, executa os testes xUnit, publica o executável autocontido, constrói o instalador e gera a SBOM. A pipeline também faz o smoke test de instalação/reinstalação/desinstalação, testa upgrade e rollback entre o baseline de main e o candidato, valida integridade, e publica os artefatos de build e metadata. A CI da revisão de código `8c5664d420b90f6813f6263f443059c970829be9` terminou com sucesso ([run 46095777614](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46095777614)). Isso valida o build e os testes automatizados, mas não substitui os testes prolongados no PC de destino.
-
-Directory.Build.props habilita a auditoria de vulnerabilidades NuGet e transforma alertas moderados ou superiores em erro de restore. Detalhes em docs/DEPENDENCY-AUDIT.md e docs/SBOM-AND-SIGNING.md.
-
-A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, PresentMon com jogos reais, energia de NIC, hardware físico, sessões prolongadas com Roblox + XT e compatibilidade com Vanguard/FACEIT numa máquina real.
-
-## Banco de perfis
-
-- Perfil GIGABYTE A520M K V2: Profiles/Motherboards/GIGABYTE/A520M-K-V2.json
-- Política segura da A520M K V2: Configs/Motherboards/GIGABYTE/A520M-K-V2-safe.json
-- Whitelist de componentes Windows preservados: Configs/Debloat/Windows-preserve.json
-- Guia para cadastrar novas placas: Profiles/Motherboards/README.md
-
-A revisão física impressa no PCB deve ser confirmada antes de escolher BIOS; o valor SMBIOS não é garantia suficiente.
-
-## Construir localmente
-
-Requer .NET 10 SDK LTS no Windows. O repositório fixa a faixa do SDK em global.json para evitar que uma versão maior instalada localmente seja selecionada por engano:
-
-```powershell
-.\build.bat
-# ou
-pwsh -ExecutionPolicy Bypass -File .\scripts\publish.ps1
-```
-
-O executável autocontido será gerado em dist\ynoez.exe. Para instalar em C:\ynoez, execute scripts/install.ps1 como administrador.
-
-## Próximas etapas
-
-Ainda faltam validação em Windows cliente e hardware real, testes prolongados de Roblox + XT, PresentMon em jogos, sensores adicionais por APIs documentadas, compatibilidade autorizada com Vanguard/FACEIT e teste de recuperação após falhas. A assinatura efetiva Authenticode exige um certificado Code Signing válido configurado nos secrets do repositório. A primeira migração entre releases publicadas só poderá ser comprovada depois de existir uma versão anterior estável. A remoção AppX continua indisponível enquanto não houver recuperação e rollback confiáveis. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
-
-## Licença
-
-Núcleo ynoez: MIT. PresentMon é distribuído sob MIT e inclui avisos de terceiros em Toolbox/Performance/. Marcas, nomes e links de terceiros pertencem aos respectivos fabricantes.
+A CI roda em Windows Server 2025 e não substitui testes visuais e funcionais em Windows cliente/hardware real, incluindo a sessão CS2 + duas instâncias Roblox + XT.
