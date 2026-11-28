@@ -79,6 +79,16 @@ public static class SystemRegistryTweakService
             [
                 new(@"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling",
                     "PowerThrottlingOff", RegistryValueKind.DWord, 1)
+            ]),
+        new(
+            new SystemRegistryTweakDefinition(
+                "win32-priority-separation",
+                "Win32 Priority Separation • Programs 0x26",
+                "Seleciona quantum curto e variável com separação máxima do primeiro plano. É uma política do agendador, não aumenta a frequência da CPU. Em Windows cliente pode ser equivalente ao padrão; compare antes/depois.",
+                false),
+            [
+                new(@"SYSTEM\CurrentControlSet\Control\PriorityControl",
+                    "Win32PrioritySeparation", RegistryValueKind.DWord, 0x26)
             ])
     ];
 

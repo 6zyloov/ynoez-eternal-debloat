@@ -10,11 +10,12 @@ public sealed class SystemRegistryTweakServiceTests
     {
         var catalog = SystemRegistryTweakService.GetCatalog();
 
-        Assert.Equal(4, catalog.Count);
+        Assert.Equal(5, catalog.Count);
         Assert.Contains(catalog, x => x.Id == "mmcss-games");
         Assert.Contains(catalog, x => x.Id == "network-throttling");
         Assert.Contains(catalog, x => x.Id == "gpu-scheduling");
         Assert.Contains(catalog, x => x.Id == "power-throttling-off");
+        Assert.Contains(catalog, x => x.Id == "win32-priority-separation");
         Assert.DoesNotContain(catalog, x => x.Id.Contains("hpet", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(catalog, x => x.Id.Contains("bcd", StringComparison.OrdinalIgnoreCase));
     }
@@ -54,6 +55,17 @@ public sealed class SystemRegistryTweakServiceTests
         Assert.Contains("([int]1)", script);
         Assert.DoesNotContain("bcdedit", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("TdrDelay", script);
+    }
+
+    [Fact]
+    public void Win32PriorityScript_UsesProgramsProfile0x26()
+    {
+        var script = SystemRegistryTweakService.BuildApplyScript("win32-priority-separation");
+
+        Assert.Contains("PriorityControl", script);
+        Assert.Contains("Win32PrioritySeparation", script);
+        Assert.Contains("([int]38)", script);
+        Assert.DoesNotContain("bcdedit", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

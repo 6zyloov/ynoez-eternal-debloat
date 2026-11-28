@@ -824,7 +824,20 @@ public partial class MainWindow : Window
         try
         {
             var registry = new RegistryTweakService();
-            foreach (var tweak in OptimizationCatalogService.LoadRegistryTweaks())
+            var visibleMainIds = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "gaming-disable-windows-capture",
+                "gaming-disable-game-dvr-policy-user",
+                "gaming-enable-auto-game-mode",
+                "gaming-enable-game-mode",
+                "interface-performance-visual-effects",
+                "interface-disable-taskbar-animations",
+                "interface-disable-transparency",
+                "ui-menu-show-delay",
+                "ui-mouse-hover-time"
+            };
+            foreach (var tweak in OptimizationCatalogService.LoadRegistryTweaks()
+                .Where(item => visibleMainIds.Contains(item.Id) || registry.CanRestore(item.Id)))
                 mainGrid.Children.Add(BuildRegistryToggleCard(tweak, registry));
         }
         catch (Exception ex)
@@ -838,6 +851,7 @@ public partial class MainWindow : Window
         kernelGrid.Children.Add(BuildSystemRegistryToggleCard("mmcss-games"));
         kernelGrid.Children.Add(BuildSystemRegistryToggleCard("network-throttling"));
         kernelGrid.Children.Add(BuildSystemRegistryToggleCard("power-throttling-off"));
+        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("win32-priority-separation"));
         kernelGrid.Children.Add(BuildTimerResolutionCard());
         tabs.Items.Add(new TabItem { Header = "Kernel", Content = kernelGrid });
 
