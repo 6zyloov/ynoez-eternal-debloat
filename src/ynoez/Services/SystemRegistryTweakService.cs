@@ -193,6 +193,10 @@ public static class SystemRegistryTweakService
                     throw new InvalidDataException("O backup contém um caminho, valor ou tipo fora da allowlist.");
             }
 
+            // Do not overwrite a value changed by another utility after ynoez applied this tweak.
+            if (definition.Values.Any(value => !IsTargetValuePresent(value)))
+                throw new InvalidOperationException("Um ou mais valores foram modificados fora do ynoez. O backup original foi preservado para revisão.");
+
             RestoreCore(definition, backup, backupPath);
             AppLog.Write("Ajuste de sistema restaurado: " + id + ".");
         }

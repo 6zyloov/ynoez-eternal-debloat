@@ -861,6 +861,8 @@ public partial class MainWindow : Window
         {
             if (_autoProfileCts is not null)
                 throw new InvalidOperationException("Desative os perfis automáticos antes de trocar o plano manualmente.");
+            if (QuickGameOptimizationService.IsApplied)
+                throw new InvalidOperationException("Restaure o perfil rápido antigo antes de trocar o plano.");
             var message = await Task.Run(() => PowerProfileService.Apply(PowerProfileMode.Performance));
             AppLog.Write(message);
         }));
@@ -868,6 +870,8 @@ public partial class MainWindow : Window
         {
             if (_autoProfileCts is not null)
                 throw new InvalidOperationException("Desative os perfis automáticos antes de trocar o plano manualmente.");
+            if (QuickGameOptimizationService.IsApplied)
+                throw new InvalidOperationException("Restaure o perfil rápido antigo antes de trocar o plano.");
             var message = await Task.Run(() => PowerProfileService.Apply(PowerProfileMode.Balanced));
             AppLog.Write(message);
         }));
@@ -898,7 +902,12 @@ public partial class MainWindow : Window
                 "Desfazer perfil rápido antigo",
                 "Restaura as alterações do perfil rápido aplicado por uma versão anterior.",
                 "Restaurar",
-                async () => await Task.Run(QuickGameOptimizationService.Restore)));
+                async () =>
+                {
+                    if (_autoProfileCts is not null)
+                        throw new InvalidOperationException("Desative os perfis automáticos antes de restaurar o perfil rápido.");
+                    await Task.Run(QuickGameOptimizationService.Restore);
+                }));
         }
         tabs.Items.Add(new TabItem { Header = "Power", Content = powerPanel });
 
@@ -947,7 +956,8 @@ public partial class MainWindow : Window
                 else SystemRegistryTweakService.Restore(id);
             }),
             status.CanChange,
-            status.HasBackup ? "BACKUP SALVO" : status.IsApplied ? "ATIVO NO WINDOWS" : "PADRÃO");
+            (status.HasBackup ? "BACKUP SALVO" : status.IsApplied ? "ATIVO NO WINDOWS" : "PADRÃO") +
+            (status.Definition.RequiresRestart ? " • REINICIAR" : ""));
     }
 
     private Border BuildTimerResolutionCard()
