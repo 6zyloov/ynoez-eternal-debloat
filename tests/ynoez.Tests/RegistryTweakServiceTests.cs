@@ -82,12 +82,15 @@ public sealed class RegistryTweakServiceTests
                 Assert.Equal(RegistryValueKind.String, tweak.Kind);
                 Assert.Contains(tweak.KeyPath, new[] { @"Control Panel\\Desktop", @"Control Panel\\Mouse" });
             }
+            {
+                Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
+                Assert.Equal(@"Software\Microsoft\GameBar", tweak.KeyPath);
+            }
             else
             {
                 Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
-                Assert.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
-            }
-        });
+                Assert.StartsWith("Software\Microsoft\Windows\CurrentVersion\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
+            }        });
     }
  
 

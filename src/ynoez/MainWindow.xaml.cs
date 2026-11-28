@@ -1352,7 +1352,7 @@ public partial class MainWindow : Window
                     return;
 
                 if (MessageBox.Show(
-                    "Abrir o desinstalador real de "" + candidate.DisplayName + ""?" +
+                    "Abrir o desinstalador real de \"" + candidate.DisplayName + "\"?" +
                     Environment.NewLine + "Editor: " + candidate.Publisher +
                     Environment.NewLine + "O instalador poderá solicitar UAC. O ynoez não executa comandos por cmd/PowerShell.",
                     "Confirmar desinstalação", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
