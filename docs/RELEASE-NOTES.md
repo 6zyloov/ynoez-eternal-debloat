@@ -1,18 +1,27 @@
-# ynoez 0.3.0
+# ynoez 0.3.1 — candidato integrado
 
-Primeira versão de referência do ynoez para Windows x64.
+Esta versão reúne a navegação modular e os diagnósticos já existentes no ynoez com atalhos de otimização, debloat, foco de jogo, compatibilidade de firmware e a abertura vetorial do sigilo.
 
-## Componentes principais
-- Painel local de hardware, monitoramento de CPU/RAM/GPU e benchmark PresentMon.
-- Sessões A/B de benchmark com três rodadas por fase, mediana e dispersão.
-- Diagnóstico de rede, monitoramento contínuo, inventário de adaptadores e relatório CSV.
-- Ajustes reversíveis com backup, verificação e restauração.
-- Inventários Win32 e AppX/MSIX, incluindo pacotes provisionados em modo somente leitura.
-- Perfis Performance, Equilibrado e AFK com proteção de processos do usuário.
-- Instalador em C:\ynoez e pacote portátil.
+## O que foi integrado
+- Painel lateral preservando Home, Monitor, Backup, Tweaks, Network, Debloat, Motherboard, Toolbox, Restore e Logs.
+- Atalhos rápidos para Otimizar agora, Debloat automático, Foco de Jogo e BIOS / anti-cheat.
+- Abertura com sigilo em partículas, desenho vetorial nítido e opção de pular por clique.
+- Perfil de otimização conservador, com backup de Registro, MMCSS Games e plano de energia; rotina explícita de restauração.
+- Debloat baseado em allowlists: aplicações AppX opcionais, serviços e tarefas selecionados, além de limpeza limitada de caches.
+- Foco de jogo com prioridade configurável, detecção CS2/Roblox e proteção contra uso de prioridade Realtime.
+- Diagnóstico de firmware e adaptações limitadas a Lenovo WMI e ASUS ACT quando a ferramenta/modelo forem compatíveis.
+- Correção da correspondência de fabricante/placa para strings SMBIOS como “Gigabyte Technology Co., Ltd.”.
+- Requisitos de firmware de anti-cheat separados do ajuste independente de boost da CPU.
+- CI acionada em pull requests, build self-contained Windows x64, instalador Inno Setup e artefatos de checksum.
 
-## Integridade
-Os arquivos de instalação e portabilidade são acompanhados por SHA256SUMS.txt. Compare os hashes antes de executar os binários. A página de release contém os hashes oficiais publicados pelo próprio repositório.
+## Segurança e compatibilidade
+- Não desativa Defender, Firewall, Windows Update, UAC, Microsoft Store, Xbox, serviços de rede, Bluetooth, Wi-Fi, áudio ou impressão em massa.
+- Não aplica offsets UEFI genéricos, não faz flash de BIOS e não altera tensão, clocks ou limites térmicos.
+- Gravação de BIOS é bloqueada se a condição do BitLocker for desconhecida e exige confirmação explícita.
+- Em placas sem interface de configuração suportada, a aplicação fornece instruções manuais; não promete escrita automática.
+- O login de abertura é demonstrativo/local e não protege o aplicativo com autenticação real.
+- A remoção de aplicativos AppX não tem restauração automática; a tela informa essa limitação antes da execução.
 
-## Limites conhecidos
-A release é compilada e testada em runner Windows x64 do GitHub. A compatibilidade física com Vanguard/FACEIT e o comportamento em cada hardware ainda precisam ser validados no PC de destino. Nenhum ganho de FPS ou estabilidade de rede é prometido.
+## Validação ainda necessária
+Este commit precisa passar pela CI de Windows antes de ser tratado como instalador pronto. Mesmo com CI verde, o funcionamento de firmware, anti-cheats, prioridades de processo, monitoramento e ganhos reais de FPS precisa de teste no PC de destino. Não há garantia universal de compatibilidade nem promessa de aumento de FPS.
+
