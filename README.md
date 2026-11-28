@@ -35,9 +35,9 @@ O .NET 10 é LTS e, na política publicada em 10 de novembro de 2026, está prev
 
 A versão do app e do instalador vem de um único campo Version em src/ynoez/ynoez.csproj. O builder gera um script Inno Setup temporário com valores literais e verifica os metadados PE antes do upload.
 
-O pipeline gera e valida uma SBOM SPDX 2.2, publica o manifesto e inclui seu SHA-256 junto ao instalador e pacote portátil. O ciclo de assinatura está preparado para certificado PFX em secrets do GitHub Actions: o executável é assinado antes de ser empacotado e o instalador é assinado depois. Sem certificado, a distribuição declara explicitamente Authenticode NOT SIGNED; não simula uma assinatura. Consulte docs/SBOM-AND-SIGNING.md.
+O pipeline gera e valida uma SBOM SPDX 2.2, publica o manifesto e inclui seu SHA-256 junto ao instalador e pacote portátil. Na SBOM desta build, os pacotes foram identificados, mas os campos de licença estão como NOASSERTION; a revisão formal de licenças continua pendente. O ciclo de assinatura aceita certificado PFX em secrets do GitHub Actions: o executável é assinado antes de ser empacotado e o instalador é assinado depois. Sem certificado, a distribuição declara explicitamente Authenticode NOT SIGNED; não simula uma assinatura. Consulte docs/SBOM-AND-SIGNING.md.
 
-A CI verifica instalação limpa, reinstalação, desinstalação preservando Data/Backups/Logs/Downloads, e executa um cenário de upgrade do baseline atual de main para o candidato, rollback e re-upgrade, comparando os SHA-256 dos executáveis instalados. Esse teste de baseline não substitui a migração de uma futura versão estável já publicada.
+A CI do commit `3c07809e50fc56fb74767bafeeb1cabfac990d99` passou no GitHub Actions em Windows Server 2025 ([run 46092514834](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46092514834)). Foram aprovados instalação limpa, reinstalação, desinstalação preservando Data/Backups/Logs/Downloads, upgrade do baseline atual de main para o candidato, rollback, re-upgrade, validação da SBOM e dos hashes. Esse teste de baseline não substitui a migração de uma futura versão estável já publicada.
 
 ## Segurança e limites
 
