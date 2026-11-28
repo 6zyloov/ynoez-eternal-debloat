@@ -80,17 +80,17 @@ public sealed class RegistryTweakServiceTests
             if (tweak.Id is "ui-menu-show-delay" or "ui-mouse-hover-time")
             {
                 Assert.Equal(RegistryValueKind.String, tweak.Kind);
-                Assert.Contains(tweak.KeyPath, new[] { @"Control Panel\\Desktop", @"Control Panel\\Mouse" });
+                Assert.Contains(tweak.KeyPath, new[] { @"Control Panel\Desktop", @"Control Panel\Mouse" });
             }
             else if (tweak.Id is "gaming-enable-auto-game-mode" or "gaming-enable-game-mode")
             {
                 Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
-                Assert.Equal(@"Software\\Microsoft\\GameBar", tweak.KeyPath);
+                Assert.Equal(@"Software\Microsoft\GameBar", tweak.KeyPath);
             }
             else
             {
                 Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
-                Assert.StartsWith("Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
+                Assert.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
             }
         });
     }
