@@ -91,6 +91,105 @@ public sealed class ServiceTweakService
         string.Equals(mode, "Auto", StringComparison.OrdinalIgnoreCase)
         || string.Equals(mode, "Manual", StringComparison.OrdinalIgnoreCase);
 
+    public IReadOnlyList<string> DisableMany(IEnumerable<string> serviceNames)
+    {
+        ArgumentNullException.ThrowIfNull(serviceNames);
+        var requested = serviceNames.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var definitions = Catalog.Where(x => requested.Contains(x.Name, StringComparer.OrdinalIgnoreCase)).ToArray();
+        if (definitions.Length != requested.Length)
+            throw new InvalidOperationException("A lista contém serviço fora da allowlist de debloat.");
+
+        var pending = new List<(OptionalServiceDefinition Definition, OptionalServiceBackup Backup, string Path)>();
+        foreach (var definition in definitions)
+        {
+            Validate(definition.Name);
+            var info = ReadService(definition.Name);
+            if (info is null || string.Equals(info.Value.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!IsRestorableStartMode(info.Value.StartMode))
+                throw new InvalidOperationException("O serviço " + definition.Name + " possui modo original não restaurável.");
+            var backupPath = GetBackupPath(definition.Name);
+            if (File.Exists(backupPath))
+                throw new InvalidOperationException("O serviço " + definition.Name + " já possui backup pendente.");
+            var backup = new OptionalServiceBackup(definition.Name, info.Value.StartMode,
+                info.Value.Delayed, string.Equals(info.Value.State, "Running", StringComparison.OrdinalIgnoreCase),
+                DateTimeOffset.UtcNow);
+            WriteAtomic(backupPath, JsonSerializer.Serialize(backup, JsonOptions));
+            pending.Add((definition, backup, backupPath));
+        }
+
+        if (pending.Count == 0) return Array.Empty<string>();
+
+        var commands = new List<string> { "$ErrorActionPreference='Stop'" };
+        foreach (var item in pending)
+        {
+            var name = item.Definition.Name;
+            commands.Add("$n='" + name + "'; $s=Get-CimInstance Win32_Service -Filter \"Name='$n'\" -ErrorAction Stop");
+            commands.Add("if ($null -ne $s -and $s.StartMode -ne 'Disabled') { Set-Service -Name $n -StartupType Disabled; if ((Get-Service -Name $n).Status -eq 'Running') { Stop-Service -Name $n -Force -ErrorAction Stop; (Get-Service -Name $n).WaitForStatus('Stopped',[TimeSpan]::FromSeconds(15)) }; $v=Get-CimInstance Win32_Service -Filter \"Name='$n'\" -ErrorAction Stop; if ($v.StartMode -ne 'Disabled' -or $v.State -eq 'Running') { throw 'Não foi possível desativar ' + $n } }");
+        }
+        commands.Add("exit 0");
+
+        try
+        {
+            RunElevatedPowerShell(string.Join("; ", commands));
+            foreach (var item in pending)
+            {
+                var after = ReadService(item.Definition.Name);
+                if (after is null ||
+                    !string.Equals(after.Value.StartMode, "Disabled", StringComparison.OrdinalIgnoreCase) ||
+                    (item.Backup.WasRunning && string.Equals(after.Value.State, "Running", StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("O Windows não confirmou a desativação de " + item.Definition.Name + ".");
+            }
+
+            AppLog.Write("Debloat em lote: serviços desativados " +
+                string.Join(", ", pending.Select(x => x.Definition.Name)) + ".");
+            return pending.Select(x => x.Definition.Name).ToArray();
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            foreach (var item in pending)
+                try { if (File.Exists(item.Path)) File.Delete(item.Path); } catch { }
+            throw new OperationCanceledException("A elevação foi cancelada. Nenhum serviço foi alterado.", ex);
+        }
+        catch (Exception applyError)
+        {
+            try
+            {
+                var rollback = new List<string> { "$ErrorActionPreference='Stop'" };
+                foreach (var item in pending)
+                {
+                    var name = item.Definition.Name;
+                    rollback.Add("$n='" + name + "'; " +
+                        BuildRestoreModeScript(name, item.Backup.StartMode, item.Backup.DelayedAutoStart) +
+                        (item.Backup.WasRunning
+                            ? "if ((Get-Service -Name $n).Status -ne 'Running') { Start-Service -Name $n; (Get-Service -Name $n).WaitForStatus('Running',[TimeSpan]::FromSeconds(15)) }; "
+                            : ""));
+                }
+                rollback.Add("exit 0");
+                RunElevatedPowerShell(string.Join("; ", rollback));
+                foreach (var item in pending)
+                {
+                    var after = ReadService(item.Definition.Name);
+                    if (after is null ||
+                        !string.Equals(after.Value.StartMode, item.Backup.StartMode, StringComparison.OrdinalIgnoreCase) ||
+                        after.Value.Delayed != item.Backup.DelayedAutoStart ||
+                        (item.Backup.WasRunning && !string.Equals(after.Value.State, "Running", StringComparison.OrdinalIgnoreCase)))
+                        throw new InvalidOperationException("A reversão não foi confirmada para " + item.Definition.Name + ".");
+                }
+                foreach (var item in pending)
+                    if (File.Exists(item.Path)) File.Delete(item.Path);
+            }
+            catch (Exception restoreError)
+            {
+                AppLog.Write("Debloat de serviços falhou e os backups foram mantidos: " + restoreError.Message);
+                throw new InvalidOperationException(
+                    "A desativação em lote falhou e a reversão não pôde ser confirmada. Os backups foram preservados. " +
+                    applyError.Message + " | " + restoreError.Message, applyError);
+            }
+            throw;
+        }
+    }
+
     public void Disable(OptionalServiceDefinition definition)
     {
         Validate(definition.Name);
