@@ -126,8 +126,8 @@ public static class FirmwareCompatibilityService
             deviceGuard.Dma,
             lenovoAvailable,
             passwordStateConfirmed,
-            passwordSet,
             asus?.ExecutablePath,
+            passwordSet,
             IsBitLockerProtectionOn(),
             antiCheats,
             firmwareSettings);
@@ -232,7 +232,7 @@ public static class FirmwareCompatibilityService
 
         var selected = selectedProfiles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var targets = GetRequiredSettingIds(selected);
-        if (targets.Length == 0)
+        if (targets.Count == 0)
             return new FirmwareApplyResult(false, false, 0, [], "Nenhum ajuste de firmware foi solicitado.");
 
         if (!snapshot.LenovoWmiAvailable && !snapshot.AsusActAvailable)
@@ -416,20 +416,20 @@ public static class FirmwareCompatibilityService
         {
             var settings = ReadLenovoSettings();
             available = settings.Count > 0;
-            return available;
+            return settings;
         }
         catch (Exception ex)
         {
             available = false;
             AppLog.Write("Interface Lenovo BIOS WMI indisponível: " + ex.Message);
-            return false;
+            return Array.Empty<FirmwareDetectedSetting>();
         }
     }
 
     private static IReadOnlyList<FirmwareDetectedSetting> ReadLenovoSettings()
     {
         var result = new List<FirmwareDetectedSetting>();
-        using var scope = new ManagementScope(WmiNamespace);
+        var scope = new ManagementScope(WmiNamespace);
         scope.Connect();
         using var searcher = new ManagementObjectSearcher(scope,
             new ObjectQuery("SELECT CurrentSetting FROM Lenovo_BiosSetting"));
@@ -453,7 +453,7 @@ public static class FirmwareCompatibilityService
 
     private static IReadOnlyList<string> ReadLenovoSelections(string setting)
     {
-        using var scope = new ManagementScope(WmiNamespace);
+        var scope = new ManagementScope(WmiNamespace);
         using var cls = new ManagementClass(scope, new ManagementPath("Lenovo_GetBiosSelections"), null);
         using var input = cls.GetMethodParameters("GetBiosSelections");
         input["Item"] = setting;
@@ -469,7 +469,7 @@ public static class FirmwareCompatibilityService
         string? argumentName,
         string? argumentValue)
     {
-        using var scope = new ManagementScope(WmiNamespace);
+        var scope = new ManagementScope(WmiNamespace);
         using var cls = new ManagementClass(scope, new ManagementPath(className), null);
         using var input = cls.GetMethodParameters(methodName);
         if (!string.IsNullOrWhiteSpace(argumentName))
@@ -483,7 +483,7 @@ public static class FirmwareCompatibilityService
         known = false;
         try
         {
-            using var scope = new ManagementScope(WmiNamespace);
+            var scope = new ManagementScope(WmiNamespace);
             scope.Connect();
             using var searcher = new ManagementObjectSearcher(scope,
                 new ObjectQuery("SELECT PasswordState FROM Lenovo_BiosPasswordSettings"));
@@ -542,7 +542,7 @@ public static class FirmwareCompatibilityService
     {
         try
         {
-            using var scope = new ManagementScope(@"\\.\root\CIMV2\Security\MicrosoftTpm");
+            var scope = new ManagementScope(@"\\.\root\CIMV2\Security\MicrosoftTpm");
             using var searcher = new ManagementObjectSearcher(scope,
                 new ObjectQuery("SELECT IsEnabled_InitialValue, IsActivated_InitialValue, SpecVersion FROM Win32_Tpm"));
             using var rows = searcher.Get();
@@ -568,7 +568,7 @@ public static class FirmwareCompatibilityService
     {
         try
         {
-            using var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\DeviceGuard");
+            var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\DeviceGuard");
             using var searcher = new ManagementObjectSearcher(scope,
                 new ObjectQuery("SELECT VirtualizationBasedSecurityStatus, SecurityServicesRunning, AvailableSecurityProperties FROM Win32_DeviceGuard"));
             using var rows = searcher.Get();
