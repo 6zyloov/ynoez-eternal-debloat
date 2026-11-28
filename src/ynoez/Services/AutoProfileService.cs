@@ -32,6 +32,12 @@ public static class AutoProfileService
         int PollIntervalSeconds,
         bool ProtectionConfigInvalid);
 
+    internal sealed record ShippedProcessConfiguration(
+        string[] GameProcessNames,
+        string[] ProtectedProcessNames,
+        int IdleThresholdMinutes,
+        int PollIntervalSeconds);
+
     private sealed record UserSettings(int SchemaVersion, string[] ProtectedProcessNames);
 
     public static IReadOnlyList<string> GetProtectedProcessNames() =>
@@ -226,44 +232,19 @@ public static class AutoProfileService
 
         try
         {
-            if (File.Exists(GamesPath))
-            {
-                using var document = JsonDocument.Parse(File.ReadAllText(GamesPath));
-                var root = document.RootElement;
-                if (root.TryGetProperty("processNames", out var gamesElement) &&
-                    gamesElement.ValueKind == JsonValueKind.Array)
-                {
-                    var names = gamesElement.EnumerateArray()
-                        .Where(x => x.ValueKind == JsonValueKind.String)
-                        .Select(x => x.GetString())
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Select(x => x!)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToArray();
-                    if (names.Length > 0) gameNames = names;
-                }
+            if (!File.Exists(GamesPath))
+                throw new FileNotFoundException("O catálogo embarcado Optimization/games.json não foi encontrado.", GamesPath);
 
-                if (root.TryGetProperty("protectedProcessNames", out var protectedElement) &&
-                    protectedElement.ValueKind == JsonValueKind.Array)
-                {
-                    shippedProtected = NormalizeProtectedProcessNames(
-                        protectedElement.EnumerateArray()
-                            .Where(x => x.ValueKind == JsonValueKind.String)
-                            .Select(x => x.GetString() ?? ""));
-                }
-
-                if (root.TryGetProperty("idleThresholdMinutes", out var idleElement) &&
-                    idleElement.TryGetInt32(out var idle))
-                    idleMinutes = Math.Clamp(idle, 1, 120);
-                if (root.TryGetProperty("pollIntervalSeconds", out var pollElement) &&
-                    pollElement.TryGetInt32(out var poll))
-                    pollSeconds = Math.Clamp(poll, 5, 120);
-            }
+            var shipped = ParseShippedProcessConfiguration(File.ReadAllText(GamesPath));
+            gameNames = shipped.GameProcessNames;
+            shippedProtected = shipped.ProtectedProcessNames;
+            idleMinutes = shipped.IdleThresholdMinutes;
+            pollSeconds = shipped.PollIntervalSeconds;
         }
         catch (Exception ex)
         {
             protectionConfigInvalid = true;
-            AppLog.Write("Configuração de jogos inválida; economia agressiva será bloqueada por segurança: " + ex.Message);
+            AppLog.Write("Configuração embarcada de jogos/proteções inválida; economia agressiva será bloqueada por segurança: " + ex.Message);
         }
 
         var protectedNames = shippedProtected;
@@ -284,6 +265,66 @@ public static class AutoProfileService
         }
 
         return new AutoProfileSettings(gameNames, protectedNames, idleMinutes, pollSeconds, protectionConfigInvalid);
+    }
+
+    internal static ShippedProcessConfiguration ParseShippedProcessConfiguration(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            throw new InvalidDataException("O catálogo embarcado de jogos/proteções está vazio.");
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("O catálogo embarcado deve ser um objeto JSON.");
+
+        if (!root.TryGetProperty("schemaVersion", out var schemaElement) ||
+            schemaElement.ValueKind != JsonValueKind.Number ||
+            !schemaElement.TryGetInt32(out var schemaVersion) ||
+            schemaVersion != 1)
+            throw new InvalidDataException("Versão do esquema do catálogo embarcado ausente ou não suportada.");
+
+        var gameNames = ReadRequiredStringArray(root, "processNames");
+        var protectedRaw = ReadRequiredStringArray(root, "protectedProcessNames");
+        string[] protectedNames;
+        try
+        {
+            protectedNames = NormalizeProtectedProcessNames(protectedRaw);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidDataException("A lista embarcada de processos protegidos contém nomes inválidos.", ex);
+        }
+        if (protectedNames.Length == 0)
+            throw new InvalidDataException("A lista embarcada de processos protegidos não pode ficar vazia.");
+
+        var idleMinutes = ReadOptionalBoundedInteger(root, "idleThresholdMinutes", 15, 1, 120);
+        var pollSeconds = ReadOptionalBoundedInteger(root, "pollIntervalSeconds", 15, 5, 120);
+        return new ShippedProcessConfiguration(gameNames, protectedNames, idleMinutes, pollSeconds);
+    }
+
+    private static string[] ReadRequiredStringArray(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var element) || element.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("O campo obrigatório " + propertyName + " deve ser uma matriz JSON.");
+
+        var values = element.EnumerateArray().ToArray();
+        if (values.Length == 0 || values.Any(x => x.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(x.GetString())))
+            throw new InvalidDataException("O campo " + propertyName + " deve conter ao menos um nome textual válido.");
+
+        return values.Select(x => x.GetString()!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static int ReadOptionalBoundedInteger(JsonElement root, string propertyName, int fallback, int min, int max)
+    {
+        if (!root.TryGetProperty(propertyName, out var element))
+            return fallback;
+        if (element.ValueKind != JsonValueKind.Number || !element.TryGetInt32(out var value))
+            throw new InvalidDataException("O campo " + propertyName + " deve ser um inteiro.");
+
+        return Math.Clamp(value, min, max);
     }
 
     internal static string[] ParseUserSettings(string json)

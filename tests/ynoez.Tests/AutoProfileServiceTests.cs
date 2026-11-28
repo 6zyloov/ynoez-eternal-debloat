@@ -161,4 +161,64 @@ public sealed class AutoProfileServiceTests
         Assert.Null(AutoProfileService.GetProtectionConfigurationWarning(configurationInvalid: false));
     }
 
+
+    [Fact]
+    public void ParseShippedProcessConfiguration_RequiresNonEmptyGameAndProtectionLists()
+    {
+        const string json = """
+        {
+          "schemaVersion": 1,
+          "processNames": ["RobloxPlayerBeta"]
+        }
+        """;
+
+        Assert.Throws<InvalidDataException>(() =>
+            AutoProfileService.ParseShippedProcessConfiguration(json));
+    }
+
+    [Fact]
+    public void ParseShippedProcessConfiguration_RejectsInvalidNamesAndUnsupportedSchema()
+    {
+        const string invalidNames = """
+        {
+          "schemaVersion": 1,
+          "processNames": ["RobloxPlayerBeta"],
+          "protectedProcessNames": ["python", 42]
+        }
+        """;
+        const string invalidSchema = """
+        {
+          "schemaVersion": 2,
+          "processNames": ["RobloxPlayerBeta"],
+          "protectedProcessNames": ["python"]
+        }
+        """;
+
+        Assert.Throws<InvalidDataException>(() =>
+            AutoProfileService.ParseShippedProcessConfiguration(invalidNames));
+        Assert.Throws<InvalidDataException>(() =>
+            AutoProfileService.ParseShippedProcessConfiguration(invalidSchema));
+    }
+
+    [Fact]
+    public void ParseShippedProcessConfiguration_ParsesAndNormalizesValidProfile()
+    {
+        const string json = """
+        {
+          "schemaVersion": 1,
+          "idleThresholdMinutes": 15,
+          "pollIntervalSeconds": 15,
+          "processNames": ["RobloxPlayerBeta", "VALORANT-Win64-Shipping"],
+          "protectedProcessNames": ["python", "Python.exe", "AutoHotkey64"]
+        }
+        """;
+
+        var result = AutoProfileService.ParseShippedProcessConfiguration(json);
+
+        Assert.Equal(new[] { "RobloxPlayerBeta", "VALORANT-Win64-Shipping" }, result.GameProcessNames);
+        Assert.Equal(new[] { "python", "AutoHotkey64" }, result.ProtectedProcessNames);
+        Assert.Equal(15, result.IdleThresholdMinutes);
+        Assert.Equal(15, result.PollIntervalSeconds);
+    }
+
 }
