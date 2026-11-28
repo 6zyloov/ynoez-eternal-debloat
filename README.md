@@ -4,23 +4,23 @@ Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual tom
 
 ## Sistemas operacionais e ciclo de suporte
 
-O aplicativo é x64 e usa .NET 10 LTS. Conforme a [matriz oficial do .NET 10 para Windows](https://learn.microsoft.com/dotnet/core/install/windows), Windows 11 deve estar em uma versão atualmente suportada; Windows 10 aparece como suportado apenas nas edições Enterprise/LTSC listadas pela Microsoft. Windows 10 Home/Pro não faz parte da matriz de suporte do .NET 10, e o suporte geral dessas edições terminou em 14 de outubro de 2025 ([ciclo de vida do Windows 10](https://support.microsoft.com/pt-br/windows/deployment/updates-lifecycle/windows-10-support-has-ended-on-october-14-2025)). Não prometemos compatibilidade oficial nessas edições.
+O aplicativo é x64 e usa .NET 10 LTS. Conforme a matriz oficial do .NET 10 para Windows, Windows 11 deve estar em uma versão atualmente suportada; Windows 10 aparece como suportado apenas nas edições Enterprise/LTSC listadas pela Microsoft. Windows 10 Home/Pro não faz parte da matriz de suporte do .NET 10, e o suporte geral dessas edições terminou em 14 de outubro de 2025. Não prometemos compatibilidade oficial nessas edições.
 
-O .NET 10 é LTS e, na política publicada em 10 de novembro de 2026, está previsto para permanecer em suporte até 14 de novembro de 2028 ([política oficial de suporte do .NET](https://dotnet.microsoft.com/en-us/platform/support/policy)). A CI do projeto roda em Windows Server 2025; isso valida o ambiente de build/teste, mas não substitui testes em Windows 11 cliente nem em hardware físico.
+O .NET 10 é LTS e, na política publicada em 10 de novembro de 2026, está previsto para permanecer em suporte até 14 de novembro de 2028. A CI do projeto roda em Windows Server 2025; isso valida o ambiente de build/teste, mas não substitui testes em Windows 11 cliente nem em hardware físico.
 
 ## Aplicativo
 
-- Projeto: `src/ynoez/`
-- Compilação Windows: `build.bat` ou `scripts/publish.ps1`
-- Instalação local: `scripts/install.ps1`
-- Publicação de builds: `.github/workflows/build.yml` (artefatos win-x64); releases estáveis por tag `vX.Y.Z` em `.github/workflows/release.yml`
-- Instalação: `C:\ynoez\`, com `Toolbox\`, `Data\`, `Backups\`, `Logs\` e `Downloads\` na mesma raiz.
+- Projeto: src/ynoez/
+- Compilação Windows: build.bat ou scripts/publish.ps1
+- Instalação local: scripts/install.ps1
+- Publicação de builds: .github/workflows/build.yml (artefatos win-x64); releases estáveis por tag vX.Y.Z em .github/workflows/release.yml
+- Instalação: C:\ynoez\, com Toolbox\, Data\, Backups\, Logs\ e Downloads\ na mesma raiz.
 
-## Estado do aplicativo — 0.3.0 (em desenvolvimento)
+## Estado do aplicativo — 0.3.0 (candidato integrado)
 
 - **Home:** inventário de CPU, GPU, RAM total, Windows, placa-mãe e BIOS; consulta sob demanda dos módulos RAM reportados por WMI/SMBIOS (posição, capacidade, DDR, velocidades, formato, ECC e part number), sem afirmar single/dual channel nem ler SPD diretamente. Mantém auditoria somente leitura de Defender, Firewall, TPM, Secure Boot, VBS/HVCI e Search/impressão/Store/Update/Vanguard/FACEIT; verificação manual de atualização estável sem download automático.
 - **Monitor:** CPU/RAM em tempo real; GPU 3D via NVIDIA SMI ou contadores do Windows; temperatura/VRAM/potência quando o driver NVIDIA oferece esses dados.
-- **Benchmark:** PresentMon 2.6.0 oficial, baixado somente quando solicitado e validado por SHA-256. Captura de 30–180 segundos, FPS médio, 1% low calculado pelo inverso do P99 de frametime, frametime médio e contagem de frames lentos. CSV salvo em `Logs\`. A captura pode solicitar UAC.
+- **Benchmark:** PresentMon 2.6.0 oficial, baixado somente quando solicitado e validado por SHA-256. Captura de 30–180 segundos, FPS médio, 1% low calculado pelo inverso do P99 de frametime, frametime médio e contagem de frames lentos. CSV salvo em Logs\. A captura pode solicitar UAC.
 - **Tweaks:** perfis Performance/Equilibrado/AFK e AFK protegido. Jogos conhecidos e runtimes comuns de scripts/automação (cmd, PowerShell, Python, Node.js, Java, WSH e AutoHotkey) ficam protegidos por padrão; a lista personalizada é somada aos padrões e não os apaga. Um seletor consulta processos em execução em modo somente leitura (nome, PID e memória) para ajudar a cadastrar o processo XT correto sem ler argumentos/caminhos. O catálogo embarcado exige schema válido e listas não vazias; configuração ausente/corrompida falha com segurança para AFK protegido. Nenhum processo é encerrado; sessão de energia exportada/restaurada; 11 ajustes HKCU reversíveis.
 - **Execução em segundo plano:** fechar a janela com uma operação longa ativa oculta o ynoez na bandeja do sistema em vez de encerrar o monitor de rede, o perfil automático, o benchmark ou a manutenção do Windows; duplo clique no ícone reabre a janela e o menu da bandeja permite encerrar explicitamente.
 - **Network:** inventário somente leitura de interfaces, drivers, endereços, gateways, DNS e MTU; diagnóstico cancelável ICMP/TCP/DNS IPv4/IPv6/tracert; monitoramento contínuo a cada 5 segundos de gateways IPv4/IPv6, Cloudflare e Google por ICMP/TCP/443 nas duas famílias, DNS com contagem A/AAAA e janela móvel de 60 segundos com perda/jitter separados por família/protocolo. Distingue ausência/filtragem IPv6, rede local, DNS, ICMP e TCP; exporta CSV completo. Contadores RX/TX e energia de NIC reversível.
@@ -31,9 +31,13 @@ O .NET 10 é LTS e, na política publicada em 10 de novembro de 2026, está prev
 - **Backup, Restore e Logs:** central de recuperação para Registro, plano base, sessão AFK interrompida, serviços, adaptadores, tarefas e inicialização; snapshots locais com nomes únicos, manifesto SHA-256 e descarte de snapshots incompletos; ponto de restauração opcional.
 - **Interface:** Poppins incorporada ao executável (Regular, Medium, SemiBold e Bold) com licença SIL Open Font License.
 
+## Instalação, SBOM e integridade
 
+A versão do app e do instalador vem de um único campo Version em src/ynoez/ynoez.csproj. O builder gera um script Inno Setup temporário com valores literais e verifica os metadados PE antes do upload.
 
-A versão do app e do instalador vem de um único campo `<Version>` em `src/ynoez/ynoez.csproj`. O builder gera um script Inno Setup temporário com valores literais e verifica os metadados PE antes do upload; releases estáveis ainda dependem de tag `vX.Y.Z` correspondente.
+O pipeline gera e valida uma SBOM SPDX 2.2, publica o manifesto e inclui seu SHA-256 junto ao instalador e pacote portátil. O ciclo de assinatura está preparado para certificado PFX em secrets do GitHub Actions: o executável é assinado antes de ser empacotado e o instalador é assinado depois. Sem certificado, a distribuição declara explicitamente Authenticode NOT SIGNED; não simula uma assinatura. Consulte docs/SBOM-AND-SIGNING.md.
+
+A CI verifica instalação limpa, reinstalação, desinstalação preservando Data/Backups/Logs/Downloads, e executa um cenário de upgrade do baseline atual de main para o candidato, rollback e re-upgrade, comparando os SHA-256 dos executáveis instalados. Esse teste de baseline não substitui a migração de uma futura versão estável já publicada.
 
 ## Segurança e limites
 
@@ -41,30 +45,30 @@ O ynoez não remove nem desativa Microsoft Store/licenciamento, impressão, Calc
 
 O catálogo de serviços opcionais é restrito a DiagTrack, dmwappushservice, MapsBroker, Fax, RetailDemo e WMPNetworkSvc; não há desligamento em massa. Cada operação exige confirmação, e alterações administrativas solicitam UAC. A opção de energia de NIC altera somente recursos compatíveis e não reinicia o adaptador automaticamente.
 
-O benchmark PresentMon não instala driver de sensor. O executável oficial é baixado sob demanda de [GameTechDev/PresentMon](https://github.com/GameTechDev/PresentMon/releases/tag/v2.6.0), validado pelo hash SHA-256 fixado no código e acompanhado dos avisos MIT/terceiros. A medição exige permissão ETW e pode solicitar UAC.
+O benchmark PresentMon não instala driver de sensor. O executável oficial é baixado sob demanda de GameTechDev/PresentMon v2.6.0, validado pelo hash SHA-256 fixado no código e acompanhado dos avisos MIT/terceiros. A medição exige permissão ETW e pode solicitar UAC.
 
 O projeto não automatiza flash de BIOS, overclock, tensão, PBO, BCD/HPET/timer tweaks ou desligamento em massa de serviços. Nenhuma ferramenta consegue garantir FPS, estabilidade de Wi-Fi ou impedir quedas causadas pelo roteador/ISP.
 
 ## Build e testes
 
-O GitHub Actions compila em Windows x64, audita dependências NuGet diretas e transitivas, executa testes de Registro, perfis AFK/protegidos e catálogo embarcado estrito, inventário de processos ativos, inventários de serviços/tarefas, SMBIOS/RAM, revisão física de placa, PnP/drivers, monitor de rede IPv4/IPv6, agregação de carga GPU e whitelists. Também publica executável autocontido, instala o setup silenciosamente, testa reinstalação sobre instalação existente e desinstalação, preservando as pastas Data, Backups, Logs e Downloads, valida metadados PE, dry-run de release, SHA-256 e artefatos.
+O GitHub Actions compila em Windows x64, audita dependências NuGet diretas e transitivas, executa os testes xUnit, publica o executável autocontido, constrói o instalador e gera a SBOM. A pipeline também faz o smoke test de instalação/reinstalação/desinstalação, testa upgrade e rollback entre o baseline de main e o candidato, valida integridade, e publica os artefatos de build e metadata. A CI desta revisão deve terminar antes de considerar essa rodada validada.
 
-`Directory.Build.props` habilita a auditoria de vulnerabilidades NuGet e transforma alertas moderados ou superiores em erro de restore. Detalhes e limites em [Auditoria de dependências](docs/DEPENDENCY-AUDIT.md).
+Directory.Build.props habilita a auditoria de vulnerabilidades NuGet e transforma alertas moderados ou superiores em erro de restore. Detalhes em docs/DEPENDENCY-AUDIT.md e docs/SBOM-AND-SIGNING.md.
 
-A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, PresentMon com jogos reais, energia de NIC, hardware físico e compatibilidade com Vanguard/FACEIT numa máquina real.
+A CI não substitui teste de execução no PC de destino. Ainda é necessário validar abertura, navegação, WMI, monitoramento prolongado, PresentMon com jogos reais, energia de NIC, hardware físico, sessões prolongadas com Roblox + XT e compatibilidade com Vanguard/FACEIT numa máquina real.
 
 ## Banco de perfis
 
-- [Perfil GIGABYTE A520M K V2](Profiles/Motherboards/GIGABYTE/A520M-K-V2.json)
-- [Política segura da A520M K V2](Configs/Motherboards/GIGABYTE/A520M-K-V2-safe.json)
-- [Whitelist de componentes Windows preservados](Configs/Debloat/Windows-preserve.json)
-- [Guia para cadastrar novas placas](Profiles/Motherboards/README.md)
+- Perfil GIGABYTE A520M K V2: Profiles/Motherboards/GIGABYTE/A520M-K-V2.json
+- Política segura da A520M K V2: Configs/Motherboards/GIGABYTE/A520M-K-V2-safe.json
+- Whitelist de componentes Windows preservados: Configs/Debloat/Windows-preserve.json
+- Guia para cadastrar novas placas: Profiles/Motherboards/README.md
 
 A revisão física impressa no PCB deve ser confirmada antes de escolher BIOS; o valor SMBIOS não é garantia suficiente.
 
 ## Construir localmente
 
-Requer .NET 10 SDK LTS no Windows. O repositório fixa a faixa do SDK em `global.json` para evitar que uma versão maior instalada localmente seja selecionada por engano:
+Requer .NET 10 SDK LTS no Windows. O repositório fixa a faixa do SDK em global.json para evitar que uma versão maior instalada localmente seja selecionada por engano:
 
 ```powershell
 .\build.bat
@@ -72,12 +76,12 @@ Requer .NET 10 SDK LTS no Windows. O repositório fixa a faixa do SDK em `global
 pwsh -ExecutionPolicy Bypass -File .\scripts\publish.ps1
 ```
 
-O executável autocontido será gerado em `dist\ynoez.exe`. Para instalar em `C:\ynoez`, execute `scripts\install.ps1` como administrador.
+O executável autocontido será gerado em dist\ynoez.exe. Para instalar em C:\ynoez, execute scripts/install.ps1 como administrador.
 
 ## Próximas etapas
 
-Ainda faltam remoção AppX/provisioned com recuperação confiável, arquitetura MVVM/DI, assinatura Authenticode e validação física de compatibilidade. A remoção AppX continua indisponível enquanto não houver rollback confiável. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
+Ainda faltam validação em Windows cliente e hardware real, testes prolongados de Roblox + XT, PresentMon em jogos, sensores adicionais por APIs documentadas, compatibilidade autorizada com Vanguard/FACEIT e teste de recuperação após falhas. A assinatura efetiva Authenticode exige um certificado Code Signing válido configurado nos secrets do repositório. A primeira migração entre releases publicadas só poderá ser comprovada depois de existir uma versão anterior estável. A remoção AppX continua indisponível enquanto não houver recuperação e rollback confiáveis. A telemetria de temperatura de CPU e sensores AMD/Intel depende de APIs específicas ainda não integradas.
 
 ## Licença
 
-Núcleo ynoez: MIT. PresentMon é distribuído sob MIT e inclui avisos de terceiros em `Toolbox\Performance\`. Marcas, nomes e links de terceiros pertencem aos respectivos fabricantes.
+Núcleo ynoez: MIT. PresentMon é distribuído sob MIT e inclui avisos de terceiros em Toolbox/Performance/. Marcas, nomes e links de terceiros pertencem aos respectivos fabricantes.
