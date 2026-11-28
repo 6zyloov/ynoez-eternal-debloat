@@ -26,7 +26,10 @@ public sealed class ServiceTweakService
         new("MapsBroker", "Gerenciador de mapas baixados", "Desativa o serviço de mapas offline. A navegação e mapas baixados podem deixar de atualizar em segundo plano.", "Baixo"),
         new("Fax", "Fax", "Desativa o serviço de fax do Windows. Não afeta impressão comum.", "Baixo"),
         new("RetailDemo", "Demonstração de varejo", "Desativa o serviço de demonstração de dispositivos de exposição em lojas.", "Baixo"),
-        new("WMPNetworkSvc", "Compartilhamento de mídia do Windows Media Player", "Desativa o compartilhamento de bibliotecas do Windows Media Player pela rede.", "Baixo")
+        new("WMPNetworkSvc", "Compartilhamento de mídia do Windows Media Player", "Desativa o compartilhamento de bibliotecas do Windows Media Player pela rede.", "Baixo"),
+        new("XblAuthManager", "Xbox Live Auth Manager", "Desativa a autenticação Xbox Live em segundo plano. Pode impedir login em Xbox Network e recursos de alguns jogos da Microsoft Store/Game Pass.", "Médio"),
+        new("XblGameSave", "Xbox Live Game Save", "Desativa sincronização de saves em nuvem do Xbox. Não use se você joga títulos que dependem de saves Xbox/Game Pass.", "Médio"),
+        new("XboxNetApiSvc", "Xbox Live Networking", "Desativa APIs de rede Xbox Live. Pode afetar multiplayer e autenticação de jogos Xbox/Game Pass.", "Médio")
     };
     private static readonly HashSet<string> Allowed = Catalog.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
     private static readonly string[] Protected =
