@@ -264,7 +264,9 @@ public partial class MainWindow : Window
         detailPanel.Children.Add(Heading("Sistema", 13));
         detailPanel.Children.Add(KeyValue("Placa-mãe", _hardware.BoardProduct));
         detailPanel.Children.Add(KeyValue("Rede", _hardware.NetworkSummary));
-        detailPanel.Children.Add(Body("As alterações são locais e registradas. Perfis e limpeza podem ser restaurados quando houver backup.", new Thickness(0, 9, 0, 0)));
+        var detailNote = Body("As alterações são locais e registradas. Perfis e limpeza podem ser restaurados quando houver backup.");
+        detailNote.Margin = new Thickness(0, 9, 0, 0);
+        detailPanel.Children.Add(detailNote);
         detailCard.Child = detailPanel;
         root.Children.Add(detailCard);
         return root;
