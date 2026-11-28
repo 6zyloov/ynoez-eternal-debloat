@@ -1,0 +1,533 @@
+using System.Diagnostics;
+using System.IO;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+
+namespace ynoez.Services;
+
+public sealed record FirmwareDetectedSetting(string Name, string Value, IReadOnlyList<string> AllowedValues);
+public sealed record FirmwareCompatibilitySnapshot(
+    string BoardManufacturer,
+    string BoardProduct,
+    string Cpu,
+    string BiosMode,
+    string BiosVersion,
+    bool SecureBootEnabled,
+    bool TpmPresent,
+    bool TpmReady,
+    string TpmVersion,
+    bool CpuVirtualizationEnabled,
+    bool VbsEnabled,
+    bool MemoryIntegrityEnabled,
+    bool DmaProtectionAvailable,
+    bool LenovoWmiAvailable,
+    bool LenovoSupervisorPasswordSet,
+    bool BitLockerProtectionOn,
+    IReadOnlyList<string> DetectedAntiCheats,
+    IReadOnlyList<FirmwareDetectedSetting> FirmwareSettings)
+{
+    public bool CanWriteBios => LenovoWmiAvailable &&
+        !LenovoSupervisorPasswordSet &&
+        !BitLockerProtectionOn &&
+        string.Equals(BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase);
+}
+
+public sealed record FirmwareApplyResult(
+    bool Applied,
+    bool RequiresRestart,
+    int ChangedSettings,
+    IReadOnlyList<string> ChangedNames,
+    string Message);
+
+/// <summary>
+/// Detects boot/security requirements and uses the documented Lenovo WMI BIOS
+/// interface only on supported Lenovo systems. It never writes raw UEFI NVRAM
+/// offsets or guesses settings for an unknown motherboard.
+/// </summary>
+public static class FirmwareCompatibilityService
+{
+    private const string WmiNamespace = @"\\.\root\WMI";
+    private static readonly string JournalDirectory = Path.Combine(AppPaths.Data, "Firmware");
+
+    private static readonly IReadOnlyDictionary<string, string[]> RequirementMap =
+        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["faceit"] = ["secureboot", "tpm", "iommu", "virtualization"],
+            ["riot-vanguard"] = ["secureboot", "tpm"],
+            ["vanguard-precheck"] = ["secureboot", "tpm", "iommu", "virtualization"],
+            ["easyanticheat"] = [],
+            ["battleye"] = []
+        };
+
+    private static readonly IReadOnlyDictionary<string, string[]> SettingNameTokens =
+        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["secureboot"] = ["secureboot"],
+            ["tpm"] = ["securitychip", "securitydevice", "tpm", "ftpm", "ptt"],
+            ["iommu"] = ["iommu", "vtd", "vt-d", "amdvi", "dmaremapping"],
+            ["virtualization"] = ["intelvirtualizationtechnology", "svm", "virtualizationtechnology", "amdvirtualization"],
+            ["cpu-boost"] = ["coreperformanceboost", "cpb", "intelturboboosttechnology", "turbomode", "turboboost"]
+        };
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFirmwareType(out uint firmwareType);
+
+    public static Task<FirmwareCompatibilitySnapshot> InspectAsync(HardwareSnapshot? hardware = null) =>
+        Task.Run(() => Inspect(hardware ?? HardwareService.GetSnapshot()));
+
+    public static FirmwareCompatibilitySnapshot Inspect(HardwareSnapshot hardware)
+    {
+        ArgumentNullException.ThrowIfNull(hardware);
+
+        var firmwareType = GetFirmwareType(out var type)
+            ? type == 2 ? "UEFI" : type == 1 ? "Legacy" : "Desconhecido"
+            : "Desconhecido";
+        var secureBoot = ReadSecureBoot();
+        var tpm = ReadTpm();
+        var deviceGuard = ReadDeviceGuard();
+        var virtualization = ReadCpuVirtualization();
+        var antiCheats = DetectAntiCheats();
+        var lenovoSettings = TryReadLenovoSettings(out var lenovoAvailable);
+        var passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState();
+
+        return new FirmwareCompatibilitySnapshot(
+            hardware.BoardManufacturer,
+            hardware.BoardProduct,
+            hardware.Cpu,
+            firmwareType,
+            hardware.BiosVersion,
+            secureBoot,
+            tpm.Present,
+            tpm.Ready,
+            tpm.Version,
+            virtualization,
+            deviceGuard.Vbs,
+            deviceGuard.Hvci,
+            deviceGuard.Dma,
+            lenovoAvailable,
+            passwordSet,
+            IsBitLockerProtectionOn(),
+            antiCheats,
+            lenovoSettings);
+    }
+
+    public static IReadOnlyList<string> GetRequiredSettingIds(IEnumerable<string> selectedProfiles)
+    {
+        ArgumentNullException.ThrowIfNull(selectedProfiles);
+        var required = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "cpu-boost"
+        };
+
+        foreach (var profile in selectedProfiles)
+        {
+            if (!RequirementMap.TryGetValue(profile, out var values))
+                throw new ArgumentException("Perfil de anti-cheat desconhecido: " + profile, nameof(selectedProfiles));
+            foreach (var value in values) required.Add(value);
+        }
+
+        return required.OrderBy(x => x, StringComparer.Ordinal).ToArray();
+    }
+
+    public static string? FindSettingName(IEnumerable<string> firmwareSettingNames, string requirementId)
+    {
+        ArgumentNullException.ThrowIfNull(firmwareSettingNames);
+        if (!SettingNameTokens.TryGetValue(requirementId, out var tokens))
+            throw new ArgumentOutOfRangeException(nameof(requirementId));
+
+        foreach (var setting in firmwareSettingNames)
+        {
+            var normalized = Normalize(setting);
+            if (tokens.Any(token => normalized.Contains(Normalize(token), StringComparison.Ordinal)))
+                return setting;
+        }
+        return null;
+    }
+
+    public static string? SelectEnabledValue(IEnumerable<string> allowedValues)
+    {
+        ArgumentNullException.ThrowIfNull(allowedValues);
+        string[] preferred = ["Enabled", "Enable", "On", "Active", "1"];
+        var values = allowedValues.ToArray();
+        return preferred.FirstOrDefault(target =>
+            values.Any(value => string.Equals(value.Trim(), target, StringComparison.OrdinalIgnoreCase))) is { } match
+            ? values.First(value => string.Equals(value.Trim(), match, StringComparison.OrdinalIgnoreCase))
+            : null;
+    }
+
+    public static FirmwareApplyResult ApplySelectedProfiles(
+        FirmwareCompatibilitySnapshot snapshot,
+        IEnumerable<string> selectedProfiles)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(selectedProfiles);
+
+        var selected = selectedProfiles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var targets = GetRequiredSettingIds(selected);
+        if (targets.Length == 0)
+            return new FirmwareApplyResult(false, false, 0, [], "Nenhum ajuste de firmware foi solicitado.");
+
+        if (!snapshot.LenovoWmiAvailable)
+            return new FirmwareApplyResult(false, false, 0, [],
+                "Esta placa não expõe uma interface de configuração de BIOS documentada e compatível com o ynoez. A análise foi feita; a gravação automática está bloqueada para evitar corromper a NVRAM. Use a entrada UEFI para os itens listados.");
+        if (!snapshot.CanWriteBios)
+        {
+            var reason = snapshot.LenovoSupervisorPasswordSet
+                ? "A BIOS possui senha de administrador; o ynoez não tenta contornar nem armazenar essa senha."
+                : snapshot.BitLockerProtectionOn
+                    ? "A proteção do BitLocker está ativa. Suspenda-a e guarde a chave de recuperação antes de alterar TPM/Secure Boot."
+                    : !string.Equals(snapshot.BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase)
+                        ? "O Windows iniciou em modo Legacy. Não será alterado o modo de boot automaticamente porque isso pode impedir a inicialização."
+                        : "A BIOS não está liberada para gravação segura.";
+            return new FirmwareApplyResult(false, false, 0, [], reason);
+        }
+
+        var current = ReadLenovoSettings();
+        var changes = BuildLenovoChangePlan(current, targets);
+        if (changes.Count == 0)
+            return new FirmwareApplyResult(false, false, 0, [],
+                "Nenhum valor compatível foi encontrado ou os recursos já estão habilitados. Nenhuma alteração foi feita.");
+
+        Directory.CreateDirectory(JournalDirectory);
+        var journalPath = Path.Combine(JournalDirectory, "lenovo-bios-pending.json");
+        if (File.Exists(journalPath))
+            throw new InvalidOperationException("Há uma configuração de BIOS pendente de reinicialização. Reinicie e execute a análise novamente antes de aplicar outro perfil.");
+
+        var journal = new
+        {
+            CapturedAt = DateTimeOffset.UtcNow,
+            Board = snapshot.BoardManufacturer + " " + snapshot.BoardProduct,
+            BiosVersion = snapshot.BiosVersion,
+            Changes = changes.Select(x => new { x.Name, Original = x.OriginalValue, Target = x.TargetValue }).ToArray()
+        };
+        WriteAtomic(journalPath, JsonSerializer.Serialize(journal, new JsonSerializerOptions { WriteIndented = true }));
+
+        var staged = new List<LenovoChange>();
+        try
+        {
+            foreach (var change in changes)
+            {
+                var status = InvokeLenovoMethod("Lenovo_SetBiosSetting", "SetBiosSetting",
+                    "parameter", change.Name + "," + change.TargetValue);
+                if (!string.Equals(status, "Success", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("A BIOS recusou " + change.Name + ": " + status);
+                staged.Add(change);
+            }
+
+            var saveStatus = InvokeLenovoMethod("Lenovo_SaveBiosSettings", "SaveBiosSettings", null, null);
+            if (!string.Equals(saveStatus, "Success", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("A BIOS não confirmou o salvamento: " + saveStatus);
+
+            AppLog.Write("Perfil BIOS Lenovo preparado: " +
+                string.Join(", ", changes.Select(x => x.Name + "=" + x.TargetValue)) +
+                ". Reinicialização necessária.");
+            return new FirmwareApplyResult(true, true, changes.Count,
+                changes.Select(x => x.Name).ToArray(),
+                "Configurações compatíveis gravadas pela interface WMI oficial da Lenovo. Reinicie para efetivá-las; depois execute Analisar novamente.");
+        }
+        catch
+        {
+            try
+            {
+                InvokeLenovoMethod("Lenovo_DiscardBiosSettings", "DiscardBiosSettings", null, null);
+                File.Delete(journalPath);
+            }
+            catch (Exception discardError)
+            {
+                AppLog.Write("A BIOS não confirmou descarte das alterações pendentes: " + discardError.Message);
+            }
+            throw;
+        }
+    }
+
+    private sealed record LenovoChange(string Name, string OriginalValue, string TargetValue);
+
+    private static List<LenovoChange> BuildLenovoChangePlan(
+        IReadOnlyList<FirmwareDetectedSetting> settings,
+        IReadOnlyList<string> requirementIds)
+    {
+        var plan = new List<LenovoChange>();
+        foreach (var requirement in requirementIds)
+        {
+            var name = FindSettingName(settings.Select(x => x.Name), requirement);
+            if (name is null) continue;
+            var current = settings.First(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            var enabled = SelectEnabledValue(current.AllowedValues);
+            if (enabled is null || string.Equals(current.Value, enabled, StringComparison.OrdinalIgnoreCase))
+                continue;
+            plan.Add(new LenovoChange(current.Name, current.Value, enabled));
+        }
+        return plan;
+    }
+
+    private static bool TryReadLenovoSettings(out bool available)
+    {
+        try
+        {
+            _ = ReadLenovoSettings();
+            available = true;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            available = false;
+            AppLog.Write("Interface Lenovo BIOS WMI indisponível: " + ex.Message);
+            return false;
+        }
+    }
+
+    private static IReadOnlyList<FirmwareDetectedSetting> ReadLenovoSettings()
+    {
+        var result = new List<FirmwareDetectedSetting>();
+        using var scope = new ManagementScope(WmiNamespace);
+        scope.Connect();
+        using var searcher = new ManagementObjectSearcher(scope,
+            new ObjectQuery("SELECT CurrentSetting FROM Lenovo_BiosSetting"));
+        using var rows = searcher.Get();
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                var current = Convert.ToString(row["CurrentSetting"]) ?? "";
+                var comma = current.IndexOf(',');
+                if (comma <= 0) continue;
+                var name = current[..comma].Trim();
+                var value = current[(comma + 1)..].Trim();
+                if (name.Length == 0) continue;
+                var allowed = ReadLenovoSelections(name);
+                result.Add(new FirmwareDetectedSetting(name, value, allowed));
+            }
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<string> ReadLenovoSelections(string setting)
+    {
+        using var scope = new ManagementScope(WmiNamespace);
+        using var cls = new ManagementClass(scope, new ManagementPath("Lenovo_GetBiosSelections"), null);
+        using var input = cls.GetMethodParameters("GetBiosSelections");
+        input["Item"] = setting;
+        using var output = cls.InvokeMethod("GetBiosSelections", input, null);
+        var selections = Convert.ToString(output?["Selections"]) ?? "";
+        return selections.Split([',', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static string InvokeLenovoMethod(
+        string className,
+        string methodName,
+        string? argumentName,
+        string? argumentValue)
+    {
+        using var scope = new ManagementScope(WmiNamespace);
+        using var cls = new ManagementClass(scope, new ManagementPath(className), null);
+        using var input = cls.GetMethodParameters(methodName);
+        if (!string.IsNullOrWhiteSpace(argumentName))
+            input[argumentName] = argumentValue ?? "";
+        using var output = cls.InvokeMethod(methodName, input, null);
+        return Convert.ToString(output?["return"]) ?? "Unknown";
+    }
+
+    private static bool ReadLenovoSupervisorPasswordState()
+    {
+        try
+        {
+            using var scope = new ManagementScope(WmiNamespace);
+            using var searcher = new ManagementObjectSearcher(scope,
+                new ObjectQuery("SELECT PasswordState FROM Lenovo_BiosPasswordSettings"));
+            using var rows = searcher.Get();
+            foreach (ManagementObject row in rows)
+            {
+                using (row)
+                {
+                    var state = Convert.ToInt32(row["PasswordState"] ?? 0);
+                    return (state & 2) != 0 || (state & 128) != 0;
+                }
+            }
+        }
+        catch (Exception ex) { AppLog.Write("Estado de senha Lenovo indisponível: " + ex.Message); }
+        return false;
+    }
+
+    private static bool ReadSecureBoot()
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo(AppPaths.PowerShellExecutable,
+                "-NoProfile -NonInteractive -Command \"try { if (Confirm-SecureBootUEFI -ErrorAction Stop) { 'True' } else { 'False' } } catch { 'Unknown' }\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            });
+            if (process is null) return false;
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(true);
+                return false;
+            }
+            return string.Equals(output, "True", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) { AppLog.Write("Secure Boot não pôde ser consultado: " + ex.Message); return false; }
+    }
+
+    private sealed record TpmStatus(bool Present, bool Ready, string Version);
+
+    private static TpmStatus ReadTpm()
+    {
+        try
+        {
+            using var scope = new ManagementScope(@"\\.\root\CIMV2\Security\MicrosoftTpm");
+            using var searcher = new ManagementObjectSearcher(scope,
+                new ObjectQuery("SELECT IsEnabled_InitialValue, IsActivated_InitialValue, SpecVersion FROM Win32_Tpm"));
+            using var rows = searcher.Get();
+            foreach (ManagementObject row in rows)
+            {
+                using (row)
+                {
+                    var enabled = Convert.ToBoolean(row["IsEnabled_InitialValue"] ?? false);
+                    var activated = Convert.ToBoolean(row["IsActivated_InitialValue"] ?? false);
+                    var version = Convert.ToString(row["SpecVersion"]) ?? "";
+                    var majorVersion = version.Split(',', ';')[0].Trim();
+                    return new TpmStatus(true, enabled && activated, majorVersion);
+                }
+            }
+        }
+        catch (Exception ex) { AppLog.Write("TPM não pôde ser consultado: " + ex.Message); }
+        return new TpmStatus(false, false, "—");
+    }
+
+    private sealed record DeviceGuardStatus(bool Vbs, bool Hvci, bool Dma);
+
+    private static DeviceGuardStatus ReadDeviceGuard()
+    {
+        try
+        {
+            using var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\DeviceGuard");
+            using var searcher = new ManagementObjectSearcher(scope,
+                new ObjectQuery("SELECT VirtualizationBasedSecurityStatus, SecurityServicesRunning, AvailableSecurityProperties FROM Win32_DeviceGuard"));
+            using var rows = searcher.Get();
+            foreach (ManagementObject row in rows)
+            {
+                using (row)
+                {
+                    var vbs = Convert.ToInt32(row["VirtualizationBasedSecurityStatus"] ?? 0) == 2;
+                    var running = ToIntSet(row["SecurityServicesRunning"]);
+                    var available = ToIntSet(row["AvailableSecurityProperties"]);
+                    return new DeviceGuardStatus(vbs, running.Contains(2), available.Contains(3));
+                }
+            }
+        }
+        catch (Exception ex) { AppLog.Write("Device Guard não pôde ser consultado: " + ex.Message); }
+        return new DeviceGuardStatus(false, false, false);
+    }
+
+    private static HashSet<int> ToIntSet(object? value)
+    {
+        var result = new HashSet<int>();
+        if (value is Array array)
+            foreach (var item in array)
+                if (int.TryParse(Convert.ToString(item), out var parsed)) result.Add(parsed);
+        return result;
+    }
+
+    private static bool ReadCpuVirtualization()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT VirtualizationFirmwareEnabled FROM Win32_Processor");
+            using var rows = searcher.Get();
+            foreach (ManagementObject row in rows)
+            {
+                using (row)
+                    if (Convert.ToBoolean(row["VirtualizationFirmwareEnabled"] ?? false)) return true;
+            }
+        }
+        catch (Exception ex) { AppLog.Write("Virtualização de CPU não pôde ser consultada: " + ex.Message); }
+        return false;
+    }
+
+    private static IReadOnlyList<string> DetectAntiCheats()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT Name FROM Win32_Service WHERE Name IN ('vgc','vgk','FACEITService','FACEITAC','EasyAntiCheat','EasyAntiCheat_EOS','BEService','BEService_x64')");
+            using var rows = searcher.Get();
+            foreach (ManagementObject row in rows)
+            {
+                using (row)
+                {
+                    var service = Convert.ToString(row["Name"]) ?? "";
+                    if (service.StartsWith("FACEIT", StringComparison.OrdinalIgnoreCase)) names.Add("faceit");
+                    else if (service.StartsWith("vg", StringComparison.OrdinalIgnoreCase)) names.Add("riot-vanguard");
+                    else if (service.StartsWith("EasyAntiCheat", StringComparison.OrdinalIgnoreCase)) names.Add("easyanticheat");
+                    else if (service.StartsWith("BE", StringComparison.OrdinalIgnoreCase)) names.Add("battleye");
+                }
+            }
+        }
+        catch (Exception ex) { AppLog.Write("Detecção de anti-cheat por serviço falhou: " + ex.Message); }
+
+        var programFiles = new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)
+        };
+        foreach (var root in programFiles.Where(Directory.Exists))
+        {
+            if (Directory.Exists(Path.Combine(root, "Riot Vanguard"))) names.Add("riot-vanguard");
+            if (Directory.Exists(Path.Combine(root, "FACEIT"))) names.Add("faceit");
+            if (Directory.Exists(Path.Combine(root, "EasyAntiCheat"))) names.Add("easyanticheat");
+            if (Directory.Exists(Path.Combine(root, "BattlEye"))) names.Add("battleye");
+        }
+        return names.OrderBy(x => x, StringComparer.Ordinal).ToArray();
+    }
+
+    private static bool IsBitLockerProtectionOn()
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("manage-bde.exe",
+                "-status " + Environment.GetEnvironmentVariable("SystemDrive"))
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            });
+            if (process is null) return true;
+            var output = process.StandardOutput.ReadToEnd();
+            if (!process.WaitForExit(7000))
+            {
+                process.Kill(true);
+                return true;
+            }
+            if (process.ExitCode != 0) return true;
+            // If manage-bde reports protection as On, do not change TPM/Secure Boot.
+            return output.Contains("Protection Status", StringComparison.OrdinalIgnoreCase) &&
+                output.Contains("Protection On", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Estado BitLocker desconhecido; alterações de firmware bloqueadas: " + ex.Message);
+            return true;
+        }
+    }
+
+    private static string Normalize(string value) =>
+        new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    private static void WriteAtomic(string path, string content)
+    {
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        File.WriteAllText(temp, content);
+        File.Move(temp, path, overwrite: true);
+    }
+}
