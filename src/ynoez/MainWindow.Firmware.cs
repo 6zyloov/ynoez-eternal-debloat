@@ -96,7 +96,7 @@ public partial class MainWindow
                     virtualizationText + " • " + iommu + " • " + vbs + " • " + hvci + "\n" + writer;
                 if (!preCheckSupported)
                     status.Text += "\nVanguard Pre-Check requer Windows 11 25H2 ou mais recente.";
-                if (!snapshot.LenovoWmiAvailable)
+                if (!snapshot.LenovoWmiAvailable && !snapshot.AsusActAvailable)
                     status.Text += "\nEsta BIOS não oferece interface de gravação documentada compatível. Nenhum offset UEFI genérico será escrito.";
                 apply.IsEnabled = true;
             }
