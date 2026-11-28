@@ -188,6 +188,7 @@ public partial class MainWindow : Window
         _currentPage = page;
         PageTitle.Text = page;
         SetNavigationState(page);
+        ResetQuickNavigationButtons();
         PageScroll.ScrollToTop();
         PageHost.Content = page switch
         {
