@@ -63,7 +63,7 @@ try {
         Set-Content -LiteralPath $markers[$folder] -Value "Preservar $folder" -Encoding UTF8
     }
 
-    Write-Host 'Etapa 2/3: atualização sobre a mesma versão, preservando dados.'
+    Write-Host 'Etapa 2/3: reinstalação do mesmo setup sobre a instalação existente, preservando dados.'
     Invoke-SilentInstaller -Path $InstallerPath
     if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
         throw 'A atualização removeu o executável instalado.'

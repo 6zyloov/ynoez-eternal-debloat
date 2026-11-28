@@ -41,7 +41,7 @@ O projeto não automatiza flash de BIOS, overclock, tensão, PBO, BCD/HPET/timer
 
 ## Build e testes
 
-O GitHub Actions compila em Windows x64, audita dependências NuGet diretas e transitivas, executa testes de Registro, perfis AFK/protegidos, inventários de serviços/tarefas, SMBIOS/RAM, revisão física de placa, PnP/drivers, monitor de rede IPv4/IPv6, agregação de carga GPU e whitelists. Também publica executável autocontido, instala o setup silenciosamente, testa atualização e desinstalação preservando `Data`, `Backups`, `Logs` e `Downloads`, valida metadados PE, dry-run de release, SHA-256 e artefatos.
+O GitHub Actions compila em Windows x64, audita dependências NuGet diretas e transitivas, executa testes de Registro, perfis AFK/protegidos, inventários de serviços/tarefas, SMBIOS/RAM, revisão física de placa, PnP/drivers, monitor de rede IPv4/IPv6, agregação de carga GPU e whitelists. Também publica executável autocontido, instala o setup silenciosamente, testa reinstalação sobre instalação existente e desinstalação, preservando as pastas Data, Backups, Logs e Downloads, valida metadados PE, dry-run de release, SHA-256 e artefatos.
 
 `Directory.Build.props` habilita a auditoria de vulnerabilidades NuGet e transforma alertas moderados ou superiores em erro de restore. Detalhes e limites em [Auditoria de dependências](docs/DEPENDENCY-AUDIT.md).
 

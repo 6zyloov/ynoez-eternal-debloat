@@ -37,6 +37,14 @@ public static class AutoProfileService
     public static IReadOnlyList<string> GetProtectedProcessNames() =>
         LoadSettings().ProtectedProcessNames;
 
+    public static string? GetProtectionConfigurationWarning() =>
+        GetProtectionConfigurationWarning(LoadSettings().ProtectionConfigInvalid);
+
+    internal static string? GetProtectionConfigurationWarning(bool configurationInvalid) =>
+        configurationInvalid
+            ? "A configuração de proteção de processos está inválida. Por segurança, o perfil automático manterá AFK protegido e não ativará a economia agressiva até você corrigir ou salvar novamente a lista."
+            : null;
+
     public static IReadOnlyList<string> GetCustomProtectedProcessNames()
     {
         if (!File.Exists(UserSettingsPath)) return Array.Empty<string>();

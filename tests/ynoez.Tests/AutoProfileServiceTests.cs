@@ -144,4 +144,21 @@ public sealed class AutoProfileServiceTests
         Assert.Equal(new[] { "python", "AutoHotkey64", "powershell", "XTExecutor" }, result);
     }
 
+
+    [Fact]
+    public void GetProtectionConfigurationWarning_InvalidConfigurationExplainsSafeFallback()
+    {
+        var warning = AutoProfileService.GetProtectionConfigurationWarning(configurationInvalid: true);
+
+        Assert.NotNull(warning);
+        Assert.Contains("AFK protegido", warning);
+        Assert.Contains("economia agressiva", warning);
+    }
+
+    [Fact]
+    public void GetProtectionConfigurationWarning_ValidConfigurationHasNoWarning()
+    {
+        Assert.Null(AutoProfileService.GetProtectionConfigurationWarning(configurationInvalid: false));
+    }
+
 }
