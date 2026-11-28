@@ -342,7 +342,7 @@ public static class ProcessPriorityProfileService
         if (changedCount > 0)
             SaveJournalCore(journal);
 
-        return new ProcessPriorityApplySummary(focusCount, backgroundCount, changedCount, skippedCount, 0, warnings);
+        return new ProcessPriorityApplySummary(focusCount, backgroundCount, changedCount, skippedCount, journal.GpuPreferences.Count, warnings);
     }
 
     private static bool TryApplyProcess(
