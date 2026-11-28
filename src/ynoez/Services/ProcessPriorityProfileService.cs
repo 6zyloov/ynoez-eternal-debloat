@@ -541,36 +541,51 @@ public static class ProcessPriorityProfileService
                 continue;
 
             var restored = false;
+            var unresolved = false;
             var currentCpu = GetPriorityClass(handle);
-            if (currentCpu == state.AppliedPriorityClass && currentCpu != state.OriginalPriorityClass)
+            if (currentCpu == 0 && state.AppliedPriorityClass != state.OriginalPriorityClass)
+            {
+                unresolved = true;
+                warnings.Add($"Não foi possível ler a prioridade de CPU do PID {state.ProcessId}; a restauração ficará pendente.");
+            }
+            else if (currentCpu == state.AppliedPriorityClass && currentCpu != state.OriginalPriorityClass)
             {
                 if (SetPriorityClass(handle, state.OriginalPriorityClass))
                     restored = true;
                 else
                 {
-                    remainingProcesses.Add(state);
+                    unresolved = true;
                     warnings.Add($"Não foi possível restaurar a prioridade de CPU do PID {state.ProcessId}: {Marshal.GetLastWin32Error()}.");
-                    continue;
                 }
             }
 
-            if (state.HasMemoryPriority
-                && GetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, out var currentMemory, (uint)Marshal.SizeOf<MemoryPriorityInformation>())
-                && currentMemory.MemoryPriority == state.AppliedMemoryPriority
-                && currentMemory.MemoryPriority != state.OriginalMemoryPriority)
+            if (state.HasMemoryPriority)
             {
-                var original = new MemoryPriorityInformation { MemoryPriority = state.OriginalMemoryPriority };
-                if (SetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, in original, (uint)Marshal.SizeOf<MemoryPriorityInformation>()))
-                    restored = true;
-                else
+                if (!GetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, out var currentMemory, (uint)Marshal.SizeOf<MemoryPriorityInformation>()))
                 {
-                    remainingProcesses.Add(state);
-                    warnings.Add($"Não foi possível restaurar a prioridade de memória do PID {state.ProcessId}: {Marshal.GetLastWin32Error()}.");
-                    continue;
+                    if (state.AppliedMemoryPriority != state.OriginalMemoryPriority)
+                    {
+                        unresolved = true;
+                        warnings.Add($"Não foi possível ler a prioridade de memória do PID {state.ProcessId}; a restauração ficará pendente.");
+                    }
+                }
+                else if (currentMemory.MemoryPriority == state.AppliedMemoryPriority
+                    && currentMemory.MemoryPriority != state.OriginalMemoryPriority)
+                {
+                    var original = new MemoryPriorityInformation { MemoryPriority = state.OriginalMemoryPriority };
+                    if (SetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, in original, (uint)Marshal.SizeOf<MemoryPriorityInformation>()))
+                        restored = true;
+                    else
+                    {
+                        unresolved = true;
+                        warnings.Add($"Não foi possível restaurar a prioridade de memória do PID {state.ProcessId}: {Marshal.GetLastWin32Error()}.");
+                    }
                 }
             }
 
-            if (restored)
+            if (unresolved)
+                remainingProcesses.Add(state);
+            else if (restored)
                 restoredProcesses++;
         }
 
