@@ -47,7 +47,7 @@ public static class QuickGameOptimizationService
                     if (!catalog.TryGetValue(id, out var tweak))
                         throw new InvalidDataException("O ajuste obrigatório não existe no catálogo: " + id + ".");
 
-                    if (registry.Inspect(tweak) == TweakState.Enabled)
+                    if (registry.Inspect(tweak) == TweakState.Enabled || registry.CanRestore(id))
                         continue;
 
                     journal = journal with { AppliedTweakIds = [.. journal.AppliedTweakIds, id] };
