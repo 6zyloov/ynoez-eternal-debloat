@@ -48,6 +48,9 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: ./scripts/build-installer.ps1
+      - name: Test install, upgrade and uninstall
+        shell: pwsh
+        run: ./scripts/test-installer.ps1
       - name: Create and publish release assets
         shell: pwsh
         env:
