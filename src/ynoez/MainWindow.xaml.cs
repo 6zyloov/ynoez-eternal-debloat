@@ -922,6 +922,92 @@ public partial class MainWindow : Window
             BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 4, 0, 8)
         };
+        var processPicker = new ComboBox
+        {
+            MinWidth = 320,
+            MinHeight = 34,
+            Margin = new Thickness(0, 4, 8, 8),
+            Background = BrushFrom("#171717"),
+            Foreground = PrimaryBrush,
+            BorderBrush = BorderBrushSoft,
+            BorderThickness = new Thickness(1),
+            IsEnabled = true
+        };
+        var refreshProcesses = new Button
+        {
+            Content = "Atualizar processos em execução",
+            Style = (Style)FindResource("QuietButton"),
+            Margin = new Thickness(0, 4, 8, 8)
+        };
+        var addSelectedProcess = new Button
+        {
+            Content = "Adicionar à proteção",
+            Style = (Style)FindResource("QuietButton"),
+            Margin = new Thickness(0, 4, 0, 8),
+            IsEnabled = false
+        };
+        processPicker.SelectionChanged += (_, _) =>
+            addSelectedProcess.IsEnabled = processPicker.SelectedItem is ComboBoxItem;
+        refreshProcesses.Click += async (_, _) =>
+        {
+            refreshProcesses.IsEnabled = false;
+            addSelectedProcess.IsEnabled = false;
+            processPicker.Items.Clear();
+            autoStatus.Text = "Lendo processos em execução (somente leitura)…";
+            try
+            {
+                var snapshot = await RunningProcessInventoryService.GetSnapshotAsync();
+                foreach (var process in snapshot)
+                {
+                    var item = new ComboBoxItem
+                    {
+                        Content = $"{process.ProcessName} • PID {process.ProcessId} • {process.WorkingSetMb:N0} MB",
+                        Tag = process.ProcessName
+                    };
+                    processPicker.Items.Add(item);
+                }
+                if (processPicker.Items.Count > 0)
+                    processPicker.SelectedIndex = 0;
+                autoStatus.Text = snapshot.Count == 0
+                    ? "Nenhum processo acessível foi encontrado."
+                    : $"Encontrados {snapshot.Count} processos. Selecione um nome e adicione-o à lista; nada será encerrado ou modificado.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Falha ao inventariar processos em execução: " + ex);
+                autoStatus.Text = "Não foi possível listar os processos: " + ex.Message;
+            }
+            finally
+            {
+                refreshProcesses.IsEnabled = true;
+                addSelectedProcess.IsEnabled = processPicker.SelectedItem is ComboBoxItem;
+            }
+        };
+        addSelectedProcess.Click += (_, _) =>
+        {
+            if (processPicker.SelectedItem is not ComboBoxItem selected ||
+                selected.Tag is not string processName)
+                return;
+
+            try
+            {
+                _ = AutoProfileService.NormalizeProtectedProcessNames(new[] { processName });
+                var names = protectedInput.Text.Split(';',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                if (!names.Contains(processName, StringComparer.OrdinalIgnoreCase))
+                    names.Add(processName);
+                protectedInput.Text = string.Join("; ", names);
+                autoStatus.Text = $"'{processName}' foi adicionado ao campo. Clique em Salvar processos protegidos para gravar a alteração.";
+            }
+            catch (Exception ex)
+            {
+                autoStatus.Text = "Esse nome não pode ser salvo na lista protegida: " + ex.Message;
+            }
+        };
+        var processPickerPanel = new WrapPanel();
+        processPickerPanel.Children.Add(processPicker);
+        processPickerPanel.Children.Add(refreshProcesses);
+        processPickerPanel.Children.Add(addSelectedProcess);
         var protectionWarning = AutoProfileService.GetProtectionConfigurationWarning();
         var autoStatus = new TextBlock
         {
@@ -955,6 +1041,7 @@ public partial class MainWindow : Window
             }
         };
         autoPanel.Children.Add(protectedInput);
+        autoPanel.Children.Add(processPickerPanel);
         autoPanel.Children.Add(saveProtected);
         autoPanel.Children.Add(autoStatus);
         var autoButtons = new WrapPanel();
