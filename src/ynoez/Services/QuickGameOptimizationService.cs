@@ -50,9 +50,9 @@ public static class QuickGameOptimizationService
                     if (registry.Inspect(tweak) == TweakState.Enabled)
                         continue;
 
-                    registry.Apply(tweak);
                     journal = journal with { AppliedTweakIds = [.. journal.AppliedTweakIds, id] };
                     WriteJournal(journal);
+                    registry.Apply(tweak);
                 }
 
                 // Do not take ownership of a power plan already backed up by another ynoez profile.
