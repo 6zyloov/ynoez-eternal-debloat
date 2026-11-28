@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 45
     steps:
       - name: Checkout tagged source
@@ -36,18 +36,43 @@ jobs:
           $expected = "v" + [string]$project.Project.PropertyGroup.Version
           if ($env:GITHUB_REF_NAME -ne $expected) { throw "Tag $env:GITHUB_REF_NAME difere da versão $expected." }
           dotnet --version
+      - name: Audit NuGet dependencies
+        shell: pwsh
+        run: |
+          dotnet list src/ynoez/ynoez.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências do app falhou." }
+          dotnet list tests/ynoez.Tests/ynoez.Tests.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências dos testes falhou." }
       - name: Run Windows integration tests
         shell: pwsh
         run: dotnet test tests/ynoez.Tests/ynoez.Tests.csproj --configuration Release --logger "console;verbosity=normal"
       - name: Publish self-contained app
         shell: pwsh
         run: ./scripts/publish.ps1
+      - name: Sign app executable with Authenticode
+        shell: pwsh
+        env:
+          YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
+          YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
+        run: ./scripts/sign-artifacts.ps1 -Target Application
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
       - name: Build installer
         shell: pwsh
         run: ./scripts/build-installer.ps1
+      - name: Sign installer and verify both Authenticode signatures
+        shell: pwsh
+        env:
+          YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
+          YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
+        run: ./scripts/sign-artifacts.ps1 -Target Installer
+      - name: Generate and validate SPDX SBOM
+        shell: pwsh
+        run: ./scripts/generate-sbom.ps1
+      - name: Test clean install, reinstall and uninstall
+        shell: pwsh
+        run: ./scripts/test-installer.ps1
       - name: Create and publish release assets
         shell: pwsh
         env:

@@ -44,6 +44,29 @@ public partial class App : Application
         AppLog.Write("Aplicativo iniciado. Versão: " + UpdateService.GetCurrentVersion());
         try
         {
+            var priorityRecovery = ProcessPriorityProfileService.RecoverInterruptedSession();
+            var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
+            if (savedPriorityProfile.Enabled)
+                ProcessPriorityProfileService.SaveProfile(savedPriorityProfile with { Enabled = false });
+
+            if (priorityRecovery.Warnings.Count > 0)
+                AppLog.Write("O perfil de foco não será retomado automaticamente: a restauração anterior tem itens pendentes. " + priorityRecovery.ToDisplayText());
+            else
+                AppLog.Write("Sessão anterior de foco restaurada. O perfil salvo exige ativação manual nesta execução.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Não foi possível recuperar prioridades de uma sessão anterior: " + ex);
+            try
+            {
+                var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
+                ProcessPriorityProfileService.SaveProfile(savedPriorityProfile with { Enabled = false });
+            }
+            catch { }
+        }
+
+        try
+        {
             PowerProfileService.RecoverInterruptedAutomaticSession();
         }
         catch (Exception ex)
@@ -89,6 +112,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try { ProcessPriorityProfileService.StopSession(); }
+        catch (Exception ex) { AppLog.Write("Falha ao restaurar prioridades de processos durante o encerramento: " + ex); }
         try { PowerProfileService.RecoverInterruptedAutomaticSession(); }
         catch (Exception ex) { AppLog.Write("A sessão automática permaneceu pendente durante o encerramento: " + ex); }
         PowerProfileService.ClearExecutionRequirement();

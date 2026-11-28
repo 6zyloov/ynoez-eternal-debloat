@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "0.2.1",
+  "catalogVersion": "0.3.1",
   "policy": {
     "defaultConsent": false,
     "backupBeforeApply": true,
@@ -180,6 +180,62 @@
       "value": 0,
       "kind": "DWord",
       "minBuild": 22000,
+      "reversible": true,
+      "requiresConsent": true
+    },
+    {
+      "id": "ui-menu-show-delay",
+      "name": "Remover atraso de menus",
+      "description": "Reduz o atraso de abertura dos menus do Windows para a conta atual.",
+      "category": "Interface",
+      "risk": "Baixo",
+      "hive": "CurrentUser",
+      "keyPath": "Control Panel\\Desktop",
+      "valueName": "MenuShowDelay",
+      "value": "0",
+      "kind": "String",
+      "reversible": true,
+      "requiresConsent": true
+    },
+    {
+      "id": "ui-mouse-hover-time",
+      "name": "Reduzir atraso de hover do mouse",
+      "description": "Reduz o atraso antes de o Windows exibir dicas e elementos ao passar o mouse. Não altera DPI nem aceleração do mouse.",
+      "category": "Interface",
+      "risk": "Baixo",
+      "hive": "CurrentUser",
+      "keyPath": "Control Panel\\Mouse",
+      "valueName": "MouseHoverTime",
+      "value": "10",
+      "kind": "String",
+      "reversible": true,
+      "requiresConsent": true
+    },
+    {
+      "id": "gaming-enable-auto-game-mode",
+      "name": "Ativar Game Mode",
+      "description": "Permite que o Windows reconheça jogos e aplique seu modo de jogo. Não remove Xbox Game Bar nem captura por este ajuste.",
+      "category": "Jogos",
+      "risk": "Baixo",
+      "hive": "CurrentUser",
+      "keyPath": "Software\\Microsoft\\GameBar",
+      "valueName": "AutoGameModeEnabled",
+      "value": 1,
+      "kind": "DWord",
+      "reversible": true,
+      "requiresConsent": true
+    },
+    {
+      "id": "gaming-enable-game-mode",
+      "name": "Permitir Game Mode automático",
+      "description": "Ativa a permissão de Game Mode automático no perfil do usuário. Resultado depende da versão do Windows e do jogo.",
+      "category": "Jogos",
+      "risk": "Baixo",
+      "hive": "CurrentUser",
+      "keyPath": "Software\\Microsoft\\GameBar",
+      "valueName": "AllowAutoGameMode",
+      "value": 1,
+      "kind": "DWord",
       "reversible": true,
       "requiresConsent": true
     }

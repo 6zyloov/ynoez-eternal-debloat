@@ -2,10 +2,11 @@ name: build-windows
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'fix/**', 'feat/**', 'feature/**', 'integration/**' ]
     paths:
       - 'src/**'
       - 'global.json'
+      - 'Directory.Build.props'
       - 'tests/**'
       - 'scripts/**'
       - 'README.md'
@@ -13,6 +14,21 @@ on:
       - 'docs/**'
       - 'installer/**'
       - '.github/workflows/build.yml'
+      - '.github/workflows/release.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'global.json'
+      - 'Directory.Build.props'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'README.md'
+      - 'STATUS.md'
+      - 'docs/**'
+      - 'installer/**'
+      - '.github/workflows/build.yml'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,16 +39,21 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 concurrency:
-  group: ynoez-build-${{ github.ref }}
+  group: ynoez-build-refs/heads/${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   test-and-build:
-    runs-on: windows-latest
-    timeout-minutes: 30
+    runs-on: windows-2025
+    timeout-minutes: 45
     steps:
-      - name: Checkout
+      - name: Checkout candidate
         uses: actions/checkout@v4
+      - name: Checkout main baseline for upgrade/rollback verification
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: migration-baseline
       - name: Setup .NET 10 LTS
         uses: actions/setup-dotnet@v4
         with:
@@ -40,34 +61,74 @@ jobs:
       - name: Show .NET SDK
         shell: pwsh
         run: dotnet --info
+      - name: Audit NuGet dependencies
+        shell: pwsh
+        run: |
+          dotnet list src/ynoez/ynoez.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências do app falhou." }
+          dotnet list tests/ynoez.Tests/ynoez.Tests.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências dos testes falhou." }
       - name: Run Windows integration tests
         shell: pwsh
         run: dotnet test tests/ynoez.Tests/ynoez.Tests.csproj --configuration Release --logger "console;verbosity=normal"
-      - name: Publish self-contained Windows app
+      - name: Publish legacy main baseline
         shell: pwsh
-        run: ./scripts/publish.ps1
+        run: ./migration-baseline/scripts/publish.ps1
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
-      - name: Build installer
+      - name: Build legacy main installer
+        shell: pwsh
+        run: ./migration-baseline/scripts/build-installer.ps1
+      - name: Publish candidate self-contained Windows app
+        shell: pwsh
+        run: ./scripts/publish.ps1
+      - name: Sign application before packaging when a certificate is configured
+        shell: pwsh
+        env:
+          YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
+          YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
+        run: ./scripts/sign-artifacts.ps1 -Target Application
+      - name: Build candidate installer
         shell: pwsh
         run: ./scripts/build-installer.ps1
+      - name: Sign installer or record unsigned status
+        shell: pwsh
+        env:
+          YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
+          YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
+        run: ./scripts/sign-artifacts.ps1 -Target Installer
+      - name: Generate and validate SPDX SBOM
+        shell: pwsh
+        run: ./scripts/generate-sbom.ps1
+      - name: Test clean install, reinstall and uninstall
+        shell: pwsh
+        run: ./scripts/test-installer.ps1
+      - name: Test upgrade, rollback, re-upgrade and user-data retention
+        shell: pwsh
+        run: |
+          [xml]$candidateProject = Get-Content src/ynoez/ynoez.csproj
+          $candidateVersion = [string]$candidateProject.Project.PropertyGroup.Version
+          if ([string]::IsNullOrWhiteSpace($candidateVersion)) { throw "Versão candidata não encontrada no csproj." }
+          ./scripts/test-installer-upgrade.ps1 -LegacyInstallerPath "migration-baseline/artifacts/ynoez-setup-0.3.0.exe" -CandidateInstallerPath "artifacts/ynoez-setup-$candidateVersion.exe" -LegacyExecutablePath "migration-baseline/dist/ynoez.exe" -CandidateExecutablePath "dist/ynoez.exe"
       - name: Validate release packaging and checksums
         shell: pwsh
         run: ./scripts/release.ps1 -DryRun
-      - name: Upload portable build
+      - name: Upload portable build and release metadata
         uses: actions/upload-artifact@v4
         with:
           name: ynoez-portable-win-x64
           path: |
             artifacts/ynoez-portable-win-x64.zip
             artifacts/SHA256SUMS.txt
+            artifacts/ynoez-*.spdx.json
+            artifacts/SIGNATURE-STATUS.txt
           if-no-files-found: error
           retention-days: 30
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: ynoez-setup-win-x64
-          path: artifacts/ynoez-setup-0.3.0.exe
+          path: artifacts/ynoez-setup-*.exe
           if-no-files-found: error
           retention-days: 30

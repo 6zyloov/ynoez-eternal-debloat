@@ -17,6 +17,23 @@
   "policy": {
     "neverTerminateProcesses": true,
     "neverChangeAntiCheatSecuritySettings": true,
-    "afkMayUsePowerSaverWhileGamesRemainOpen": true
-  }
+    "afkMayUsePowerSaverWhileGamesRemainOpen": false
+  },
+  "protectedProcessNames": [
+    "cmd",
+    "powershell",
+    "pwsh",
+    "python",
+    "pythonw",
+    "node",
+    "java",
+    "javaw",
+    "wscript",
+    "cscript",
+    "AutoHotkey",
+    "AutoHotkey64",
+    "AutoHotkey32",
+    "AutoHotkeyU64",
+    "AutoHotkeyU32"
+  ]
 }

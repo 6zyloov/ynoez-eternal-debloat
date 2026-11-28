@@ -76,12 +76,24 @@ public sealed class RegistryTweakServiceTests
         Assert.All(tweaks, tweak =>
         {
             Assert.Equal(RegistryHive.CurrentUser, tweak.Hive);
-            Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
             Assert.DoesNotContain(@"\\", tweak.KeyPath);
-            Assert.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
+            if (tweak.Id is "ui-menu-show-delay" or "ui-mouse-hover-time")
+            {
+                Assert.Equal(RegistryValueKind.String, tweak.Kind);
+                Assert.Contains(tweak.KeyPath, new[] { @"Control Panel\Desktop", @"Control Panel\Mouse" });
+            }
+            else if (tweak.Id is "gaming-enable-auto-game-mode" or "gaming-enable-game-mode")
+            {
+                Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
+                Assert.Equal(@"Software\Microsoft\GameBar", tweak.KeyPath);
+            }
+            else
+            {
+                Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
+                Assert.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
+            }
         });
     }
- 
 
     [Fact]
     public void Inspect_RejectsNonCanonicalRegistryPath()
@@ -608,7 +620,10 @@ public sealed class RegistryTweakServiceTests
 
         Assert.Contains("REDE LOCAL", line);
         Assert.Contains("Há perda recorrente", line);
-        Assert.Equal(28, line.Split(',').Length);
+        var headerColumns = NetworkMonitorService.BuildCsvHeader().Split(',');
+        Assert.Equal(headerColumns.Length, line.Split(',').Length);
+        Assert.Equal("root_cause_category", headerColumns[^2]);
+        Assert.Equal("root_cause_assessment", headerColumns[^1]);
     }
 
     [Fact]

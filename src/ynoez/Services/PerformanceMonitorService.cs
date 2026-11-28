@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 namespace ynoez.Services;
 
@@ -9,6 +10,47 @@ public sealed record SystemMetricsSnapshot(
     DateTimeOffset Timestamp, double? CpuPercent, double MemoryUsedGb, double MemoryTotalGb,
     double MemoryPercent, double? Gpu3DPercent, double? GpuTemperatureC,
     double? GpuMemoryUsedMb, double? GpuMemoryTotalMb, double? GpuPowerWatts, string GpuTelemetrySource);
+
+internal static class GpuEngineUtilization
+{
+    private static readonly Regex EngineIdentity = new(
+        @"(?<engine>luid_.+?_phys_\d+_eng_\d+)_engtype_3D$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    public static double? GetMaximum3DEngineUtilization(IEnumerable<(string InstanceName, double Utilization)> samples)
+    {
+        ArgumentNullException.ThrowIfNull(samples);
+
+        var perEngine = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        double? unknownFormatMaximum = null;
+
+        foreach (var (instanceName, utilization) in samples)
+        {
+            if (string.IsNullOrWhiteSpace(instanceName) ||
+                !instanceName.Contains("engtype_3D", StringComparison.OrdinalIgnoreCase) ||
+                !double.IsFinite(utilization))
+                continue;
+
+            var normalized = Math.Clamp(utilization, 0d, 100d);
+            var match = EngineIdentity.Match(instanceName);
+            if (!match.Success)
+            {
+                // Unknown Windows counter formats are deliberately not merged:
+                // summing unrelated instances could report a false 100% load.
+                unknownFormatMaximum = Math.Max(unknownFormatMaximum ?? 0d, normalized);
+                continue;
+            }
+
+            var engine = match.Groups["engine"].Value;
+            perEngine[engine] = Math.Min(100d, (perEngine.TryGetValue(engine, out var current) ? current : 0d) + normalized);
+        }
+
+        var knownMaximum = perEngine.Count == 0 ? (double?)null : perEngine.Values.Max();
+        if (!knownMaximum.HasValue) return unknownFormatMaximum;
+        if (!unknownFormatMaximum.HasValue) return knownMaximum;
+        return Math.Max(knownMaximum.Value, unknownFormatMaximum.Value);
+    }
+}
 
 public sealed class PerformanceMonitorService
 {
@@ -60,20 +102,22 @@ public sealed class PerformanceMonitorService
         {
             using var searcher = new ManagementObjectSearcher("root\\CIMV2",
                 "SELECT Name, UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine");
-            double? maximum = null;
+            var samples = new List<(string InstanceName, double Utilization)>();
             using var results = searcher.Get();
             foreach (ManagementObject item in results)
             {
                 using (item)
                 {
                     var name = Convert.ToString(item["Name"]) ?? "";
-                    if (!name.Contains("engtype_3D", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (double.TryParse(Convert.ToString(item["UtilizationPercentage"]), NumberStyles.Any,
+                    if (!double.TryParse(Convert.ToString(item["UtilizationPercentage"]), NumberStyles.Any,
                         CultureInfo.InvariantCulture, out var value))
-                        maximum = Math.Max(maximum ?? 0, Math.Clamp(value, 0, 100));
+                        continue;
+
+                    samples.Add((name, value));
                 }
             }
-            return maximum;
+
+            return GpuEngineUtilization.GetMaximum3DEngineUtilization(samples);
         }
         catch { return null; }
     }
@@ -112,7 +156,8 @@ public sealed class PerformanceMonitorService
     }
 
     private static double? Parse(string value) =>
-        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? number : null;
+        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) && double.IsFinite(number)
+            ? number : null;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct FileTime
