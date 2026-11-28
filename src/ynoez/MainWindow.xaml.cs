@@ -160,6 +160,8 @@ public partial class MainWindow : Window
         }
         await RefreshHardwareAsync();
         ShowPage("Home");
+        if (ProcessPriorityProfileService.LoadProfile().Enabled)
+            StartProcessFocusMonitor();
     }
 
     private async Task RefreshHardwareAsync()
@@ -201,6 +203,7 @@ public partial class MainWindow : Window
         {
             "Home" => BuildHome(),
             "Monitor" => BuildMonitor(),
+            "Foco de Jogo" => BuildProcessFocusPage(),
             "Backup" => BuildBackup(),
             "Tweaks" => BuildTweaks(),
             "Network" => BuildNetwork(),
@@ -217,7 +220,7 @@ public partial class MainWindow : Window
     {
         var map = new Dictionary<string, Button>
         {
-            ["Home"] = NavHome, ["Monitor"] = NavMonitor, ["Backup"] = NavBackup, ["Tweaks"] = NavTweaks,
+            ["Home"] = NavHome, ["Monitor"] = NavMonitor, ["Foco de Jogo"] = NavProcessFocus, ["Backup"] = NavBackup, ["Tweaks"] = NavTweaks,
             ["Network"] = NavNetwork, ["Debloat"] = NavDebloat, ["Motherboard"] = NavBoard,
             ["Toolbox"] = NavToolbox, ["Restore"] = NavRestore, ["Logs"] = NavLogs
         };
