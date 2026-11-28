@@ -1,6 +1,6 @@
 # Roteiro de engenharia — ynoez 0.3.0 até a versão estável
 
-O candidato integrado reúne o aplicativo atual em PR draft #12. A CI usa Windows Server 2025 e as caixas abaixo distinguem o que já está no código/CI do que exige validação externa. Uma compilação verde não equivale a teste em Windows 11 cliente nem a teste em hardware real.
+O candidato integrado reúne o aplicativo atual em PR draft #12. A CI usa Windows Server 2025. Uma compilação verde não equivale a teste em Windows 11 cliente nem a teste em hardware real.
 
 ## Fase 0 — auditoria, referências e licença
 
@@ -14,12 +14,12 @@ O candidato integrado reúne o aplicativo atual em PR draft #12. A CI usa Window
 
 - [x] Projeto WPF nativo net10.0-windows, Nullable e build self-contained win-x64.
 - [x] Suíte xUnit e CI Windows para testes, publicação e empacotamento.
-- [x] Auditoria de vulnerabilidades NuGet para dependências diretas/transitivas; avisos NU1901–NU1904 são erros de restore.
+- [x] Auditoria de vulnerabilidades NuGet diretas/transitivas; avisos NU1901–NU1904 são erros de restore.
 - [x] Motor transacional inicial de Registro HKCU com backup, verificação e reversão.
 - [ ] Refatorar MainWindow.xaml.cs para MVVM/DI, separando UI, domínio, infraestrutura Windows e catálogos.
 - [ ] Journal global transacional e recuperação de todas as operações após crash, além da recuperação específica de energia.
-- [ ] Análise estática, SBOM SPDX/CycloneDX e revisão formal de licenças de todas as dependências.
-- [ ] Política de integridade/assinatura de artefatos; Authenticode depende de certificado válido.
+- [x] Pipeline de geração e validação de SBOM SPDX 2.2; revisão formal de licenças continua separada.
+- [x] Pipeline de assinatura Authenticode opcional com verificação e estado explícito sem certificado; assinatura efetiva depende de certificado Code Signing válido.
 
 ## Fase 2 — observabilidade e inventário
 
@@ -73,14 +73,13 @@ O candidato integrado reúne o aplicativo atual em PR draft #12. A CI usa Window
 
 - [x] Instalador Inno Setup e pacote portátil com versão única, metadados PE e SHA-256.
 - [x] CI Windows testa instalação limpa, reinstalação sobre a mesma instalação e desinstalação preservando Data, Backups, Logs e Downloads.
-- [x] Pipeline de release por tag também executa testes de aplicação e de ciclo de vida antes de publicar assets.
-- [ ] Testar upgrade real de uma versão anterior publicada e rollback; smoke test atual ainda não substitui essa migração.
+- [x] CI testa upgrade do baseline atual de main para o candidato, rollback para o baseline, re-upgrade e retenção de dados; a migração de uma release estável publicada continuará pendente até existir uma versão anterior distribuída.
+- [x] Pipeline de release por tag executa testes, gera SBOM SPDX 2.2 e cria status Authenticode verificável; assinatura real exige certificado.
 - [ ] Validar versões suportadas de Windows 11 e Windows 10 Enterprise/LTSC em máquinas clientes reais, conta padrão/administrador, com/sem Internet e diferentes escalas de DPI. Windows 10 Home/Pro não está na matriz oficial do .NET 10.
 - [ ] Validar hardware AMD/Intel/NVIDIA e sessões longas com Roblox + XT.
 - [ ] Testar Vanguard/FACEIT em ambiente autorizado, sem tentar contornar anti-cheat.
-- [ ] Assinar Authenticode quando houver certificado; caso contrário, fornecer hash e instruções de verificação.
-- [ ] Gerar SBOM, revisar avisos de terceiros e publicar release notes definitivas.
-- [ ] Revisão manual final, promover o PR consolidado e somente então criar tag/release, com autorização do dono do repositório.
+- [ ] Testar uma migração real entre duas releases públicas depois da primeira versão estável.
+- [ ] Revisão formal de licenças e revisão manual final, promover o PR consolidado e somente então criar tag/release, com autorização do dono do repositório.
 
 ## Regras que não serão flexibilizadas
 
@@ -93,4 +92,4 @@ O candidato integrado reúne o aplicativo atual em PR draft #12. A CI usa Window
 
 ## Critério de saída
 
-A versão só sai de candidata quando os testes automatizados e os testes em Windows/hardware real estiverem documentados, a instalação/upgrade/rollback/desinstalação estiverem validados, os artefatos estiverem auditáveis e os limites restantes forem aceitos explicitamente.
+A versão só sai de candidata quando os testes automatizados e os testes em Windows/hardware real estiverem documentados, instalação/migração/rollback/desinstalação estiverem validados, artefatos estiverem auditáveis e os limites restantes forem aceitos explicitamente.
