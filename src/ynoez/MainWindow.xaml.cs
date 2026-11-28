@@ -3252,7 +3252,8 @@ public partial class MainWindow : Window
         _metricsCts is not null ||
         _benchmarkCts is not null ||
         _integrityAuditCts is not null ||
-        _windowsRepairCts is not null;
+        _windowsRepairCts is not null ||
+        ProcessPriorityProfileService.LoadProfile().Enabled;
 
     private bool EnsureTrayIcon()
     {

@@ -1,0 +1,42 @@
+# Foco de Jogo — ynoez 0.3.0
+
+## Objetivo
+
+Permitir que um jogo principal tenha prioridade de CPU e preferência de GPU de alto desempenho enquanto aplicações AFK (por exemplo, duas instâncias do Roblox) recebem prioridade de CPU extremamente baixa e prioridade de memória muito baixa, sem encerrar os processos.
+
+## Configuração
+
+1. Abra **Foco de Jogo** no menu lateral.
+2. Em **Jogo principal**, escolha o executável do jogo. Para Counter-Strike 2, selecione `cs2.exe`.
+3. Deixe **Alta — agressiva** para maior prioridade de CPU ou escolha **Acima do normal — recomendado** para uma opção mais conservadora. A opção Alta exige confirmação.
+4. Em **Segundo plano / AFK**, adicione `RobloxPlayerBeta.exe` uma única vez. Todas as instâncias com o mesmo nome de processo recebem o perfil — não é necessário cadastrar cada janela separadamente.
+5. Se o XT usar um executável independente, adicione o arquivo .exe correspondente também. Caso use PowerShell, Python, Node.js ou outro runtime protegido, não cadastre processos do sistema sem identificar primeiro o processo correto.
+6. Deixe o modo AFK em **Idle (extremamente baixa)**. Se o Roblox perder conexão ou deixar de avançar por falta de tempo de CPU, mude para **Abaixo do normal**.
+7. Clique em **Ativar perfil de foco**. Feche e reabra os jogos para que a preferência gráfica do Windows seja considerada.
+
+## O que cada controle realmente faz
+
+- **CPU do jogo:** `HIGH_PRIORITY_CLASS` ou `ABOVE_NORMAL_PRIORITY_CLASS`. Alta fica abaixo de Realtime e pode consumir quase todo o tempo de CPU; por isso exige confirmação e nunca deve ser confundida com uma reserva exclusiva de processador.
+- **CPU dos bots:** `IDLE_PRIORITY_CLASS` por padrão. O Windows agenda essas threads quando processos de classes superiores deixam tempo disponível. A opção Abaixo do normal é um fallback para aplicações AFK que não toleram Idle.
+- **Memória:** o jogo usa prioridade Normal e bots Very Low. Isso orienta o gerenciador de memória a remover páginas de prioridade mais baixa antes de páginas mais altas quando precisa reduzir working sets; não reserva toda a RAM ao jogo nem limita o consumo dos bots.
+- **GPU:** o ynoez grava a preferência por aplicativo do Windows para adaptador de alto desempenho no jogo e economia nos bots. É uma escolha de adaptador, principalmente útil em sistemas com GPU integrada + dedicada. Não reserva a placa, VRAM ou um percentual de execução; em computadores com uma única GPU, a diferença pode ser nula.
+
+## Segurança e restauração
+
+- O ynoez não usa `REALTIME_PRIORITY_CLASS`, não muda afinidade de CPU, prioridades individuais de threads ou limites de working set.
+- Processos essenciais do Windows e o próprio ynoez são ignorados.
+- As prioridades originais são registradas por PID e horário de criação, evitando aplicar restauração a um processo diferente caso o Windows reutilize um PID.
+- O perfil é reavaliado a cada dois segundos para alcançar novas instâncias do executável.
+- O diário é salvo antes das mudanças nativas e de Registro. Ao desativar, fechar o ynoez ou iniciar uma nova sessão após falha, o aplicativo tenta restaurar os valores originais.
+- Enquanto o perfil estiver ativo, fechar a janela a oculta na bandeja para manter o monitoramento. Para encerrar completamente, use **Encerrar ynoez** no menu da bandeja; isso tenta restaurar as prioridades antes de sair.
+- Se o Windows negar acesso ao processo, o ynoez mostra uma advertência. Executar como administrador pode ser necessário para processos elevados ou protegidos, mas não remove as restrições impostas por processos protegidos.
+
+## Teste recomendado
+
+Comece com CS2 em Acima do normal e Roblox em Idle. Verifique se as duas instâncias continuam recebendo atualizações e se o XT não perde a execução. Depois, experimente Alta no CS2 apenas se o sistema permanecer responsivo. Caso Roblox desconecte, altere o perfil AFK para Abaixo do normal. Faça uma sessão longa antes de considerar a configuração estável.
+
+## Referências técnicas
+
+- [Classes de prioridade e agendamento de CPU — Microsoft Learn](https://learn.microsoft.com/pt-br/windows/win32/procthread/scheduling-priorities)
+- [SetPriorityClass — Microsoft Learn](https://learn.microsoft.com/pt-br/windows/win32/api/processthreadsapi/nf-processthreadsapi-setpriorityclass)
+- [MEMORY_PRIORITY_INFORMATION — Microsoft Learn](https://learn.microsoft.com/pt-br/windows/win32/api/processthreadsapi/ns-processthreadsapi-memory_priority_information)

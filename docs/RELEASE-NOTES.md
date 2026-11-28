@@ -6,6 +6,7 @@ Este artefato é uma build candidata para avaliação, não uma release estável
 
 - Aplicativo WPF .NET 10 LTS, self-contained para Windows x64.
 - Perfis Performance/Equilibrado/AFK; detecção de jogos e proteção de scripts/automação comuns.
+- **Foco de Jogo:** prioridade configurável de CPU para jogo principal e bots AFK (Alta/Acima do normal no foco; Idle/Abaixo do normal no fundo), prioridades de memória Normal/Very Low, preferências de adaptador gráfico do Windows e journal de restauração. Uma configuração de RobloxPlayerBeta.exe alcança todas as instâncias desse processo.
 - Catálogo embarcado de processos validado por schema; ausente ou inválido bloqueia economia AFK agressiva.
 - Inventário somente leitura de processos em execução para cadastrar nomes adicionais na lista AFK, sem ler argumentos/caminhos nem alterar processos.
 - Monitor CPU/RAM/GPU com agregação WMI de engine 3D; monitor e diagnóstico IPv4/IPv6.
@@ -25,4 +26,4 @@ Compare SHA256SUMS.txt com os hashes calculados localmente antes de executar os 
 
 ## Limites
 
-Esta CI roda em Windows Server 2025. Ela não substitui validação em Windows 11 cliente ou hardware real. Roblox + automações XT, Vanguard/FACEIT, telemetria de CPU/AMD/Intel, recuperação após falha e migração entre releases públicas ainda precisam de testes dedicados. O teste automatizado de migração usa o baseline atual de main, não uma release estável publicada. Authenticode só fica assinado quando um certificado válido está configurado. Nenhum ganho de FPS ou estabilidade de rede é prometido.
+Esta CI roda em Windows Server 2025. Ela não substitui validação em Windows 11 cliente ou hardware real. Roblox + automações XT, Vanguard/FACEIT, telemetria de CPU/AMD/Intel, recuperação após falha e migração entre releases públicas ainda precisam de testes dedicados. O teste automatizado de migração usa o baseline atual de main, não uma release estável publicada. Authenticode só fica assinado quando um certificado válido está configurado. A prioridade de CPU High pode consumir quase todo o tempo disponível; Realtime não é usado. Prioridade de memória não reserva RAM, e preferência gráfica não reserva GPU/VRAM nem garante uma fatia de processamento. Nenhum ganho de FPS ou estabilidade de rede é prometido.

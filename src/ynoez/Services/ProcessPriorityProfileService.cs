@@ -322,7 +322,7 @@ public static class ProcessPriorityProfileService
                     if (isFocus) focusCount++;
                     else backgroundCount++;
 
-                    var accessible = TryApplyProcess(process, isFocus, settings.UseHighCpuPriority, journal, out var changed, out var warning);
+                    var accessible = TryApplyProcess(process, isFocus, settings.UseHighCpuPriority, settings.UseLowestBackgroundCpuPriority, journal, out var changed, out var warning);
                     if (changed) changedCount++;
                     if (!accessible || !string.IsNullOrWhiteSpace(warning))
                     {
@@ -350,6 +350,7 @@ public static class ProcessPriorityProfileService
         Process process,
         bool isFocus,
         bool useHighCpuPriority,
+        bool useLowestBackgroundCpuPriority,
         SessionJournal journal,
         out bool changed,
         out string warning)
@@ -405,36 +406,52 @@ public static class ProcessPriorityProfileService
 
         var desiredCpuPriority = isFocus
             ? (useHighCpuPriority ? HighPriorityClass : AboveNormalPriorityClass)
-            : (settings.UseLowestBackgroundCpuPriority ? IdlePriorityClass : 0x00004000u);
+            : (useLowestBackgroundCpuPriority ? IdlePriorityClass : 0x00004000u);
         var desiredMemoryPriority = isFocus ? MemoryPriorityNormal : MemoryPriorityVeryLow;
 
         var currentCpuPriority = GetPriorityClass(handle);
-        if (currentCpuPriority != 0 && currentCpuPriority != desiredCpuPriority)
+        if (currentCpuPriority == 0)
         {
+            warning = $"Não foi possível ler a prioridade de CPU de {process.ProcessName} (PID {process.Id}): {Marshal.GetLastWin32Error()}.";
+        }
+        else if (currentCpuPriority != desiredCpuPriority)
+        {
+            // Persist the intended value before the native call so crash recovery knows
+            // what to restore even if the app exits immediately after SetPriorityClass.
+            state.AppliedPriorityClass = desiredCpuPriority;
+            SaveJournalCore(journal);
             if (SetPriorityClass(handle, desiredCpuPriority))
             {
-                state.AppliedPriorityClass = desiredCpuPriority;
                 changed = true;
             }
             else
             {
+                state.AppliedPriorityClass = currentCpuPriority;
+                SaveJournalCore(journal);
                 warning = $"O Windows negou a alteração de CPU de {process.ProcessName} (PID {process.Id}): {Marshal.GetLastWin32Error()}.";
             }
         }
 
         if (state.HasMemoryPriority
-            && GetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, out var currentMemory, (uint)Marshal.SizeOf<MemoryPriorityInformation>())
-            && currentMemory.MemoryPriority != desiredMemoryPriority)
+            && GetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, out var currentMemory, (uint)Marshal.SizeOf<MemoryPriorityInformation>()))
         {
-            var desired = new MemoryPriorityInformation { MemoryPriority = desiredMemoryPriority };
-            if (SetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, in desired, (uint)Marshal.SizeOf<MemoryPriorityInformation>()))
+            if (currentMemory.MemoryPriority != desiredMemoryPriority)
             {
+                var desired = new MemoryPriorityInformation { MemoryPriority = desiredMemoryPriority };
+                // As above, journal the requested value before changing the process.
                 state.AppliedMemoryPriority = desiredMemoryPriority;
-                changed = true;
-            }
-            else if (string.IsNullOrWhiteSpace(warning))
-            {
-                warning = $"O Windows negou a alteração de prioridade de memória de {process.ProcessName} (PID {process.Id}): {Marshal.GetLastWin32Error()}.";
+                SaveJournalCore(journal);
+                if (SetProcessInformationMemory(handle, ProcessMemoryPriorityInformation, in desired, (uint)Marshal.SizeOf<MemoryPriorityInformation>()))
+                {
+                    changed = true;
+                }
+                else
+                {
+                    state.AppliedMemoryPriority = currentMemory.MemoryPriority;
+                    SaveJournalCore(journal);
+                    if (string.IsNullOrWhiteSpace(warning))
+                        warning = $"O Windows negou a alteração de prioridade de memória de {process.ProcessName} (PID {process.Id}): {Marshal.GetLastWin32Error()}.";
+                }
             }
         }
 
@@ -484,15 +501,19 @@ public static class ProcessPriorityProfileService
                     OriginalValueExisted = existed,
                     OriginalValue = original?.ToString(),
                     OriginalValueKind = (int)kind,
-                    AppliedValue = string.Empty
+                    AppliedValue = preference
                 };
                 journal.GpuPreferences.Add(snapshot);
-                SaveJournalCore(journal);
+            }
+            else
+            {
+                snapshot.AppliedValue = preference;
             }
 
-            key.SetValue(normalizedPath, preference, RegistryValueKind.String);
-            snapshot.AppliedValue = preference;
+            // Save the intended value before the registry write; recovery can then
+            // compare the current value and restore only if our change actually landed.
             SaveJournalCore(journal);
+            key.SetValue(normalizedPath, preference, RegistryValueKind.String);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)

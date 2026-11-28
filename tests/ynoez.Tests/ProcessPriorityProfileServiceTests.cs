@@ -5,6 +5,16 @@ namespace ynoez.Tests;
 public sealed class ProcessPriorityProfileServiceTests
 {
     [Fact]
+    public void DefaultProfile_PrioritizesFocusAndKeepsBackgroundAtIdle()
+    {
+        var settings = new ProcessPriorityProfileSettings();
+
+        Assert.True(settings.UseHighCpuPriority);
+        Assert.True(settings.UseLowestBackgroundCpuPriority);
+        Assert.False(settings.Enabled);
+    }
+
+    [Fact]
     public void MatchesExecutableName_IgnoresExtensionAndCase()
     {
         Assert.True(ProcessPriorityProfileService.MatchesExecutableName(
