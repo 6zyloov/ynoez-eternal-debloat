@@ -122,7 +122,7 @@ public sealed class ServiceTweakService
         {
             var name = item.Definition.Name;
             commands.Add("$n='" + name + "'; $s=Get-CimInstance Win32_Service -Filter \"Name='$n'\" -ErrorAction Stop");
-            commands.Add("if ($null -ne $s -and $s.StartMode -ne 'Disabled') { Set-Service -Name $n -StartupType Disabled; if ((Get-Service -Name $n).Status -eq 'Running') { Stop-Service -Name $n -Force -ErrorAction Stop; (Get-Service -Name $n).WaitForStatus('Stopped',[TimeSpan]::FromSeconds(15)) }; $v=Get-CimInstance Win32_Service -Filter \"Name='$n'\" -ErrorAction Stop; if ($v.StartMode -ne 'Disabled' -or $v.State -eq 'Running') { throw 'Não foi possível desativar ' + $n } }");
+            commands.Add("if ($null -ne $s -and $s.StartMode -ne 'Disabled') { Set-Service -Name $n -StartupType Disabled; if ((Get-Service -Name $n).Status -eq 'Running') { Stop-Service -Name $n -ErrorAction Stop; (Get-Service -Name $n).WaitForStatus('Stopped',[TimeSpan]::FromSeconds(15)) }; $v=Get-CimInstance Win32_Service -Filter \"Name='$n'\" -ErrorAction Stop; if ($v.StartMode -ne 'Disabled' -or $v.State -eq 'Running') { throw 'Não foi possível desativar ' + $n } }");
         }
         commands.Add("exit 0");
 
