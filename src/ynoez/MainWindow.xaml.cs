@@ -204,11 +204,8 @@ public partial class MainWindow : Window
             "NavHome" => "Home",
             "NavTweaks" => "Tweaks",
             "NavDebloat" => "Debloat",
-            "NavNetwork" => "Network",
             "NavProcessFocus" => "Foco de Jogo",
             "NavBoard" => "Motherboard",
-            "NavToolbox" => "Toolbox",
-            "NavBackup" => "Backup",
             _ => "Home"
         };
         ShowPage(page);
@@ -220,9 +217,7 @@ public partial class MainWindow : Window
         PageTitle.Text = page switch
         {
             "Tweaks" => "Otimizações",
-            "Network" => "Rede",
-            "Motherboard" => "Placa-mãe",
-            "Toolbox" => "Ferramentas",
+            "Motherboard" => "BIOS / Placa-mãe",
             "Foco de Jogo" => "Foco de Jogo",
             _ => page
         };
@@ -234,10 +229,8 @@ public partial class MainWindow : Window
             "Foco de Jogo" => BuildProcessFocusPage(),
             "Backup" => BuildBackup(),
             "Tweaks" => BuildTweaks(),
-            "Network" => BuildNetwork(),
             "Debloat" => BuildDebloat(),
             "Motherboard" => BuildMotherboard(),
-            "Toolbox" => BuildToolbox(),
             _ => BuildHome()
         };
     }
@@ -249,11 +242,8 @@ public partial class MainWindow : Window
             ["Home"] = NavHome,
             ["Tweaks"] = NavTweaks,
             ["Debloat"] = NavDebloat,
-            ["Network"] = NavNetwork,
             ["Foco de Jogo"] = NavProcessFocus,
             ["Motherboard"] = NavBoard,
-            ["Toolbox"] = NavToolbox,
-            ["Backup"] = NavBackup
         };
         foreach (var item in map)
         {
@@ -813,118 +803,7 @@ public partial class MainWindow : Window
         return root;
     }
 
-    private UIElement BuildTweaks()
-    {
-        var root = PageContainer();
-        root.Children.Add(PageIntro("Otimizações", "Ajustes reais do Windows. Ative o que quiser testar; cada alteração compatível guarda o valor anterior."));
-
-        var tabs = new TabControl { Background = PageBrush, BorderThickness = new Thickness(0), Margin = new Thickness(0, 0, 0, 6) };
-
-        var mainGrid = new UniformGrid { Columns = 3 };
-        try
-        {
-            var registry = new RegistryTweakService();
-            var visibleMainIds = new HashSet<string>(StringComparer.Ordinal)
-            {
-                "gaming-disable-windows-capture",
-                "gaming-disable-game-dvr-policy-user",
-                "gaming-enable-auto-game-mode",
-                "gaming-enable-game-mode",
-                "interface-performance-visual-effects",
-                "interface-disable-taskbar-animations",
-                "interface-disable-transparency",
-                "ui-menu-show-delay",
-                "ui-mouse-hover-time"
-            };
-            foreach (var tweak in OptimizationCatalogService.LoadRegistryTweaks()
-                .Where(item => visibleMainIds.Contains(item.Id) || registry.CanRestore(item.Id)))
-                mainGrid.Children.Add(BuildRegistryToggleCard(tweak, registry));
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write("Catálogo de otimizações indisponível: " + ex);
-            mainGrid.Children.Add(NoteCard("Catálogo indisponível", ex.Message));
-        }
-        tabs.Items.Add(new TabItem { Header = "Main", Content = mainGrid });
-
-        var kernelGrid = new UniformGrid { Columns = 2 };
-        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("mmcss-games"));
-        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("network-throttling"));
-        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("power-throttling-off"));
-        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("win32-priority-separation"));
-        kernelGrid.Children.Add(BuildTimerResolutionCard());
-        tabs.Items.Add(new TabItem { Header = "Kernel", Content = kernelGrid });
-
-        var powerPanel = new StackPanel();
-        var powerGrid = new UniformGrid { Columns = 2 };
-        powerGrid.Children.Add(BuildToolActionCard("Alto desempenho", "Ativa o plano Alto desempenho do Windows.", "Ativar", async () =>
-        {
-            if (_autoProfileCts is not null)
-                throw new InvalidOperationException("Desative os perfis automáticos antes de trocar o plano manualmente.");
-            if (QuickGameOptimizationService.IsApplied)
-                throw new InvalidOperationException("Restaure o perfil rápido antigo antes de trocar o plano.");
-            var message = await Task.Run(() => PowerProfileService.Apply(PowerProfileMode.Performance));
-            AppLog.Write(message);
-        }));
-        powerGrid.Children.Add(BuildToolActionCard("Equilibrado", "Volta ao plano Equilibrado do Windows.", "Ativar", async () =>
-        {
-            if (_autoProfileCts is not null)
-                throw new InvalidOperationException("Desative os perfis automáticos antes de trocar o plano manualmente.");
-            if (QuickGameOptimizationService.IsApplied)
-                throw new InvalidOperationException("Restaure o perfil rápido antigo antes de trocar o plano.");
-            var message = await Task.Run(() => PowerProfileService.Apply(PowerProfileMode.Balanced));
-            AppLog.Write(message);
-        }));
-        if (PowerProfileService.CanRestoreOriginal())
-        {
-            powerGrid.Children.Add(BuildToolActionCard("Plano anterior", "Recupera o plano salvo pelo ynoez.", "Restaurar", async () =>
-            {
-                if (_autoProfileCts is not null)
-                    throw new InvalidOperationException("Desative os perfis automáticos antes de restaurar o plano.");
-                var message = await Task.Run(PowerProfileService.RestoreOriginal);
-                AppLog.Write(message);
-            }));
-        }
-        powerPanel.Children.Add(powerGrid);
-        var autoStatus = Body(_autoProfileCts is null ? "Desligado" : "Ativo");
-        var autoCard = BuildToggleCard(
-            "Perfis automáticos",
-            "Jogo em foco = Alto desempenho. Jogo/XT protegido em segundo plano = Equilibrado. Sem atividade protegida = economia.",
-            _autoProfileCts is not null,
-            enabled => SetAutomaticProfilesAsync(enabled, autoStatus),
-            true,
-            _autoProfileCts is null ? "DESLIGADO" : "ATIVO");
-        powerPanel.Children.Add(autoCard);
-        powerPanel.Children.Add(autoStatus);
-        if (QuickGameOptimizationService.IsApplied)
-        {
-            powerPanel.Children.Add(BuildToolActionCard(
-                "Desfazer perfil rápido antigo",
-                "Restaura as alterações do perfil rápido aplicado por uma versão anterior.",
-                "Restaurar",
-                async () =>
-                {
-                    if (_autoProfileCts is not null)
-                        throw new InvalidOperationException("Desative os perfis automáticos antes de restaurar o perfil rápido.");
-                    await Task.Run(QuickGameOptimizationService.Restore);
-                }));
-        }
-        tabs.Items.Add(new TabItem { Header = "Power", Content = powerPanel });
-
-        var gpuGrid = new UniformGrid { Columns = 2 };
-        gpuGrid.Children.Add(BuildSystemRegistryToggleCard("gpu-scheduling"));
-        gpuGrid.Children.Add(BuildToolActionCard("Preferência gráfica do jogo", "Abra o Foco de Jogo para definir a GPU de alto desempenho para o CS2.", "Configurar", () =>
-        {
-            ShowPage("Foco de Jogo");
-            return Task.CompletedTask;
-        }));
-        gpuGrid.Children.Add(BuildToolActionCard("AMD Software", "Abre o painel Radeon/Adrenalin, quando instalado pelo driver.", "Abrir", OpenAmdSoftwareAsync));
-        gpuGrid.Children.Add(BuildToolActionCard("Gráficos do Windows", "Configuração oficial de GPU por aplicativo e agendamento de GPU.", "Abrir", () => OpenTargetAsync("ms-settings:display-advancedgraphics")));
-        tabs.Items.Add(new TabItem { Header = "GPU", Content = gpuGrid });
-
-        root.Children.Add(tabs);
-        return root;
-    }
+    private UIElement BuildTweaks() => BuildPerformancePage();
 
     private Border BuildRegistryToggleCard(RegistryTweak tweak, RegistryTweakService service)
     {
@@ -1147,56 +1026,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private UIElement BuildDebloat()
-    {
-        var root = PageContainer();
-        root.Children.Add(PageIntro("Debloat", "Aplicativos, inicialização e serviços que você não usa."));
-
-        var cleanup = new UniformGrid { Columns = 2 };
-        cleanup.Children.Add(BuildToolActionCard("Limpar temporários", "Remove arquivos temporários liberados pelo Windows.", "Limpar", async () =>
-        {
-            var result = await CleanupService.ClearWindowsTempAsync();
-            AppLog.Write("Limpeza de temporários: " + result.Summary);
-        }));
-        cleanup.Children.Add(BuildToolActionCard("Limpar caches", "Limpa Cache, Code Cache e GPUCache do Brave e Discord.", "Limpar", async () =>
-        {
-            var results = await Task.WhenAll(
-                CleanupService.ClearBraveCacheAsync(),
-                CleanupService.ClearDiscordCacheAsync());
-            AppLog.Write("Caches: Brave " + results[0].Summary + " | Discord " + results[1].Summary);
-        }));
-        root.Children.Add(cleanup);
-
-        var tabs = new TabControl { Background = PageBrush, BorderThickness = new Thickness(0), Margin = new Thickness(0, 8, 0, 0) };
-        tabs.Items.Add(new TabItem { Header = "Apps", Content = BuildAppxDebloatCard() });
-
-        var win32Host = new StackPanel();
-        var win32Status = Body("Lendo programas Win32…");
-        win32Host.Children.Add(win32Status);
-        tabs.Items.Add(new TabItem { Header = "Win32", Content = win32Host });
-        _ = LoadWin32ProgramsAsync(win32Host, win32Status);
-
-        var startupHost = new StackPanel();
-        var startupStatus = Body("Lendo inicialização…");
-        startupHost.Children.Add(startupStatus);
-        tabs.Items.Add(new TabItem { Header = "Inicialização", Content = startupHost });
-        _ = LoadDebloatStartupAsync(startupHost, startupStatus, new StartupManagerService());
-
-        var servicesHost = new StackPanel();
-        var servicesStatus = Body("Consultando serviços…");
-        servicesHost.Children.Add(servicesStatus);
-        tabs.Items.Add(new TabItem { Header = "Serviços", Content = servicesHost });
-        _ = LoadDebloatServicesAsync(servicesHost, servicesStatus, new ServiceTweakService());
-
-        var tasksHost = new StackPanel();
-        var tasksStatus = Body("Consultando tarefas…");
-        tasksHost.Children.Add(tasksStatus);
-        tabs.Items.Add(new TabItem { Header = "Tarefas", Content = tasksHost });
-        _ = LoadDebloatTasksAsync(tasksHost, tasksStatus, new ScheduledTaskTweakService());
-
-        root.Children.Add(tabs);
-        return root;
-    }
+    private UIElement BuildDebloat() => BuildDebloatPage();
 
     private Border BuildAppxDebloatCard()
     {
@@ -1557,67 +1387,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private UIElement BuildMotherboard()
-    {
-        var root = PageContainer();
-        var profile = MotherboardProfileService.Find(_hardware);
-        if (profile is null)
-        {
-            root.Children.Add(PageIntro("Placa-mãe", _hardware.BoardManufacturer + " " + _hardware.BoardProduct));
-            root.Children.Add(NoteCard("Perfil não cadastrado", "O ynoez não vai aplicar ajustes de firmware em uma placa não identificada."));
-            root.Children.Add(BuildToolActionCard("Entrar na UEFI", "Abra o firmware para consultar as opções da placa.", "Reiniciar", RestartToUefiAsync));
-            return root;
-        }
-
-        root.Children.Add(PageIntro(profile.Manufacturer + " " + profile.Product, "Ajustes de CPU, memória, ventoinhas e firmware para esta placa."));
-        var recommendations = new UniformGrid { Columns = 2 };
-        recommendations.Children.Add(InfoTile("MEMÓRIA • XMP/DOCP", "Ative o Profile 1 somente se o kit suportar a frequência e estiver estável.", "RAM"));
-        recommendations.Children.Add(InfoTile("CPU • CORE PERFORMANCE BOOST", "Mantenha Auto/Enabled para preservar o boost padrão do Ryzen.", "CPU"));
-        recommendations.Children.Add(InfoTile("CPU • PBO", "Deixe Auto por padrão. Não aplique tensão ou limites térmicos sem validar refrigeração.", "PBO"));
-        recommendations.Children.Add(InfoTile("VENTOINHAS • SMART FAN 5", "Use curva baseada na temperatura real do CPU; mantenha proteção térmica.", "FAN"));
-        recommendations.Children.Add(InfoTile("SMART ACCESS MEMORY", "Se suportado pela BIOS, confira Above 4G Decoding e Re-Size BAR. Verifique o estado no AMD Adrenalin; não force opções ausentes.", "SAM"));
-        root.Children.Add(recommendations);
-
-        var actions = new UniformGrid { Columns = 2 };
-        actions.Children.Add(BuildToolActionCard("Abrir UEFI / BIOS", "Reinicia o computador diretamente no firmware.", "Reiniciar", RestartToUefiAsync));
-        actions.Children.Add(BuildToolActionCard("Driver AMD Chipset", "Abre o suporte oficial da AMD.", "Abrir", () => OpenTargetAsync("https://www.amd.com/en/support/download/drivers.html")));
-        root.Children.Add(actions);
-
-        var biosCard = MakeCard();
-        var biosPanel = new StackPanel { Margin = new Thickness(15) };
-        biosPanel.Children.Add(Heading("BIOS da revisão correta", 13));
-        var row = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        var picker = new ComboBox
-        {
-            MinWidth = 150,
-            Height = 34,
-            ItemsSource = profile.RevisionLinks.OrderBy(x => x.Revision, StringComparer.OrdinalIgnoreCase),
-            DisplayMemberPath = nameof(MotherboardRevisionLink.Revision),
-            SelectedIndex = -1,
-            Margin = new Thickness(0, 2, 8, 0)
-        };
-        var openBios = new Button
-        {
-            Content = "Página oficial",
-            Style = (Style)FindResource("AccentButton"),
-            IsEnabled = false,
-            Margin = new Thickness(0, 2, 0, 0)
-        };
-        picker.SelectionChanged += (_, _) => openBios.IsEnabled = picker.SelectedItem is MotherboardRevisionLink;
-        openBios.Click += async (_, _) =>
-        {
-            if (picker.SelectedItem is MotherboardRevisionLink selected)
-                await OpenTargetAsync(selected.Bios);
-        };
-        row.Children.Add(picker);
-        row.Children.Add(openBios);
-        biosPanel.Children.Add(row);
-        biosCard.Child = biosPanel;
-        root.Children.Add(biosCard);
-
-        root.Children.Add(BuildToolActionCard("Manual da placa", "Abra o manual oficial da série A520M K.", "Manual", () => OpenTargetAsync(profile.ManualUrl)));
-        return root;
-    }
+    private UIElement BuildMotherboard() => BuildFirmwarePage();
 
     private Task RestartToUefiAsync()
     {
