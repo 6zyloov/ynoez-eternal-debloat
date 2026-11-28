@@ -6,13 +6,11 @@ Permitir que um jogo principal tenha prioridade de CPU e preferência de GPU de 
 
 ## Configuração
 
-1. Abra **Foco de Jogo** no menu lateral.
-2. Em **Jogo principal**, escolha o executável do jogo. Para Counter-Strike 2, selecione `cs2.exe`.
-3. Deixe **Alta — agressiva** para maior prioridade de CPU ou escolha **Acima do normal — recomendado** para uma opção mais conservadora. A opção Alta exige confirmação.
-4. Em **Segundo plano / AFK**, adicione `RobloxPlayerBeta.exe` uma única vez. Todas as instâncias com o mesmo nome de processo recebem o perfil — não é necessário cadastrar cada janela separadamente.
-5. Se o XT usar um executável independente, adicione o arquivo .exe correspondente também. Caso use PowerShell, Python, Node.js ou outro runtime protegido, não cadastre processos do sistema sem identificar primeiro o processo correto.
-6. Deixe o modo AFK em **Idle (extremamente baixa)**. Se o Roblox perder conexão ou deixar de avançar por falta de tempo de CPU, mude para **Abaixo do normal**.
-7. Clique em **Ativar perfil de foco**. Feche e reabra os jogos para que a preferência gráfica do Windows seja considerada.
+1. Abra **Foco de Jogo** no menu lateral. O ynoez tenta detectar o CS2 nas bibliotecas Steam e a versão mais recente do Roblox automaticamente.
+2. Clique em **Detectar CS2 + Roblox** para atualizar os caminhos. Se algum jogo não for localizado, abra-o uma vez ou use o seletor de executável.
+3. O perfil recomendado já usa prioridade **Alta** para o jogo (com confirmação de segurança) e **Idle** para Roblox. Uma única entrada de `RobloxPlayerBeta.exe` abrange os dois clientes e novas instâncias.
+4. Clique em **Ativar perfil de foco**. Feche e reabra os jogos para que a preferência gráfica do Windows seja considerada.
+5. O XT não é rebaixado por um nome presumido: runtimes comuns como PowerShell, Python, Node.js, Java e AutoHotkey já são protegidos pelo perfil automático. Só cadastre o executável do XT aqui se ele for independente e você souber qual arquivo é.
 
 ## O que cada controle realmente faz
 

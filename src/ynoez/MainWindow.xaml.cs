@@ -16,13 +16,13 @@ namespace ynoez;
 
 public partial class MainWindow : Window
 {
-    private static readonly Brush PageBrush = BrushFrom("#121212");
-    private static readonly Brush CardBrush = BrushFrom("#1E1E1E");
-    private static readonly Brush AccentBrush = BrushFrom("#FF80FF");
+    private static readonly Brush PageBrush = BrushFrom("#000000");
+    private static readonly Brush CardBrush = BrushFrom("#080808");
+    private static readonly Brush AccentBrush = BrushFrom("#FFFFFF");
     private static readonly Brush PrimaryBrush = BrushFrom("#FFFFFF");
-    private static readonly Brush SecondaryBrush = BrushFrom("#AFAFAF");
-    private static readonly Brush MutedBrush = BrushFrom("#787878");
-    private static readonly Brush BorderBrushSoft = BrushFrom("#333333");
+    private static readonly Brush SecondaryBrush = BrushFrom("#D2D2D2");
+    private static readonly Brush MutedBrush = BrushFrom("#858585");
+    private static readonly Brush BorderBrushSoft = BrushFrom("#242424");
 
     private HardwareSnapshot _hardware = new();
     private string _currentPage = "Home";
@@ -226,7 +226,7 @@ public partial class MainWindow : Window
         };
         foreach (var item in map)
         {
-            item.Value.Background = item.Key == page ? BrushFrom("#262026") : PageBrush;
+            item.Value.Background = item.Key == page ? BrushFrom("#181818") : PageBrush;
             item.Value.Foreground = item.Key == page ? AccentBrush : PrimaryBrush;
         }
     }
@@ -261,10 +261,10 @@ public partial class MainWindow : Window
             CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"),
-            AlternatingRowBackground = BrushFrom("#202020"),
+            RowBackground = BrushFrom("#050505"),
+            AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft,
             Height = 210,
             Margin = new Thickness(0, 10, 0, 10)
@@ -364,9 +364,9 @@ public partial class MainWindow : Window
         panel.Children.Add(Heading("Information", 17));
         panel.Children.Add(Body("O ynoez funciona localmente. Nenhum ajuste é aplicado em segundo plano. Cada alteração disponível fica identificada, exige ação explícita e registra o que foi feito."));
         var row = new WrapPanel { Margin = new Thickness(0, 13, 0, 0) };
-        row.Children.Add(Badge("BACKUP ANTES DE AJUSTAR", "#FF80FF"));
-        row.Children.Add(Badge("RESTAURAÇÃO", "#FF80FF"));
-        row.Children.Add(Badge("VANGUARD / FACEIT: PROTEÇÕES PRESERVADAS", "#AFAFAF"));
+        row.Children.Add(Badge("BACKUP ANTES DE AJUSTAR", "#FFFFFF"));
+        row.Children.Add(Badge("RESTAURAÇÃO", "#FFFFFF"));
+        row.Children.Add(Badge("VANGUARD / FACEIT: PROTEÇÕES PRESERVADAS", "#D2D2D2"));
         panel.Children.Add(row);
         info.Child = panel;
         root.Children.Add(info);
@@ -441,8 +441,8 @@ public partial class MainWindow : Window
             CanUserDeleteRows = false, CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"), AlternatingRowBackground = BrushFrom("#202020"),
+            Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#050505"), AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft, Height = 280, Margin = new Thickness(0, 10, 0, 10)
         };
         integrityGrid.Columns.Add(new DataGridTextColumn { Header = "Área", Binding = new Binding(nameof(WindowsIntegrityAuditRow.Area)), Width = new DataGridLength(1.1, DataGridLengthUnitType.Star) });
@@ -691,7 +691,7 @@ public partial class MainWindow : Window
             MinWidth = 300,
             Height = 34,
             FontSize = 11,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             Padding = new Thickness(8, 6, 8, 6),
@@ -828,7 +828,7 @@ public partial class MainWindow : Window
 
     private static (Border Container, TextBlock Value) MetricLine(string label, string initial)
     {
-        var border = new Border { Background = BrushFrom("#171717"), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 4, 0, 4) };
+        var border = new Border { Background = BrushFrom("#050505"), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 4, 0, 4) };
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -919,7 +919,7 @@ public partial class MainWindow : Window
             Text = string.Join("; ", AutoProfileService.GetCustomProtectedProcessNames()),
             MinHeight = 36,
             Padding = new Thickness(10, 8, 10, 8),
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             BorderThickness = new Thickness(1),
@@ -929,7 +929,7 @@ public partial class MainWindow : Window
         var autoStatus = new TextBlock
         {
             Text = protectionWarning ?? "Automação desligada.",
-            Foreground = protectionWarning is null ? SecondaryBrush : BrushFrom("#FFC078"),
+            Foreground = protectionWarning is null ? SecondaryBrush : BrushFrom("#FFFFFF"),
             FontSize = 11,
             Margin = new Thickness(0, 10, 0, 10),
             TextWrapping = TextWrapping.Wrap
@@ -939,7 +939,7 @@ public partial class MainWindow : Window
             MinWidth = 320,
             MinHeight = 34,
             Margin = new Thickness(0, 4, 8, 8),
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             BorderThickness = new Thickness(1),
@@ -1092,7 +1092,6 @@ public partial class MainWindow : Window
         stopAuto.Click += (_, _) => _autoProfileCts?.Cancel();
         autoButtons.Children.Add(startAuto);
         autoButtons.Children.Add(stopAuto);
-        autoPanel.Children.Add(autoStatus);
         autoPanel.Children.Add(autoButtons);
         autoCard.Child = autoPanel;
         root.Children.Add(autoCard);
@@ -1355,8 +1354,8 @@ public partial class MainWindow : Window
             CanUserDeleteRows = false, CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"), AlternatingRowBackground = BrushFrom("#202020"),
+            Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#050505"), AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft, Height = 270, Margin = new Thickness(0, 10, 0, 10)
         };
         inventoryGrid.Columns.Add(new DataGridTextColumn { Header = "Adaptador", Binding = new Binding(nameof(NetworkAdapterInventory.Name)), Width = new DataGridLength(1.4, DataGridLengthUnitType.Star) });
@@ -1422,10 +1421,10 @@ public partial class MainWindow : Window
             CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"),
-            AlternatingRowBackground = BrushFrom("#202020"),
+            RowBackground = BrushFrom("#050505"),
+            AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft,
             Height = 330,
             Margin = new Thickness(0, 10, 0, 10)
@@ -1504,10 +1503,10 @@ public partial class MainWindow : Window
             CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"),
-            AlternatingRowBackground = BrushFrom("#202020"),
+            RowBackground = BrushFrom("#050505"),
+            AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft,
             Height = 240,
             Margin = new Thickness(0, 10, 0, 10)
@@ -1714,7 +1713,7 @@ public partial class MainWindow : Window
         var programsStatus = Body("Programas ainda não consultados.");
         var programsSearch = new TextBox
         {
-            Height = 32, MinWidth = 230, Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
+            Height = 32, MinWidth = 230, Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft, Padding = new Thickness(8, 5, 8, 5),
             Margin = new Thickness(0, 8, 0, 8), ToolTip = "Filtrar por nome, versão, editor ou classificação"
         };
@@ -1728,10 +1727,10 @@ public partial class MainWindow : Window
             CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"),
-            AlternatingRowBackground = BrushFrom("#202020"),
+            RowBackground = BrushFrom("#050505"),
+            AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft,
             Height = 280,
             Margin = new Thickness(0, 0, 0, 10)
@@ -1832,10 +1831,10 @@ public partial class MainWindow : Window
             CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"),
-            AlternatingRowBackground = BrushFrom("#202020"),
+            RowBackground = BrushFrom("#050505"),
+            AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft,
             Height = 260,
             Margin = new Thickness(0, 10, 0, 10)
@@ -1908,8 +1907,8 @@ public partial class MainWindow : Window
             CanUserDeleteRows = false, CanUserResizeRows = false,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"), Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"), AlternatingRowBackground = BrushFrom("#202020"),
+            Background = BrushFrom("#050505"), Foreground = PrimaryBrush,
+            RowBackground = BrushFrom("#050505"), AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft, Height = 250, Margin = new Thickness(0, 10, 0, 10)
         };
         systemAppxGrid.Columns.Add(new DataGridTextColumn { Header = "Pacote", Binding = new Binding(nameof(AppxSystemPackageInfo.Name)), Width = new DataGridLength(1.6, DataGridLengthUnitType.Star) });
@@ -2023,7 +2022,7 @@ public partial class MainWindow : Window
                 Height = 38,
                 MinWidth = 180,
                 Padding = new Thickness(8, 5, 8, 5),
-                Background = BrushFrom("#171717"),
+                Background = BrushFrom("#050505"),
                 Foreground = PrimaryBrush,
                 BorderBrush = BorderBrushSoft,
                 BorderThickness = new Thickness(1),
@@ -2113,10 +2112,10 @@ public partial class MainWindow : Window
                 SelectionMode = DataGridSelectionMode.Single,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-                Background = BrushFrom("#171717"),
+                Background = BrushFrom("#050505"),
                 Foreground = PrimaryBrush,
-                RowBackground = BrushFrom("#171717"),
-                AlternatingRowBackground = BrushFrom("#202020"),
+                RowBackground = BrushFrom("#050505"),
+                AlternatingRowBackground = BrushFrom("#171717"),
                 BorderBrush = BorderBrushSoft,
                 Height = 300,
                 Margin = new Thickness(0, 10, 0, 10)
@@ -2322,7 +2321,7 @@ public partial class MainWindow : Window
             Height = 38,
             FontSize = 12,
             Padding = new Thickness(11, 8, 11, 8),
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             BorderThickness = new Thickness(1),
@@ -2342,10 +2341,10 @@ public partial class MainWindow : Window
             SelectionMode = DataGridSelectionMode.Single,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"),
-            AlternatingRowBackground = BrushFrom("#202020"),
+            RowBackground = BrushFrom("#050505"),
+            AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft,
             Height = 330,
             Margin = new Thickness(0, 10, 0, 10)
@@ -2482,7 +2481,7 @@ public partial class MainWindow : Window
             Height = 38,
             FontSize = 12,
             Padding = new Thickness(11, 8, 11, 8),
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             BorderThickness = new Thickness(1),
@@ -2502,10 +2501,10 @@ public partial class MainWindow : Window
             SelectionMode = DataGridSelectionMode.Single,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
-            RowBackground = BrushFrom("#171717"),
-            AlternatingRowBackground = BrushFrom("#202020"),
+            RowBackground = BrushFrom("#050505"),
+            AlternatingRowBackground = BrushFrom("#171717"),
             BorderBrush = BorderBrushSoft,
             Height = 330,
             Margin = new Thickness(0, 10, 0, 10)
@@ -2991,7 +2990,7 @@ public partial class MainWindow : Window
         var text = new TextBox
         {
             Text = AppLog.ReadRecent(), IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = BrushFrom("#171717"),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = BrushFrom("#050505"),
             Foreground = SecondaryBrush, BorderBrush = BorderBrushSoft, FontFamily = new FontFamily("Consolas"),
             FontSize = 10, Height = 390, Padding = new Thickness(10), Margin = new Thickness(0, 12, 0, 0)
         };
@@ -3035,7 +3034,7 @@ public partial class MainWindow : Window
         return row;
     }
 
-    private static StackPanel PageContainer() => new() { Orientation = Orientation.Vertical, MinWidth = 550 };
+    private static StackPanel PageContainer() => new() { Orientation = Orientation.Vertical, MinWidth = 0 };
 
     private static UIElement PageIntro(string title, string description)
     {
@@ -3076,7 +3075,7 @@ public partial class MainWindow : Window
         var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var header = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
         header.Children.Add(Heading(title, 13));
-        header.Children.Add(Badge(status, status.Contains("PROTEG") ? "#AFAFAF" : "#FF80FF"));
+        header.Children.Add(Badge(status, status.Contains("PROTEG") ? "#D2D2D2" : "#FFFFFF"));
         content.Children.Add(header);
         content.Children.Add(Body(description));
         grid.Children.Add(content);
@@ -3136,7 +3135,7 @@ public partial class MainWindow : Window
         var brush = BrushFrom(color);
         return new Border
         {
-            Background = BrushFrom("#2A242A"), CornerRadius = new CornerRadius(4),
+            Background = BrushFrom("#151515"), CornerRadius = new CornerRadius(4),
             Padding = new Thickness(7, 3, 7, 3), Margin = new Thickness(10, 0, 0, 4),
             Child = new TextBlock { Text = text, Foreground = brush, FontSize = 8, FontWeight = FontWeights.Bold }
         };

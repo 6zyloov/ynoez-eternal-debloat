@@ -1,4 +1,7 @@
 using System.IO;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
+using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -20,6 +23,7 @@ public partial class MainWindow
     private ComboBox? _backgroundCpuPriorityCombo;
     private ListBox? _backgroundExecutableList;
     private TextBlock? _processFocusStatus;
+    private TextBlock? _focusDiscoveryStatus;
     private DispatcherTimer? _processFocusTimer;
     private bool _processFocusTickRunning;
 
@@ -48,6 +52,14 @@ public partial class MainWindow
         var focusPanel = new StackPanel();
         focusPanel.Children.Add(FocusHeading("JOGO PRINCIPAL"));
         focusPanel.Children.Add(FocusDescription("Este aplicativo recebe prioridade de CPU Alta (padrão, com confirmação) ou Acima do normal e prioridade de memória normal. A preferência do Windows para a GPU de alto desempenho também é configurada para o próximo início."));
+        var detectionRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 8) };
+        var detectGames = CreateFocusButton("Detectar CS2 + Roblox", true);
+        detectGames.Click += (_, _) => DetectFocusTargets(showSummary: true);
+        detectionRow.Children.Add(detectGames);
+        _focusDiscoveryStatus = FocusDescription("O ynoez procura o CS2 nas bibliotecas Steam e a versão mais recente instalada do Roblox.", new Thickness(10, 7, 0, 0));
+        _focusDiscoveryStatus.VerticalAlignment = VerticalAlignment.Center;
+        detectionRow.Children.Add(_focusDiscoveryStatus);
+        focusPanel.Children.Add(detectionRow);
         var focusPathTextBox = CreateFocusTextBox();
         focusPathTextBox.Text = settings.FocusExecutablePath ?? string.Empty;
         _focusExecutableTextBox = focusPathTextBox;
@@ -74,7 +86,7 @@ public partial class MainWindow
             Height = 36,
             MinWidth = 260,
             HorizontalAlignment = HorizontalAlignment.Left,
-            Background = BrushFrom("#292329"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             Padding = new Thickness(8, 5, 8, 5),
@@ -96,7 +108,7 @@ public partial class MainWindow
         {
             Height = 112,
             Margin = new Thickness(0, 10, 0, 8),
-            Background = BrushFrom("#171717"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             BorderThickness = new Thickness(1),
@@ -112,7 +124,7 @@ public partial class MainWindow
             Height = 36,
             MinWidth = 300,
             HorizontalAlignment = HorizontalAlignment.Left,
-            Background = BrushFrom("#292329"),
+            Background = BrushFrom("#050505"),
             Foreground = PrimaryBrush,
             BorderBrush = BorderBrushSoft,
             Padding = new Thickness(8, 5, 8, 5),
@@ -196,10 +208,183 @@ public partial class MainWindow
         limitationCard.Child = limitationPanel;
         root.Children.Add(limitationCard);
 
+        DetectFocusTargets(showSummary: false);
+
         if (settings.Enabled)
             StartProcessFocusMonitor();
 
         return root;
+    }
+
+    private void DetectFocusTargets(bool showSummary)
+    {
+        if (_focusExecutableTextBox is null || _backgroundExecutableList is null)
+            return;
+
+        var messages = new List<string>();
+        var currentFocusPath = _focusExecutableTextBox.Text.Trim();
+        var focusPath = File.Exists(currentFocusPath) ? currentFocusPath : FindCounterStrikeExecutable();
+        if (!string.IsNullOrWhiteSpace(focusPath) && File.Exists(focusPath))
+        {
+            _focusExecutableTextBox.Text = focusPath;
+            messages.Add("CS2 detectado");
+        }
+        else
+        {
+            messages.Add("CS2 não encontrado automaticamente");
+        }
+
+        var robloxPath = FindRobloxExecutable();
+        if (!string.IsNullOrWhiteSpace(robloxPath) && File.Exists(robloxPath))
+        {
+            // Roblox updates into a new version folder. Replace the saved path so the
+            // Windows GPU preference is written for the current executable location.
+            var oldRobloxItems = _backgroundExecutableList.Items
+                .Cast<FocusExecutableItem>()
+                .Where(x => string.Equals(Path.GetFileNameWithoutExtension(x.FilePath),
+                    "RobloxPlayerBeta", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            foreach (var oldItem in oldRobloxItems)
+                _backgroundExecutableList.Items.Remove(oldItem);
+
+            _backgroundExecutableList.Items.Add(new FocusExecutableItem(robloxPath));
+            messages.Add("Roblox detectado (todas as instâncias serão incluídas)");
+        }
+        else
+        {
+            messages.Add("Roblox não encontrado — abra-o uma vez ou escolha o .exe");
+        }
+
+        var result = string.Join(" • ", messages);
+        if (_focusDiscoveryStatus is not null)
+            _focusDiscoveryStatus.Text = result;
+
+        if (showSummary)
+            MessageBox.Show(result + Environment.NewLine + Environment.NewLine +
+                "Confira os caminhos e clique em Ativar perfil de foco. O Roblox é cadastrado apenas uma vez, mesmo com duas ou mais instâncias.",
+                "ynoez — detecção automática", MessageBoxButton.OK,
+                focusPath is not null && robloxPath is not null ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private static string? FindCounterStrikeExecutable()
+    {
+        var running = FindRunningExecutable("cs2");
+        if (running is not null)
+            return running;
+
+        var steamRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (root, keyPath) in new[]
+        {
+            (Registry.CurrentUser, @"Software\\Valve\\Steam"),
+            (Registry.LocalMachine, @"SOFTWARE\\WOW6432Node\\Valve\\Steam"),
+            (Registry.LocalMachine, @"SOFTWARE\\Valve\\Steam")
+        })
+        {
+            try
+            {
+                using var key = root.OpenSubKey(keyPath);
+                var value = key?.GetValue("SteamPath")?.ToString() ?? key?.GetValue("InstallPath")?.ToString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    steamRoots.Add(value.Replace('/', Path.DirectorySeparatorChar));
+            }
+            catch (System.Security.SecurityException)
+            {
+                // Another registry hive may still provide the Steam location.
+            }
+        }
+
+        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        if (!string.IsNullOrWhiteSpace(programFilesX86))
+            steamRoots.Add(Path.Combine(programFilesX86, "Steam"));
+        if (!string.IsNullOrWhiteSpace(programFiles))
+            steamRoots.Add(Path.Combine(programFiles, "Steam"));
+
+        var libraries = new HashSet<string>(steamRoots, StringComparer.OrdinalIgnoreCase);
+        foreach (var steamRoot in steamRoots)
+        {
+            var libraryFile = Path.Combine(steamRoot, "steamapps", "libraryfolders.vdf");
+            if (!File.Exists(libraryFile))
+                continue;
+
+            try
+            {
+                var vdf = File.ReadAllText(libraryFile);
+                foreach (Match match in Regex.Matches(vdf, "\"path\"\\s+\"([^\"]+)\"", RegexOptions.IgnoreCase))
+                {
+                    var library = match.Groups[1].Value.Replace("\\\\", "\\");
+                    if (!string.IsNullOrWhiteSpace(library))
+                        libraries.Add(library);
+                }
+            }
+            catch (IOException)
+            {
+                // Continue searching the other known Steam libraries.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Continue searching the other known Steam libraries.
+            }
+        }
+
+        foreach (var library in libraries)
+        {
+            var candidate = Path.Combine(library, "steamapps", "common",
+                "Counter-Strike Global Offensive", "game", "bin", "win64", "cs2.exe");
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static string? FindRobloxExecutable()
+    {
+        var running = FindRunningExecutable("RobloxPlayerBeta");
+        if (running is not null)
+            return running;
+
+        var versionsRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Roblox", "Versions");
+        if (!Directory.Exists(versionsRoot))
+            return null;
+
+        try
+        {
+            return Directory.EnumerateDirectories(versionsRoot, "version-*", SearchOption.TopDirectoryOnly)
+                .Select(directory => Path.Combine(directory, "RobloxPlayerBeta.exe"))
+                .Where(File.Exists)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static string? FindRunningExecutable(string processName)
+    {
+        foreach (var process in Process.GetProcessesByName(processName))
+        {
+            using (process)
+            {
+                try
+                {
+                    var path = process.MainModule?.FileName;
+                    if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                        return Path.GetFullPath(path);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException
+                    or System.ComponentModel.Win32Exception or NotSupportedException)
+                {
+                    // Process paths can be hidden by Windows access restrictions.
+                }
+            }
+        }
+
+        return null;
     }
 
     private void ActivateProcessFocusProfile()
