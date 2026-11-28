@@ -20,7 +20,6 @@
 
             <Style TargetType="{x:Type TextBlock}">
                 <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
-                <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
 
@@ -43,7 +42,8 @@
                                     CornerRadius="6" Padding="{TemplateBinding Padding}">
                                 <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                  RecognizesAccessKey="True" />
+                                                  RecognizesAccessKey="True"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}" />
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
@@ -426,7 +426,8 @@
                                     <TextBlock Text="{TemplateBinding Tag}" FontSize="15"
                                                VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}" />
                                     <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
-                                                      RecognizesAccessKey="True" />
+                                                      RecognizesAccessKey="True"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}" />
                                 </Grid>
                             </Border>
                             <ControlTemplate.Triggers>
@@ -462,7 +463,8 @@
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="6" Padding="{TemplateBinding Padding}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                  RecognizesAccessKey="True" />
+                                                  RecognizesAccessKey="True"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}" />
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
