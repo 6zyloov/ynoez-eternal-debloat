@@ -254,31 +254,34 @@ public partial class MainWindow : Window
     private UIElement BuildHome()
     {
         var root = PageContainer();
-        root.Children.Add(PageIntro("Home", "Seu PC. Seus ajustes. Sem painel de gráficos."));
+        var brand = Heading("ynoez", 28);
+        brand.Margin = new Thickness(0, 0, 0, 18);
+        root.Children.Add(brand);
 
-        var hardware = new UniformGrid { Columns = 3, Margin = new Thickness(0, 2, 0, 15) };
-        hardware.Children.Add(InfoTile("CPU", _hardware.Cpu, "CPU"));
-        hardware.Children.Add(InfoTile("GPU", _hardware.Gpu, "GPU"));
-        hardware.Children.Add(InfoTile("RAM", _hardware.Memory, "RAM"));
-        root.Children.Add(hardware);
-
-        var actions = MakeCard();
-        var actionPanel = new StackPanel { Margin = new Thickness(17, 14, 17, 14) };
-        actionPanel.Children.Add(Heading("Ações", 14));
-        var actionGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 5, 0, 0) };
-        actionGrid.Children.Add(SmallAction("Otimizações", () => ShowPage("Tweaks")));
-        actionGrid.Children.Add(SmallAction("Debloat", () => ShowPage("Debloat")));
-        actionGrid.Children.Add(SmallAction("Foco de Jogo", () => ShowPage("Foco de Jogo")));
-        actionGrid.Children.Add(SmallAction("Placa-mãe", () => ShowPage("Motherboard")));
-        actionPanel.Children.Add(actionGrid);
-        actions.Child = actionPanel;
+        var actions = new UniformGrid { Columns = 2 };
+        actions.Children.Add(HomeAction("OTIMIZAR", "Tweaks"));
+        actions.Children.Add(HomeAction("DEBLOAT", "Debloat"));
+        actions.Children.Add(HomeAction("FOCO DE JOGO", "Foco de Jogo"));
+        actions.Children.Add(HomeAction("BIOS / PLACA-MÃE", "Motherboard"));
         root.Children.Add(actions);
-
-        var system = Body(_hardware.OperatingSystem + " • " + _hardware.BoardProduct);
-        system.Margin = new Thickness(2, 11, 0, 0);
-        system.Foreground = MutedBrush;
-        root.Children.Add(system);
         return root;
+    }
+
+    private Button HomeAction(string label, string page)
+    {
+        var button = new Button
+        {
+            Content = label,
+            Style = (Style)FindResource("QuietButton"),
+            Height = 74,
+            Margin = new Thickness(0, 0, 10, 10),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            FontSize = 12,
+            FontWeight = FontWeights.Bold
+        };
+        button.Click += (_, _) => ShowPage(page);
+        return button;
     }
 
     private Border BuildToggleCard(
