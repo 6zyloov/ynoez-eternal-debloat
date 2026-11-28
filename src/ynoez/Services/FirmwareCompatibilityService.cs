@@ -255,7 +255,13 @@ public static class FirmwareCompatibilityService
             if (name is null) continue;
             var current = settings.First(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
             var enabled = SelectEnabledValue(current.AllowedValues);
-            if (enabled is null || string.Equals(current.Value, enabled, StringComparison.OrdinalIgnoreCase))
+            var alreadyEnabled = string.Equals(current.Value, "Enabled", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(current.Value, "Enable", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(current.Value, "On", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(current.Value, "Active", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(current.Value, "1", StringComparison.OrdinalIgnoreCase) ||
+                (requirement == "cpu-boost" && string.Equals(current.Value, "Auto", StringComparison.OrdinalIgnoreCase));
+            if (enabled is null || alreadyEnabled)
                 continue;
             plan.Add(new LenovoChange(current.Name, current.Value, enabled));
         }
@@ -266,9 +272,9 @@ public static class FirmwareCompatibilityService
     {
         try
         {
-            _ = ReadLenovoSettings();
-            available = true;
-            return true;
+            var settings = ReadLenovoSettings();
+            available = settings.Count > 0;
+            return available;
         }
         catch (Exception ex)
         {
@@ -494,8 +500,8 @@ public static class FirmwareCompatibilityService
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo("manage-bde.exe",
-                "-status " + Environment.GetEnvironmentVariable("SystemDrive"))
+            using var process = Process.Start(new ProcessStartInfo(AppPaths.PowerShellExecutable,
+                "-NoProfile -NonInteractive -Command \"try { $v=Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction Stop; if ($v.ProtectionStatus -eq 'On') { 'On' } else { 'Off' } } catch { 'Unknown' }\"")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -503,16 +509,15 @@ public static class FirmwareCompatibilityService
                 RedirectStandardError = true
             });
             if (process is null) return true;
-            var output = process.StandardOutput.ReadToEnd();
-            if (!process.WaitForExit(7000))
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            if (!process.WaitForExit(8000))
             {
                 process.Kill(true);
                 return true;
             }
-            if (process.ExitCode != 0) return true;
-            // If manage-bde reports protection as On, do not change TPM/Secure Boot.
-            return output.Contains("Protection Status", StringComparison.OrdinalIgnoreCase) &&
-                output.Contains("Protection On", StringComparison.OrdinalIgnoreCase);
+            var output = outputTask.GetAwaiter().GetResult().Trim();
+            // Unknown is intentionally treated as protected: never risk changing PCR measurements.
+            return !string.Equals(output, "Off", StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception ex)
         {
