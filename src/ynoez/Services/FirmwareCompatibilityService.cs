@@ -657,24 +657,29 @@ public static class FirmwareCompatibilityService
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(AppPaths.PowerShellExecutable,
-                "-NoProfile -NonInteractive -Command \"try { $v=Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction Stop; if ($v.ProtectionStatus -eq 'On') { 'On' } else { 'Off' } } catch { 'Unknown' }\"")
+            var systemDrive = Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
+            using var searcher = new ManagementObjectSearcher(
+                @"\\.\root\CIMV2\Security\MicrosoftVolumeEncryption",
+                "SELECT DriveLetter, ProtectionStatus FROM Win32_EncryptableVolume");
+            using var rows = searcher.Get();
+            foreach (ManagementObject volume in rows)
             {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            });
-            if (process is null) return true;
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            if (!process.WaitForExit(8000))
-            {
-                process.Kill(true);
-                return true;
+                using (volume)
+                {
+                    var driveLetter = Convert.ToString(volume["DriveLetter"]);
+                    if (!string.Equals(driveLetter, systemDrive, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    // Win32_EncryptableVolume: 0 = protection off, 1 = on, 2 = unknown.
+                    // Unknown is treated as protected so an unattended firmware change
+                    // cannot alter TPM/Secure Boot measurements while BitLocker may be active.
+                    var status = Convert.ToInt32(volume["ProtectionStatus"] ?? 2);
+                    return status != 0;
+                }
             }
-            var output = outputTask.GetAwaiter().GetResult().Trim();
-            // Unknown is intentionally treated as protected: never risk changing PCR measurements.
-            return !string.Equals(output, "Off", StringComparison.OrdinalIgnoreCase);
+
+            AppLog.Write("Volume de sistema não apareceu na consulta BitLocker; alterações de BIOS bloqueadas.");
+            return true;
         }
         catch (Exception ex)
         {
