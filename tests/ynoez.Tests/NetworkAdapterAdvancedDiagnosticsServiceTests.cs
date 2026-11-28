@@ -139,6 +139,10 @@ public sealed class NetworkAdapterAdvancedDiagnosticsServiceTests
         Assert.DoesNotContain("Set-NetAdapterAdvancedProperty", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Set-NetAdapter", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Remove-NetAdapter", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("$errors = New-Object System.Collections.Generic.List[string]", script);
+        Assert.Contains("$errors.Add(", script);
+        Assert.Contains("Errors = @($errors.ToArray())", script);
+        Assert.DoesNotContain("$warnings", script, StringComparison.Ordinal);
     }
 
     [Theory]
