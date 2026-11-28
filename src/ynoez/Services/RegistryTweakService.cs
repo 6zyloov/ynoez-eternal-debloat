@@ -173,7 +173,7 @@ public sealed class RegistryTweakService
             throw new InvalidOperationException("Este ajuste exige Windows build " + tweak.MinimumBuild + " ou superior.");
         var path = tweak.KeyPath.Replace('/', '\\').Trim('\\');
         var allowedPrefixes = new[] { "Software\\Microsoft\\Windows\\CurrentVersion\\", "Software\\Microsoft\\GameBar\\" };
-        var exactAllowed = new[] { "Control Panel\\Desktop", "Control Panel\\Mouse" };
+        var exactAllowed = new[] { "Control Panel\\Desktop", "Control Panel\\Mouse", "Software\\Microsoft\\GameBar" };
         if (!string.Equals(path, tweak.KeyPath, StringComparison.Ordinal) || path.Contains(@"\\", StringComparison.Ordinal))
             throw new InvalidOperationException("O caminho de registro precisa estar em formato canônico, sem separadores duplicados.");
         if (!allowedPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) &&

@@ -837,6 +837,7 @@ public partial class MainWindow : Window
         var kernelGrid = new UniformGrid { Columns = 2 };
         kernelGrid.Children.Add(BuildSystemRegistryToggleCard("mmcss-games"));
         kernelGrid.Children.Add(BuildSystemRegistryToggleCard("network-throttling"));
+        kernelGrid.Children.Add(BuildSystemRegistryToggleCard("power-throttling-off"));
         kernelGrid.Children.Add(BuildTimerResolutionCard());
         tabs.Items.Add(new TabItem { Header = "Kernel", Content = kernelGrid });
 
@@ -877,6 +878,14 @@ public partial class MainWindow : Window
             _autoProfileCts is null ? "DESLIGADO" : "ATIVO");
         powerPanel.Children.Add(autoCard);
         powerPanel.Children.Add(autoStatus);
+        if (QuickGameOptimizationService.IsApplied)
+        {
+            powerPanel.Children.Add(BuildToolActionCard(
+                "Desfazer perfil rápido antigo",
+                "Restaura as alterações do perfil rápido aplicado por uma versão anterior.",
+                "Restaurar",
+                async () => await Task.Run(QuickGameOptimizationService.Restore)));
+        }
         tabs.Items.Add(new TabItem { Header = "Power", Content = powerPanel });
 
         var gpuGrid = new UniformGrid { Columns = 2 };
@@ -1078,6 +1087,12 @@ public partial class MainWindow : Window
         var tabs = new TabControl { Background = PageBrush, BorderThickness = new Thickness(0), Margin = new Thickness(0, 8, 0, 0) };
         tabs.Items.Add(new TabItem { Header = "Apps", Content = BuildAppxDebloatCard() });
 
+        var win32Host = new StackPanel();
+        var win32Status = Body("Lendo programas Win32…");
+        win32Host.Children.Add(win32Status);
+        tabs.Items.Add(new TabItem { Header = "Win32", Content = win32Host });
+        _ = LoadWin32ProgramsAsync(win32Host, win32Status);
+
         var startupHost = new StackPanel();
         var startupStatus = Body("Lendo inicialização…");
         startupHost.Children.Add(startupStatus);
@@ -1234,6 +1249,88 @@ public partial class MainWindow : Window
         panel.Children.Add(buttons);
         card.Child = panel;
         return card;
+    }
+
+    private async Task LoadWin32ProgramsAsync(StackPanel host, TextBlock status)
+    {
+        try
+        {
+            var programs = await Task.Run(Win32ProgramRemovalService.GetCandidates);
+            host.Children.Clear();
+            status.Text = programs.Count + " programa(s) com desinstalador direto válido.";
+            host.Children.Add(status);
+
+            var list = new ListBox { Height = 240, Margin = new Thickness(0, 8, 0, 8) };
+            foreach (var item in programs)
+            {
+                var version = string.IsNullOrWhiteSpace(item.Version) ? "" : " • " + item.Version;
+                list.Items.Add(new ListBoxItem
+                {
+                    Content = item.DisplayName + version + Environment.NewLine +
+                        (string.IsNullOrWhiteSpace(item.Publisher) ? item.HiveName : item.Publisher + " • " + item.HiveName),
+                    Tag = item
+                });
+            }
+
+            var row = new WrapPanel();
+            var uninstall = new Button
+            {
+                Content = "Desinstalar selecionado",
+                Style = (Style)FindResource("AccentButton"),
+                IsEnabled = false
+            };
+            var refresh = new Button
+            {
+                Content = "Atualizar lista",
+                Style = (Style)FindResource("QuietButton"),
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            list.SelectionChanged += (_, _) => uninstall.IsEnabled = list.SelectedItem is ListBoxItem;
+            uninstall.Click += async (_, _) =>
+            {
+                if (list.SelectedItem is not ListBoxItem selected ||
+                    selected.Tag is not Win32UninstallCandidate candidate)
+                    return;
+
+                if (MessageBox.Show(
+                    "Abrir o desinstalador real de "" + candidate.DisplayName + ""?" +
+                    Environment.NewLine + "Editor: " + candidate.Publisher +
+                    Environment.NewLine + "O instalador poderá solicitar UAC. O ynoez não executa comandos por cmd/PowerShell.",
+                    "Confirmar desinstalação", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+
+                uninstall.IsEnabled = false;
+                status.Text = "Iniciando desinstalador…";
+                try
+                {
+                    var result = await Task.Run(() => Win32ProgramRemovalService.LaunchUninstaller(candidate));
+                    status.Text = "Desinstalador aberto: " + result.DisplayName;
+                    AppLog.Write("Desinstalador Win32 iniciado: " + result.DisplayName);
+                }
+                catch (Exception ex)
+                {
+                    status.Text = "Não foi possível iniciar: " + ex.Message;
+                    AppLog.Write("Desinstalação Win32 falhou: " + ex);
+                }
+                finally { uninstall.IsEnabled = list.SelectedItem is ListBoxItem; }
+            };
+            refresh.Click += async (_, _) =>
+            {
+                refresh.IsEnabled = false;
+                status.Text = "Atualizando…";
+                try { await LoadWin32ProgramsAsync(host, status); }
+                finally { refresh.IsEnabled = true; }
+            };
+            row.Children.Add(uninstall);
+            row.Children.Add(refresh);
+            host.Children.Add(list);
+            host.Children.Add(row);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Consulta Win32 para desinstalação falhou: " + ex);
+            status.Text = "Falha ao ler programas Win32: " + ex.Message;
+        }
     }
 
     private async Task LoadDebloatStartupAsync(
@@ -1395,6 +1492,7 @@ public partial class MainWindow : Window
         recommendations.Children.Add(InfoTile("CPU • CORE PERFORMANCE BOOST", "Mantenha Auto/Enabled para preservar o boost padrão do Ryzen.", "CPU"));
         recommendations.Children.Add(InfoTile("CPU • PBO", "Deixe Auto por padrão. Não aplique tensão ou limites térmicos sem validar refrigeração.", "PBO"));
         recommendations.Children.Add(InfoTile("VENTOINHAS • SMART FAN 5", "Use curva baseada na temperatura real do CPU; mantenha proteção térmica.", "FAN"));
+        recommendations.Children.Add(InfoTile("SMART ACCESS MEMORY", "Se suportado pela BIOS, confira Above 4G Decoding e Re-Size BAR. Verifique o estado no AMD Adrenalin; não force opções ausentes.", "SAM"));
         root.Children.Add(recommendations);
 
         var actions = new UniformGrid { Columns = 2 };

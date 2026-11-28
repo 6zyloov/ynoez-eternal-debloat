@@ -6,14 +6,15 @@ namespace ynoez.Tests;
 public sealed class SystemRegistryTweakServiceTests
 {
     [Fact]
-    public void Catalog_ContainsOnlyThreeExplicitPerformanceTweaks()
+    public void Catalog_ContainsExplicitKernelGpuAndPowerTweaks()
     {
         var catalog = SystemRegistryTweakService.GetCatalog();
 
-        Assert.Equal(3, catalog.Count);
+        Assert.Equal(4, catalog.Count);
         Assert.Contains(catalog, x => x.Id == "mmcss-games");
         Assert.Contains(catalog, x => x.Id == "network-throttling");
         Assert.Contains(catalog, x => x.Id == "gpu-scheduling");
+        Assert.Contains(catalog, x => x.Id == "power-throttling-off");
         Assert.DoesNotContain(catalog, x => x.Id.Contains("hpet", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(catalog, x => x.Id.Contains("bcd", StringComparison.OrdinalIgnoreCase));
     }
@@ -41,6 +42,18 @@ public sealed class SystemRegistryTweakServiceTests
         Assert.Contains("([int]2)", script);
         Assert.DoesNotContain("TdrDelay", script);
         Assert.DoesNotContain("DriverStore", script);
+    }
+
+    [Fact]
+    public void PowerThrottlingScript_OnlyDisablesTheWindowsPowerThrottlePolicy()
+    {
+        var script = SystemRegistryTweakService.BuildApplyScript("power-throttling-off");
+
+        Assert.Contains("PowerThrottling", script);
+        Assert.Contains("PowerThrottlingOff", script);
+        Assert.Contains("([int]1)", script);
+        Assert.DoesNotContain("bcdedit", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("TdrDelay", script);
     }
 
     [Fact]

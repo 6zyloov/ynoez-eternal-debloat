@@ -69,6 +69,16 @@ public static class SystemRegistryTweakService
             [
                 new(@"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
                     "HwSchMode", RegistryValueKind.DWord, 2)
+            ]),
+        new(
+            new SystemRegistryTweakDefinition(
+                "power-throttling-off",
+                "Desativar Power Throttling",
+                "Impede que o Windows aplique a política global de economia de CPU em processos elegíveis. Pode aumentar consumo, temperatura e uso em segundo plano; teste apenas em desktop.",
+                true),
+            [
+                new(@"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling",
+                    "PowerThrottlingOff", RegistryValueKind.DWord, 1)
             ])
     ];
 
