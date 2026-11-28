@@ -69,6 +69,93 @@ public sealed class ScheduledTaskTweakService
         return result;
     }
 
+    public IReadOnlyList<string> DisableMany()
+    {
+        var pending = GetStatuses()
+            .Where(x => x.Available &&
+                string.Equals(x.State, "Ready", StringComparison.OrdinalIgnoreCase) &&
+                !x.DisabledByYnoez)
+            .Select(x => x.Definition)
+            .ToArray();
+        if (pending.Length == 0) return Array.Empty<string>();
+
+        var backups = new List<(ScheduledTaskDefinition Definition, string Path, ScheduledTaskBackup Backup)>();
+        foreach (var definition in pending)
+        {
+            var backupPath = GetBackupPath(definition);
+            if (File.Exists(backupPath))
+                throw new InvalidOperationException("A tarefa " + definition.TaskName + " já possui backup pendente.");
+            var backup = new ScheduledTaskBackup(
+                definition.TaskPath, definition.TaskName, "Ready", DateTimeOffset.UtcNow);
+            WriteAtomic(backupPath, JsonSerializer.Serialize(backup, JsonOptions));
+            backups.Add((definition, backupPath, backup));
+        }
+
+        var commands = new List<string>
+        {
+            "$ErrorActionPreference='Stop'",
+            "Import-Module ScheduledTasks -ErrorAction Stop"
+        };
+        foreach (var item in backups)
+        {
+            var path = Escape(item.Definition.TaskPath);
+            var name = Escape(item.Definition.TaskName);
+            commands.Add("Disable-ScheduledTask -TaskPath '" + path + "' -TaskName '" + name + "' -ErrorAction Stop | Out-Null");
+            commands.Add("$t=Get-ScheduledTask -TaskPath '" + path + "' -TaskName '" + name + "' -ErrorAction Stop; if ([string]$t.State -ne 'Disabled') { throw 'A tarefa não foi desativada: " + name + "' }");
+        }
+        commands.Add("exit 0");
+
+        try
+        {
+            RunElevated(string.Join("; ", commands));
+            foreach (var item in backups)
+                if (!string.Equals(QueryState(item.Definition), "Disabled", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("O Windows não confirmou a desativação da tarefa " + item.Definition.TaskName + ".");
+            AppLog.Write("Debloat em lote: tarefas desativadas " +
+                string.Join(", ", backups.Select(x => Key(x.Definition.TaskPath, x.Definition.TaskName))) + ".");
+            return backups.Select(x => x.Definition.TaskName).ToArray();
+        }
+        catch (OperationCanceledException)
+        {
+            foreach (var item in backups)
+                try { if (File.Exists(item.Path)) File.Delete(item.Path); } catch { }
+            throw;
+        }
+        catch (Exception applyError)
+        {
+            try
+            {
+                var rollback = new List<string>
+                {
+                    "$ErrorActionPreference='Stop'",
+                    "Import-Module ScheduledTasks -ErrorAction Stop"
+                };
+                foreach (var item in backups)
+                {
+                    var path = Escape(item.Definition.TaskPath);
+                    var name = Escape(item.Definition.TaskName);
+                    rollback.Add("Enable-ScheduledTask -TaskPath '" + path + "' -TaskName '" + name + "' -ErrorAction Stop | Out-Null");
+                    rollback.Add("$t=Get-ScheduledTask -TaskPath '" + path + "' -TaskName '" + name + "' -ErrorAction Stop; if ([string]$t.State -eq 'Disabled') { throw 'A reversão falhou: " + name + "' }");
+                }
+                rollback.Add("exit 0");
+                RunElevated(string.Join("; ", rollback));
+                foreach (var item in backups)
+                    if (!string.Equals(QueryState(item.Definition), "Ready", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("A reversão não foi confirmada para " + item.Definition.TaskName + ".");
+                foreach (var item in backups)
+                    if (File.Exists(item.Path)) File.Delete(item.Path);
+            }
+            catch (Exception restoreError)
+            {
+                AppLog.Write("Debloat de tarefas falhou e os backups foram mantidos: " + restoreError.Message);
+                throw new InvalidOperationException(
+                    "A desativação em lote falhou e a reversão não pôde ser confirmada. Os backups foram preservados. " +
+                    applyError.Message + " | " + restoreError.Message, applyError);
+            }
+            throw;
+        }
+    }
+
     public void Disable(ScheduledTaskDefinition definition)
     {
         Validate(definition);
