@@ -2,7 +2,7 @@ name: build-windows
 
 on:
   push:
-    branches: [ main, 'fix/**', 'feat/**', 'integration/**' ]
+    branches: [ main, 'fix/**', 'feat/**', 'feature/**', 'integration/**' ]
     paths:
       - 'src/**'
       - 'global.json'
