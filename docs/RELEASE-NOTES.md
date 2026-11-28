@@ -11,14 +11,16 @@ Este artefato é uma build candidata para avaliação, não uma release estável
 - Monitor CPU/RAM/GPU com agregação WMI de engine 3D; monitor e diagnóstico IPv4/IPv6.
 - Benchmark PresentMon com verificação SHA-256, relatórios CSV/JSON.
 - Ferramentas de inventário Windows, manutenção, backups/restauração e perfil GIGABYTE A520M K V2.
-- Setup Inno e pacote portátil, hashes SHA-256 e verificação de instalação/reinstalação/desinstalação no runner.
+- Setup Inno e pacote portátil, hashes SHA-256 e smoke tests de instalação/reinstalação/desinstalação.
+- SBOM SPDX 2.2 separada e manifesto SHA256SUMS; status Authenticode explícito (assinatura real opcional quando houver certificado Code Signing).
+- CI de upgrade do baseline atual de main para o candidato, rollback, re-upgrade e verificação de retenção de dados.
 
 ## Integridade e validação
 
-A CI desta build executou auditoria NuGet, testes xUnit, publish Windows, instalador Inno, instalação limpa, reinstalação sobre a instalação, desinstalação preservando Data/Backups/Logs/Downloads, dry-run de release e hashes. O commit e run exatos estão registrados no PR #12 e em GitHub Actions.
+O GitHub Actions executa auditoria NuGet, testes xUnit, publicação Windows, instalador Inno, geração e validação de SBOM, smoke test de instalação, upgrade/rollback e dry-run de checksums. A execução desta rodada deve terminar com sucesso antes de considerar a entrega validada. O manifesto SHA256SUMS inclui os artefatos publicados relevantes.
 
-Compare o arquivo SHA256SUMS.txt publicado com os hashes calculados localmente antes de executar os pacotes.
+Compare o arquivo SHA256SUMS.txt com os hashes calculados localmente antes de executar os pacotes. Consulte docs/SBOM-AND-SIGNING.md para os detalhes da SBOM e da assinatura.
 
 ## Limites
 
-Esta CI roda em Windows Server 2025. Ela não substitui validação em Windows 11 cliente ou hardware real. Roblox + automações XT, Vanguard/FACEIT, telemetria de CPU/AMD/Intel, recuperação após falha e migração/rollback de versões anteriores ainda precisam de testes dedicados. A assinatura Authenticode depende de certificado válido. Nenhum ganho de FPS ou estabilidade de rede é prometido.
+Esta CI roda em Windows Server 2025. Ela não substitui validação em Windows 11 cliente ou hardware real. Roblox + automações XT, Vanguard/FACEIT, telemetria de CPU/AMD/Intel, recuperação após falha e migração entre releases públicas ainda precisam de testes dedicados. O teste automatizado de migração usa o baseline atual de main, não uma release estável publicada. Authenticode só fica assinado quando um certificado válido está configurado. Nenhum ganho de FPS ou estabilidade de rede é prometido.
