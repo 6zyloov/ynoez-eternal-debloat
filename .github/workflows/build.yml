@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'global.json'
+      - 'Directory.Build.props'
       - 'tests/**'
       - 'scripts/**'
       - 'README.md'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'src/**'
       - 'global.json'
+      - 'Directory.Build.props'
       - 'tests/**'
       - 'scripts/**'
       - 'README.md'
@@ -52,6 +54,13 @@ jobs:
       - name: Show .NET SDK
         shell: pwsh
         run: dotnet --info
+      - name: Audit NuGet dependencies
+        shell: pwsh
+        run: |
+          dotnet list src/ynoez/ynoez.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências do app falhou." }
+          dotnet list tests/ynoez.Tests/ynoez.Tests.csproj package --vulnerable --include-transitive
+          if ($LASTEXITCODE -ne 0) { throw "A auditoria de dependências dos testes falhou." }
       - name: Run Windows integration tests
         shell: pwsh
         run: dotnet test tests/ynoez.Tests/ynoez.Tests.csproj --configuration Release --logger "console;verbosity=normal"
