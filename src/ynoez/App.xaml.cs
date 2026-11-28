@@ -115,7 +115,7 @@ public partial class App : Application
     {
         try { ProcessPriorityProfileService.RecoverInterruptedSession(); }
         catch (Exception ex) { AppLog.Write("Falha ao restaurar prioridades de processos durante o encerramento: " + ex); }
-        try { PowerProfileService.RecoverInterruptedAutomaticSession();
+        try { PowerProfileService.RecoverInterruptedAutomaticSession(); }
         catch (Exception ex) { AppLog.Write("A sessão automática permaneceu pendente durante o encerramento: " + ex); }
         PowerProfileService.ClearExecutionRequirement();
         AppLog.Write("Aplicativo encerrado.");
