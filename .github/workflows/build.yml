@@ -121,7 +121,7 @@ jobs:
           path: |
             artifacts/ynoez-portable-win-x64.zip
             artifacts/SHA256SUMS.txt
-            artifacts/ynoez-0.3.0.spdx.json
+            artifacts/ynoez-*.spdx.json
             artifacts/SIGNATURE-STATUS.txt
           if-no-files-found: error
           retention-days: 30
