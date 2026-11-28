@@ -43,7 +43,8 @@ O candidato integrado reúne o aplicativo atual em PR draft #12. A CI usa Window
 ## Fase 4 — jogos, processos e performance
 
 - [x] Perfis Performance/Equilibrado/AFK com restauração do plano original.
-- [x] AFK protegido: jogos e runtimes comuns de automação protegidos por padrão; lista personalizada soma sem apagar a lista embarcada; configuração corrompida falha de forma segura.
+- [x] AFK protegido: jogos e runtimes comuns de automação protegidos por padrão; lista personalizada soma sem apagar a lista embarcada; catálogo embarcado exige schema e listas válidas; config ausente/corrompida falha de forma segura e mostra aviso.
+- [x] Inventário somente leitura de processos em execução (nome, PID e memória) com seleção para adicionar o nome à lista protegida; sem linha de comando, caminhos ou manipulação de processos.
 - [x] PresentMon com métricas de frametime/FPS, 1%/0,1% low e sessões A/B.
 - [ ] Catálogo de processos por jogo atualizado e revisado, sem supor nomes de executáveis XT desconhecidos.
 - [ ] Comparações A/B controladas por jogo com registro de cena, resolução, preset, driver, temperatura, processos concorrentes e variação entre rodadas.
