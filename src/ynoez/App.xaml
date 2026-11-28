@@ -160,8 +160,8 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="{x:Type ComboBoxItem}">
-                            <Border x:Name="ItemBorder" Background="{TemplateBinding Background}"
-                                    Padding="{TemplateBinding Padding}">
+                            <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" BorderBrush="#FFFFFF"
+                                    BorderThickness="0" Padding="{TemplateBinding Padding}">
                                 <ContentPresenter VerticalAlignment="Center"
                                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                   TextElement.Foreground="{TemplateBinding Foreground}" />
@@ -172,8 +172,9 @@
                                     <Setter Property="Foreground" Value="#FFFFFF" />
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="ItemBorder" Property="Background" Value="#FFFFFF" />
-                                    <Setter Property="Foreground" Value="#000000" />
+                                    <Setter TargetName="ItemBorder" Property="Background" Value="#222222" />
+                                    <Setter TargetName="ItemBorder" Property="BorderThickness" Value="1" />
+                                    <Setter Property="Foreground" Value="#FFFFFF" />
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter Property="Opacity" Value="0.4" />
@@ -217,8 +218,8 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="{x:Type ListBoxItem}">
-                            <Border x:Name="ItemBorder" Background="{TemplateBinding Background}"
-                                    CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" BorderBrush="#FFFFFF"
+                                    BorderThickness="0" CornerRadius="4" Padding="{TemplateBinding Padding}">
                                 <ContentPresenter VerticalAlignment="Center"
                                                   TextElement.Foreground="{TemplateBinding Foreground}" />
                             </Border>
@@ -227,8 +228,9 @@
                                     <Setter TargetName="ItemBorder" Property="Background" Value="#171717" />
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="ItemBorder" Property="Background" Value="#FFFFFF" />
-                                    <Setter Property="Foreground" Value="#000000" />
+                                    <Setter TargetName="ItemBorder" Property="Background" Value="#222222" />
+                                    <Setter TargetName="ItemBorder" Property="BorderThickness" Value="1" />
+                                    <Setter Property="Foreground" Value="#FFFFFF" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -334,11 +336,33 @@
                 <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
 
+            <Style TargetType="{x:Type DataGridRow}">
+                <Setter Property="Background" Value="#080808" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="BorderBrush" Value="#1D1D1D" />
+                <Setter Property="BorderThickness" Value="0,0,0,1" />
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#171717" />
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="#222222" />
+                        <Setter Property="Foreground" Value="#FFFFFF" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
             <Style TargetType="{x:Type DataGridCell}">
                 <Setter Property="Foreground" Value="#FFFFFF" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Padding" Value="8,5" />
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="#252525" />
+                        <Setter Property="Foreground" Value="#FFFFFF" />
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
             <Style TargetType="{x:Type ContextMenu}">
