@@ -11,6 +11,7 @@ $artifactDir = Join-Path $projectRoot 'artifacts'
 $statusFile = Join-Path $artifactDir 'SIGNATURE-STATUS.txt'
 $application = Join-Path $dist 'ynoez.exe'
 $setupFiles = @(Get-ChildItem -LiteralPath $artifactDir -Filter 'ynoez-setup-*.exe' -File -ErrorAction SilentlyContinue)
+if (Test-Path -LiteralPath $statusFile) { Remove-Item -LiteralPath $statusFile -Force }
 $certificateBase64 = [Environment]::GetEnvironmentVariable('YNOEZ_SIGNING_CERTIFICATE_BASE64')
 $certificatePassword = [Environment]::GetEnvironmentVariable('YNOEZ_SIGNING_CERTIFICATE_PASSWORD')
 
@@ -50,7 +51,7 @@ if ($Target -eq 'Installer') {
 
 $tempRoot = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
 $pfxPath = Join-Path $tempRoot 'ynoez-authenticode-signing.pfx'
-$certificateStorePath = $null
+$importedCertificatePaths = @()
 $securePassword = $null
 $pfxBytes = $null
 
@@ -62,7 +63,8 @@ try {
     $pfxBytes = $null
 
     $securePassword = ConvertTo-SecureString -String $certificatePassword -AsPlainText -Force
-    $importedCertificates = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation 'Cert:\CurrentUser\My' -Password $securePassword -Exportable)
+    $importedCertificates = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation 'Cert:\CurrentUser\My' -Password $securePassword)
+    $importedCertificatePaths = @($importedCertificates | ForEach-Object { "Cert:\CurrentUser\My\$($_.Thumbprint)" })
     $certificate = $null
     foreach ($candidate in $importedCertificates) {
         if (-not $candidate.HasPrivateKey) { continue }
@@ -76,7 +78,6 @@ try {
     }
     if (-not $certificate) { throw 'O PFX não contém um certificado com chave privada e EKU Code Signing.' }
     $thumbprint = $certificate.Thumbprint
-    $certificateStorePath = "Cert:\CurrentUser\My\$thumbprint"
 
     $windowsKits = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Windows Kits\10\bin'
     $signTool = Get-ChildItem -LiteralPath $windowsKits -Filter 'signtool.exe' -File -Recurse -ErrorAction SilentlyContinue |
@@ -116,7 +117,9 @@ try {
 }
 finally {
     if ($pfxBytes) { [Array]::Clear($pfxBytes, 0, $pfxBytes.Length) }
-    if ($certificateStorePath -and (Test-Path -LiteralPath $certificateStorePath)) { Remove-Item -LiteralPath $certificateStorePath -Force }
+    foreach ($certificatePath in $importedCertificatePaths) {
+        if (Test-Path -LiteralPath $certificatePath) { Remove-Item -LiteralPath $certificatePath -Force }
+    }
     if (Test-Path -LiteralPath $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force }
     if ($securePassword) { $securePassword.Dispose() }
 }
