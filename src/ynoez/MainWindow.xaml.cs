@@ -657,6 +657,11 @@ public partial class MainWindow : Window
         applyGame.IsEnabled = !QuickGameOptimizationService.IsApplied;
         applyGame.Click += async (_, _) =>
         {
+            if (_autoProfileCts is not null)
+            {
+                gameStatus.Text = "Pause os perfis automáticos antes de aplicar o perfil rápido.";
+                return;
+            }
             if (MessageBox.Show(
                 "Aplicar o perfil para jogos? A captura em segundo plano do Xbox será desativada, alguns efeitos visuais serão reduzidos e o plano de energia poderá mudar para Alto desempenho. NVIDIA Instant Replay, OBS, drivers e anti-cheats não serão alterados.",
                 "Confirmar otimização", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
@@ -740,6 +745,12 @@ public partial class MainWindow : Window
         {
             if (_autoProfileCts is not null)
                 return;
+            if (QuickGameOptimizationService.IsApplied)
+            {
+                MessageBox.Show("Restaure o perfil rápido de jogos antes de ativar a troca automática de energia.",
+                    "Perfis automáticos", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             if (MessageBox.Show("Ativar a troca automática de energia conforme jogos, automações protegidas e inatividade?",
                 "Perfis automáticos", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
