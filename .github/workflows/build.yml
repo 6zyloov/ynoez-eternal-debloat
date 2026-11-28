@@ -13,6 +13,18 @@ on:
       - 'docs/**'
       - 'installer/**'
       - '.github/workflows/build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'global.json'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'README.md'
+      - 'STATUS.md'
+      - 'docs/**'
+      - 'installer/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 permissions:
@@ -68,6 +80,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ynoez-setup-win-x64
-          path: artifacts/ynoez-setup-0.3.0.exe
+          path: artifacts/ynoez-setup-*.exe
           if-no-files-found: error
           retention-days: 30
