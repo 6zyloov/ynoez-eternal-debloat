@@ -2,6 +2,12 @@
 
 Aplicativo nativo para Windows em C# / WPF (.NET 10 LTS). A linguagem visual toma como referência o Stix Free Utility (sidebar, cartões escuros, Poppins e destaque rosa), com implementação própria do ynoez.
 
+## Sistemas operacionais e ciclo de suporte
+
+O aplicativo é x64 e usa .NET 10 LTS. Conforme a [matriz oficial do .NET 10 para Windows](https://learn.microsoft.com/dotnet/core/install/windows), Windows 11 deve estar em uma versão atualmente suportada; Windows 10 aparece como suportado apenas nas edições Enterprise/LTSC listadas pela Microsoft. Windows 10 Home/Pro não faz parte da matriz de suporte do .NET 10, e o suporte geral dessas edições terminou em 14 de outubro de 2025 ([ciclo de vida do Windows 10](https://support.microsoft.com/pt-br/windows/deployment/updates-lifecycle/windows-10-support-has-ended-on-october-14-2025)). Não prometemos compatibilidade oficial nessas edições.
+
+O .NET 10 é LTS e, na política publicada em 10 de novembro de 2026, está previsto para permanecer em suporte até 14 de novembro de 2028 ([política oficial de suporte do .NET](https://dotnet.microsoft.com/en-us/platform/support/policy)). A CI do projeto roda em Windows Server 2025; isso valida o ambiente de build/teste, mas não substitui testes em Windows 11 cliente nem em hardware físico.
+
 ## Aplicativo
 
 - Projeto: `src/ynoez/`

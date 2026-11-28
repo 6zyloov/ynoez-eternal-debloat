@@ -1,6 +1,6 @@
 # Roteiro de engenharia — ynoez 0.3.0 até a versão estável
 
-O candidato integrado reúne o aplicativo atual em PR draft #12. As caixas abaixo distinguem o que já está no código/CI do que exige validação externa. Uma compilação verde não equivale a teste em hardware real.
+O candidato integrado reúne o aplicativo atual em PR draft #12. A CI usa Windows Server 2025 e as caixas abaixo distinguem o que já está no código/CI do que exige validação externa. Uma compilação verde não equivale a teste em Windows 11 cliente nem a teste em hardware real.
 
 ## Fase 0 — auditoria, referências e licença
 
@@ -74,7 +74,7 @@ O candidato integrado reúne o aplicativo atual em PR draft #12. As caixas abaix
 - [x] CI Windows testa instalação limpa, reinstalação sobre a mesma instalação e desinstalação preservando Data, Backups, Logs e Downloads.
 - [x] Pipeline de release por tag também executa testes de aplicação e de ciclo de vida antes de publicar assets.
 - [ ] Testar upgrade real de uma versão anterior publicada e rollback; smoke test atual ainda não substitui essa migração.
-- [ ] Validar Windows 10 e Windows 11 em máquinas clientes reais, conta padrão/administrador, com/sem Internet e diferentes escalas de DPI.
+- [ ] Validar versões suportadas de Windows 11 e Windows 10 Enterprise/LTSC em máquinas clientes reais, conta padrão/administrador, com/sem Internet e diferentes escalas de DPI. Windows 10 Home/Pro não está na matriz oficial do .NET 10.
 - [ ] Validar hardware AMD/Intel/NVIDIA e sessões longas com Roblox + XT.
 - [ ] Testar Vanguard/FACEIT em ambiente autorizado, sem tentar contornar anti-cheat.
 - [ ] Assinar Authenticode quando houver certificado; caso contrário, fornecer hash e instruções de verificação.

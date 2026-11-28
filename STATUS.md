@@ -24,7 +24,7 @@ Permanecem protegidos Microsoft Store/licenciamento, impressão, Calculadora, Cl
 1. Testar em Windows real: abertura, navegação, WMI, sessões longas, PresentMon com jogos reais, rede e recuperação após falhas.
 2. Validar Roblox + automações XT por várias horas e observar que processos/scripts permanecem ativos; cadastrar o nome exato do processo XT se ele for independente dos runtimes protegidos.
 3. Testar Vanguard/FACEIT em ambiente autorizado e hardware AMD/Intel/NVIDIA reais. A CI não confirma compatibilidade de anti-cheat.
-4. Testar Windows 10 e Windows 11 suportados, contas padrão/administrador e cenários sem Internet.
+4. Validar versões suportadas de Windows 11 e Windows 10 Enterprise/LTSC listadas pela Microsoft, contas padrão/administrador e cenários sem Internet. Windows 10 Home/Pro não faz parte da matriz suportada do .NET 10.
 5. Testar upgrade de uma versão anterior publicada e rollback; o smoke test atual cobre instalação limpa, reinstalação do mesmo setup e desinstalação com retenção de dados.
 6. Integrar sensores adicionais somente por APIs/documentação/licenças verificadas, sem instalar drivers de kernel que possam interferir com anti-cheats.
 7. Produzir SBOM e assinar Authenticode quando houver certificado válido. Sem certificado, a distribuição só pode ser acompanhada de hashes verificáveis.
