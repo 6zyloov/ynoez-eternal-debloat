@@ -11,7 +11,8 @@ public sealed record ProcessPriorityProfileSettings
     public bool Enabled { get; init; }
     public string? FocusExecutablePath { get; init; }
     public List<string> BackgroundExecutablePaths { get; init; } = [];
-    public bool UseHighCpuPriority { get; init; }
+    public bool UseHighCpuPriority { get; init; } = true;
+    public bool UseLowestBackgroundCpuPriority { get; init; } = true;
 }
 
 public sealed record ProcessPriorityApplySummary(
@@ -404,7 +405,7 @@ public static class ProcessPriorityProfileService
 
         var desiredCpuPriority = isFocus
             ? (useHighCpuPriority ? HighPriorityClass : AboveNormalPriorityClass)
-            : IdlePriorityClass;
+            : (settings.UseLowestBackgroundCpuPriority ? IdlePriorityClass : 0x00004000u);
         var desiredMemoryPriority = isFocus ? MemoryPriorityNormal : MemoryPriorityVeryLow;
 
         var currentCpuPriority = GetPriorityClass(handle);
