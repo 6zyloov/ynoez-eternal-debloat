@@ -23,16 +23,18 @@ public sealed record FirmwareCompatibilitySnapshot(
     bool DmaProtectionAvailable,
     bool LenovoWmiAvailable,
     bool LenovoPasswordStateKnown,
+    string? AsusActExecutable,
     bool LenovoSupervisorPasswordSet,
     bool BitLockerProtectionOn,
     IReadOnlyList<string> DetectedAntiCheats,
     IReadOnlyList<FirmwareDetectedSetting> FirmwareSettings)
 {
-    public bool CanWriteBios => LenovoWmiAvailable &&
-        LenovoPasswordStateKnown &&
-        !LenovoSupervisorPasswordSet &&
+    public bool AsusActAvailable => !string.IsNullOrWhiteSpace(AsusActExecutable);
+    public bool CanWriteBios =>
         !BitLockerProtectionOn &&
-        string.Equals(BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase);
+        string.Equals(BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase) &&
+        ((LenovoWmiAvailable && LenovoPasswordStateKnown && !LenovoSupervisorPasswordSet) ||
+         AsusActAvailable);
 }
 
 public sealed record FirmwareApplyResult(
@@ -91,10 +93,22 @@ public static class FirmwareCompatibilityService
         var deviceGuard = ReadDeviceGuard();
         var virtualization = ReadCpuVirtualization();
         var antiCheats = DetectAntiCheats();
-        var lenovoSettings = TryReadLenovoSettings(out var lenovoAvailable);
+        var manufacturer = Normalize(hardware.BoardManufacturer);
+        var lenovoAvailable = false;
+        IReadOnlyList<FirmwareDetectedSetting> lenovoSettings = Array.Empty<FirmwareDetectedSetting>();
         var passwordStateKnown = false;
-        var passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState(out passwordStateKnown);
+        var passwordSet = false;
+        if (manufacturer.Contains("LENOVO", StringComparison.Ordinal))
+        {
+            lenovoSettings = TryReadLenovoSettings(out lenovoAvailable);
+            passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState(out passwordStateKnown);
+        }
         var passwordStateConfirmed = lenovoAvailable && passwordStateKnown;
+
+        AsusFirmwareInspection? asus = null;
+        if (manufacturer.Contains("ASUS", StringComparison.Ordinal))
+            AsusConfigurationToolAdapter.TryInspect(out asus);
+        var firmwareSettings = asus?.Settings ?? lenovoSettings;
 
         return new FirmwareCompatibilitySnapshot(
             hardware.BoardManufacturer,
@@ -113,9 +127,10 @@ public static class FirmwareCompatibilityService
             lenovoAvailable,
             passwordStateConfirmed,
             passwordSet,
+            asus?.ExecutablePath,
             IsBitLockerProtectionOn(),
             antiCheats,
-            lenovoSettings);
+            firmwareSettings);
     }
 
     public static IReadOnlyList<string> GetRequiredSettingIds(IEnumerable<string> selectedProfiles)
@@ -174,33 +189,42 @@ public static class FirmwareCompatibilityService
         if (targets.Length == 0)
             return new FirmwareApplyResult(false, false, 0, [], "Nenhum ajuste de firmware foi solicitado.");
 
-        if (!snapshot.LenovoWmiAvailable)
+        if (!snapshot.LenovoWmiAvailable && !snapshot.AsusActAvailable)
             return new FirmwareApplyResult(false, false, 0, [],
-                "Esta placa não expõe uma interface de configuração de BIOS documentada e compatível com o ynoez. A análise foi feita; a gravação automática está bloqueada para evitar corromper a NVRAM. Use a entrada UEFI para os itens listados.");
+                "Esta placa não oferece uma interface documentada compatível de gravação de BIOS. A análise foi feita; nenhum offset UEFI genérico será escrito. Requisitos encontrados: " +
+                string.Join(", ", targets) + ". Use Entrar na BIOS para aplicar apenas os itens necessários.");
         if (!snapshot.CanWriteBios)
         {
-            var reason = !snapshot.LenovoPasswordStateKnown
+            var reason = snapshot.LenovoWmiAvailable && !snapshot.LenovoPasswordStateKnown
                 ? "Não foi possível confirmar o estado da senha de administrador da BIOS; a gravação foi bloqueada por segurança."
                 : snapshot.LenovoSupervisorPasswordSet
                     ? "A BIOS possui senha de administrador; o ynoez não tenta contornar nem armazenar essa senha."
                     : snapshot.BitLockerProtectionOn
-                        ? "A proteção do BitLocker está ativa ou seu estado é desconhecido. A gravação foi bloqueada para evitar problemas com o TPM/recuperação."
+                        ? "A proteção do BitLocker está ativa ou seu estado é desconhecido. A gravação foi bloqueada para evitar problemas com TPM/recuperação."
                         : !string.Equals(snapshot.BiosMode, "UEFI", StringComparison.OrdinalIgnoreCase)
-                            ? "O Windows iniciou em modo Legacy. Não será alterado o modo de boot automaticamente porque isso pode impedir a inicialização."
+                            ? "O Windows iniciou em modo Legacy. A troca para UEFI não será feita automaticamente porque pode impedir a inicialização."
                             : "A BIOS não está liberada para gravação segura.";
             return new FirmwareApplyResult(false, false, 0, [], reason);
         }
 
+        if (snapshot.AsusActAvailable && !snapshot.LenovoWmiAvailable)
+            return AsusConfigurationToolAdapter.Apply(snapshot.AsusActExecutable!, targets);
+
         var current = ReadLenovoSettings();
+        var missing = GetMissingRequirementIds(current, targets);
+        if (missing.Count > 0)
+            return new FirmwareApplyResult(false, false, 0, [],
+                "A BIOS Lenovo não expôs opções seguras para todos os requisitos: " +
+                string.Join(", ", missing) + ". Nenhuma configuração foi alterada.");
         var changes = BuildLenovoChangePlan(current, targets);
         if (changes.Count == 0)
             return new FirmwareApplyResult(false, false, 0, [],
-                "Nenhum valor compatível foi encontrado ou os recursos já estão habilitados. Nenhuma alteração foi feita.");
+                "Os recursos necessários já estão habilitados na BIOS. Nenhuma alteração foi necessária.");
 
         Directory.CreateDirectory(JournalDirectory);
         var journalPath = Path.Combine(JournalDirectory, "lenovo-bios-pending.json");
-        if (File.Exists(journalPath))
-            throw new InvalidOperationException("Há uma configuração de BIOS pendente de reinicialização. Reinicie e execute a análise novamente antes de aplicar outro perfil.");
+        if (File.Exists(journalPath) && !ResolveLenovoPendingJournal(journalPath, current))
+            throw new InvalidOperationException("Há uma configuração Lenovo pendente, parcialmente aplicada ou não confirmada. Reinicie e analise novamente antes de aplicar outro perfil.");
 
         var journal = new
         {
@@ -250,6 +274,72 @@ public static class FirmwareCompatibilityService
     }
 
     private sealed record LenovoChange(string Name, string OriginalValue, string TargetValue);
+
+    private static IReadOnlyList<string> GetMissingRequirementIds(
+        IReadOnlyList<FirmwareDetectedSetting> settings,
+        IReadOnlyList<string> requirementIds)
+    {
+        var missing = new List<string>();
+        foreach (var requirement in requirementIds)
+        {
+            var name = FindSettingName(settings.Select(x => x.Name), requirement);
+            if (name is null)
+            {
+                missing.Add(requirement);
+                continue;
+            }
+            var setting = settings.First(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            var alreadyEnabled =
+                string.Equals(setting.Value, "Enabled", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(setting.Value, "Enable", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(setting.Value, "On", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(setting.Value, "Active", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(setting.Value, "1", StringComparison.OrdinalIgnoreCase) ||
+                (requirement == "cpu-boost" && string.Equals(setting.Value, "Auto", StringComparison.OrdinalIgnoreCase));
+            if (!alreadyEnabled && SelectEnabledValue(setting.AllowedValues) is null)
+                missing.Add(requirement);
+        }
+        return missing;
+    }
+
+    private static bool ResolveLenovoPendingJournal(
+        string journalPath,
+        IReadOnlyList<FirmwareDetectedSetting> currentSettings)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(journalPath));
+            if (!document.RootElement.TryGetProperty("Changes", out var changes) ||
+                changes.ValueKind != JsonValueKind.Array || changes.GetArrayLength() == 0)
+                return false;
+
+            var allTarget = true;
+            var allOriginal = true;
+            foreach (var change in changes.EnumerateArray())
+            {
+                var name = change.GetProperty("Name").GetString();
+                var target = change.GetProperty("Target").GetString();
+                var original = change.GetProperty("Original").GetString();
+                var current = currentSettings.FirstOrDefault(x =>
+                    string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (current is null) return false;
+                allTarget &= string.Equals(current.Value, target, StringComparison.OrdinalIgnoreCase);
+                allOriginal &= string.Equals(current.Value, original, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (!allTarget && !allOriginal) return false;
+            File.Delete(journalPath);
+            AppLog.Write(allTarget
+                ? "Lenovo BIOS confirmou os ajustes após reinicialização."
+                : "Lenovo BIOS permaneceu nos valores originais; a tentativa anterior não foi aplicada.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Journal Lenovo BIOS não pôde ser reconciliado: " + ex.Message);
+            return false;
+        }
+    }
 
     private static List<LenovoChange> BuildLenovoChangePlan(
         IReadOnlyList<FirmwareDetectedSetting> settings,
