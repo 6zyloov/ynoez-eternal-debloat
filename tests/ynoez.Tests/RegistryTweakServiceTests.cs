@@ -76,9 +76,17 @@ public sealed class RegistryTweakServiceTests
         Assert.All(tweaks, tweak =>
         {
             Assert.Equal(RegistryHive.CurrentUser, tweak.Hive);
-            Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
             Assert.DoesNotContain(@"\\", tweak.KeyPath);
-            Assert.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
+            if (tweak.Id is "ui-menu-show-delay" or "ui-mouse-hover-time")
+            {
+                Assert.Equal(RegistryValueKind.String, tweak.Kind);
+                Assert.Contains(tweak.KeyPath, new[] { @"Control Panel\\Desktop", @"Control Panel\\Mouse" });
+            }
+            else
+            {
+                Assert.Equal(RegistryValueKind.DWord, tweak.Kind);
+                Assert.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\", tweak.KeyPath, StringComparison.OrdinalIgnoreCase);
+            }
         });
     }
  

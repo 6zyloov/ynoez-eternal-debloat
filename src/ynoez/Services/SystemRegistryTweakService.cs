@@ -118,6 +118,12 @@ public static class SystemRegistryTweakService
                     throw new InvalidOperationException("O Windows não confirmou todos os valores do Registro.");
                 AppLog.Write("Ajuste de sistema aplicado: " + id + ". Backup original salvo.");
             }
+            catch (OperationCanceledException)
+            {
+                // UAC cancellation means the elevated script never started.
+                try { if (File.Exists(backupPath)) File.Delete(backupPath); } catch { }
+                throw;
+            }
             catch (Exception applyError)
             {
                 try
@@ -150,6 +156,22 @@ public static class SystemRegistryTweakService
             if (!string.Equals(backup.Id, id, StringComparison.Ordinal) ||
                 backup.Values.Count != definition.Values.Count)
                 throw new InvalidDataException("O backup não corresponde exatamente ao ajuste selecionado.");
+
+            // The journal is data, not authority: validate every path/value/type against
+            // the closed catalog before creating any elevated PowerShell command.
+            var expected = definition.Values;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < backup.Values.Count; index++)
+            {
+                var snapshot = backup.Values[index];
+                var allowed = expected[index];
+                if (!string.Equals(snapshot.KeyPath, allowed.KeyPath, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(snapshot.ValueName, allowed.ValueName, StringComparison.OrdinalIgnoreCase) ||
+                    (snapshot.Kind is not RegistryValueKind.DWord and not RegistryValueKind.String) ||
+                    !seen.Add(snapshot.KeyPath + "|" + snapshot.ValueName) ||
+                    (!snapshot.ValueExisted && (snapshot.DwordValue != 0 || snapshot.StringValue is not null)))
+                    throw new InvalidDataException("O backup contém um caminho, valor ou tipo fora da allowlist.");
+            }
 
             RestoreCore(definition, backup, backupPath);
             AppLog.Write("Ajuste de sistema restaurado: " + id + ".");
