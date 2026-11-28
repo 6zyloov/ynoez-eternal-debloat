@@ -9,6 +9,13 @@ Este artefato é uma build candidata para avaliação, não uma release estável
 - Corrigido o crash WPF de navegação em Tweaks causado pela inserção duplicada do mesmo controle visual.
 - Detecção automática de CS2 em execução/bibliotecas Steam e do Roblox mais recente instalado; seleção manual continua como alternativa.
 
+## Interface e operações de otimização
+
+- Home simplificada, tema monocromático preto/branco e rótulos de botões legíveis em controles de alto contraste.
+- Painel de Tweaks com ação de otimização para jogos: captura Game DVR do Windows desativada, preferência de efeitos visuais para desempenho, animações da barra de tarefas e transparência desativadas; aplicação com diário e restauração. Alto desempenho é aplicado somente quando não há outro perfil de energia ynoez gerenciando um backup.
+- Debloat consulta startup, serviços e tarefas em segundo plano para a interface continuar responsiva.
+- Remoção AppX restrita a allowlist exata de aplicativos opcionais do usuário atual. Não remove frameworks, componentes protegidos, provisionamento nem pacotes de outros usuários; a remoção não tem rollback automático.
+
 ## Incluído
 
 - Aplicativo WPF .NET 10 LTS, self-contained para Windows x64.

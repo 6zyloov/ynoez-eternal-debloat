@@ -1,14 +1,25 @@
 # Status do projeto — ynoez 0.3.0
 
-**Situação:** candidato integrado na PR draft #12. A revisão de código `4388929e99a1308b5b9055486232c50fd5d5123e` passou pela CI completa em Windows Server 2025 ([run 46103835497](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46103835497)). Auditoria NuGet, testes xUnit, publicação, instalador, SBOM, assinatura/status, instalação limpa, reinstalação, desinstalação, upgrade do baseline main, rollback, re-upgrade, retenção de dados e checksums concluíram com sucesso. Não há release estável publicada.
+**Situação:** candidato em revisão na PR draft #12. A revisão de código `4388929e99a1308b5b9055486232c50fd5d5123e` passou pela CI completa em Windows Server 2025 ([run 46103835497](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46103835497)). Auditoria NuGet, testes xUnit, publicação, instalador, SBOM, assinatura/status, instalação limpa, reinstalação, desinstalação, upgrade do baseline main, rollback, re-upgrade, retenção de dados e checksums concluíram com sucesso. Não há release estável publicada.
 
-## Interface e correções da revisão final
+## Interface, otimização e correções da revisão final
 
 - Tema monocromático aplicado globalmente: preto absoluto no fundo, cartões quase pretos, branco de alto contraste e detalhes brancos; o destaque rosa foi removido.
 - Botões, ComboBox/itens, TextBox, ListBox/itens, CheckBox, RadioButton, menus, tooltips e DataGrid receberam estilos escuros consistentes. Itens selecionados permanecem escuros, com texto branco e contorno claro.
 - Layout esticável e responsivo, sem largura mínima artificial em todos os containers.
 - Corrigido o crash WPF reportado ao abrir Tweaks: o mesmo controle visual de status era adicionado duas vezes ao mesmo painel.
 - Foco de Jogo detecta automaticamente CS2 em execução/bibliotecas Steam e a versão mais recente do Roblox instalada. Seleção manual permanece como fallback.
+
+## Interface, otimização e correções da revisão atual
+
+- Home reduzida a quatro indicadores de hardware, ações rápidas e informações essenciais; inventário de DIMMs, auditoria longa e atualização não ocupam mais o painel principal.
+- Tema global monocromático preto/branco corrigido: o rótulo de botões agora herda a cor do próprio botão, evitando branco sobre branco. Listas, seletores e campos permanecem escuros.
+- Tweaks reorganizado para expor primeiro uma ação de **Otimização para jogos** e o Foco de Jogo, deixando o controle automático de energia separado.
+- A otimização rápida aplica cinco ajustes reversíveis: desativa captura Game DVR do Windows, define preferência visual de desempenho e desliga animações/transparência da conta atual. Também tenta Alto desempenho somente quando nenhum outro perfil de energia do ynoez já possui backup. O diário registra o que o próprio perfil alterou.
+- A otimização rápida não desativa NVIDIA Instant Replay, OBS, drivers, serviços críticos ou anti-cheats; não promete um aumento universal de FPS.
+- Debloat não bloqueia mais a navegação: leitura de inicialização, serviços e tarefas ocorre fora da thread da interface. A página mostra status enquanto consulta em segundo plano.
+- **Remoção AppX real:** lista fechada de aplicativos opcionais conhecidos, com seleção múltipla e remoção apenas para o usuário atual. Frameworks, recursos, bundles, pacotes não removíveis e componentes essenciais não são elegíveis. Não remove pacotes provisionados nem altera outros perfis. A ação não tem rollback automático; reinstalação depende de disponibilidade na Microsoft Store.
+- Limpeza temporária e caches Brave/Discord permanecem seletivos; inicialização, serviços e tarefas opcionais continuam com backup para restauração.
 
 ## Funcionalidades integradas
 
