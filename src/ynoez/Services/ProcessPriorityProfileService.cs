@@ -59,6 +59,7 @@ public static class ProcessPriorityProfileService
 
     private static readonly object Sync = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static string? _journalLoadError;
     private static readonly HashSet<string> ProtectedProcessNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "System", "Registry", "Idle", "smss", "csrss", "wininit", "winlogon",
@@ -86,12 +87,14 @@ public static class ProcessPriorityProfileService
 
     private sealed class SessionJournal
     {
+        public SessionJournal() { }
         public List<ProcessStateSnapshot> Processes { get; set; } = [];
         public List<GpuPreferenceSnapshot> GpuPreferences { get; set; } = [];
     }
 
     private sealed class ProcessStateSnapshot
     {
+        public ProcessStateSnapshot() { }
         public int ProcessId { get; set; }
         public long CreationTimeFileTimeUtc { get; set; }
         public uint OriginalPriorityClass { get; set; }
@@ -103,6 +106,7 @@ public static class ProcessPriorityProfileService
 
     private sealed class GpuPreferenceSnapshot
     {
+        public GpuPreferenceSnapshot() { }
         public string ExecutablePath { get; set; } = string.Empty;
         public bool OriginalValueExisted { get; set; }
         public string? OriginalValue { get; set; }
@@ -187,10 +191,10 @@ public static class ProcessPriorityProfileService
 
             SaveProfileCore(normalized);
             var journal = new SessionJournal();
-            ApplyGpuPreferences(normalized, journal);
+            var gpuCount = ApplyGpuPreferences(normalized, journal);
             SaveJournalCore(journal);
 
-            var result = ApplyCycleCore(normalized, journal);
+            var result = ApplyCycleCore(normalized, journal) with { GpuPreferencesUpdated = gpuCount };
             AppLog.Write("Perfil de prioridade por aplicativo iniciado. " + result.ToDisplayText());
             return result;
         }
@@ -207,9 +211,13 @@ public static class ProcessPriorityProfileService
             var journal = LoadJournalCore();
             if (journal is null)
             {
+                if (_journalLoadError is not null)
+                    return new ProcessPriorityApplySummary(0, 0, 0, 0, 0, [_journalLoadError]);
+
                 journal = new SessionJournal();
-                ApplyGpuPreferences(settings, journal);
+                var gpuCount = ApplyGpuPreferences(settings, journal);
                 SaveJournalCore(journal);
+                return ApplyCycleCore(settings, journal) with { GpuPreferencesUpdated = gpuCount };
             }
 
             return ApplyCycleCore(settings, journal);
@@ -313,11 +321,9 @@ public static class ProcessPriorityProfileService
                     if (isFocus) focusCount++;
                     else backgroundCount++;
 
-                    if (TryApplyProcess(process, isFocus, settings.UseHighCpuPriority, journal, out var changed, out var warning))
-                    {
-                        if (changed) changedCount++;
-                    }
-                    else
+                    var accessible = TryApplyProcess(process, isFocus, settings.UseHighCpuPriority, journal, out var changed, out var warning);
+                    if (changed) changedCount++;
+                    if (!accessible || !string.IsNullOrWhiteSpace(warning))
                     {
                         skippedCount++;
                         if (!string.IsNullOrWhiteSpace(warning) && warnings.Count < 6)
@@ -437,16 +443,21 @@ public static class ProcessPriorityProfileService
         return true;
     }
 
-    private static void ApplyGpuPreferences(ProcessPriorityProfileSettings settings, SessionJournal journal)
+    private static int ApplyGpuPreferences(ProcessPriorityProfileSettings settings, SessionJournal journal)
     {
-        if (!string.IsNullOrWhiteSpace(settings.FocusExecutablePath))
-            WriteGpuPreference(settings.FocusExecutablePath, HighPerformanceGpuPreference, journal);
+        var updated = 0;
+        if (!string.IsNullOrWhiteSpace(settings.FocusExecutablePath)
+            && WriteGpuPreference(settings.FocusExecutablePath, HighPerformanceGpuPreference, journal))
+            updated++;
 
         foreach (var path in settings.BackgroundExecutablePaths)
-            WriteGpuPreference(path, PowerSavingGpuPreference, journal);
+            if (WriteGpuPreference(path, PowerSavingGpuPreference, journal))
+                updated++;
+
+        return updated;
     }
 
-    private static void WriteGpuPreference(string executablePath, string preference, SessionJournal journal)
+    private static bool WriteGpuPreference(string executablePath, string preference, SessionJournal journal)
     {
         try
         {
@@ -458,7 +469,7 @@ public static class ProcessPriorityProfileService
             if (key is null)
             {
                 AppLog.Write("Não foi possível abrir a configuração de GPU do Windows.");
-                return;
+                return false;
             }
 
             if (snapshot is null)
@@ -481,10 +492,12 @@ public static class ProcessPriorityProfileService
             key.SetValue(normalizedPath, preference, RegistryValueKind.String);
             snapshot.AppliedValue = preference;
             SaveJournalCore(journal);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
         {
             AppLog.Write($"Não foi possível definir a preferência de GPU para {executablePath}: {ex.Message}");
+            return false;
         }
     }
 
@@ -492,7 +505,9 @@ public static class ProcessPriorityProfileService
     {
         var journal = LoadJournalCore();
         if (journal is null)
-            return EmptySummary();
+            return _journalLoadError is null
+                ? EmptySummary()
+                : new ProcessPriorityApplySummary(0, 0, 0, 1, 0, [_journalLoadError]);
 
         var warnings = new List<string>();
         var restoredProcesses = 0;
@@ -506,10 +521,23 @@ public static class ProcessPriorityProfileService
                 state.ProcessId);
 
             if (handle.IsInvalid)
+            {
+                if (IsProcessStillRunning(state.ProcessId))
+                {
+                    remainingProcesses.Add(state);
+                    warnings.Add($"Sem acesso para restaurar o PID {state.ProcessId}; a restauração ficará pendente.");
+                }
                 continue;
+            }
 
-            if (!GetProcessTimes(handle, out var creationTime, out _, out _, out _)
-                || creationTime.ToInt64() != state.CreationTimeFileTimeUtc)
+            if (!GetProcessTimes(handle, out var creationTime, out _, out _, out _))
+            {
+                remainingProcesses.Add(state);
+                warnings.Add($"Não foi possível validar o PID {state.ProcessId}; a restauração ficará pendente.");
+                continue;
+            }
+
+            if (creationTime.ToInt64() != state.CreationTimeFileTimeUtc)
                 continue;
 
             var restored = false;
@@ -620,13 +648,40 @@ public static class ProcessPriorityProfileService
         try
         {
             if (!File.Exists(JournalPath))
+            {
+                _journalLoadError = null;
                 return null;
-            return JsonSerializer.Deserialize<SessionJournal>(File.ReadAllText(JournalPath), JsonOptions) ?? new SessionJournal();
+            }
+
+            var loaded = JsonSerializer.Deserialize<SessionJournal>(File.ReadAllText(JournalPath), JsonOptions);
+            if (loaded is null)
+                throw new InvalidDataException("O diário JSON retornou um objeto vazio.");
+
+            _journalLoadError = null;
+            return loaded;
         }
         catch (Exception ex)
         {
-            AppLog.Write("O diário de prioridade por aplicativo está inválido e foi preservado para inspeção: " + ex.Message);
+            _journalLoadError = "O diário de prioridade está inválido e foi preservado. Não será aplicada outra sessão até a restauração ser resolvida: " + ex.Message;
+            AppLog.Write(_journalLoadError);
             return null;
+        }
+    }
+
+    private static bool IsProcessStillRunning(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return true;
         }
     }
 
