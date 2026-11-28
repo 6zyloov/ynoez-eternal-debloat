@@ -93,24 +93,24 @@ public static class NetworkAdapterPerformanceTweakService
             var targetRegistry = property.ValidRegistryValues[targetIndex];
             if (property.ValidDisplayValues.Count != property.ValidRegistryValues.Count ||
                 property.ValidDisplayValues.Count == 0 ||
-                property.CurrentDisplayValue.Contains(';') ||
-                property.CurrentRegistryValue.Contains(';'))
+                property.DisplayValue.Contains(';') ||
+                property.RegistryValue.Contains(';'))
                 continue;
 
             var backupPath = GetBackupPath(property.AdapterName, property.RegistryKeyword);
             var hasBackup = File.Exists(backupPath);
-            var atTarget = string.Equals(property.CurrentDisplayValue, targetDisplay, StringComparison.OrdinalIgnoreCase);
+            var atTarget = string.Equals(property.DisplayValue, targetDisplay, StringComparison.OrdinalIgnoreCase);
             var conflict = false;
             if (hasBackup)
             {
                 var backup = ReadBackup(backupPath);
-                conflict = !string.Equals(property.CurrentDisplayValue, backup.AppliedDisplayValue, StringComparison.OrdinalIgnoreCase);
+                conflict = !string.Equals(property.DisplayValue, backup.AppliedDisplayValue, StringComparison.OrdinalIgnoreCase);
             }
 
             result.Add(new NetworkAdapterPerformanceTweak(
                 property.AdapterName, property.InterfaceDescription, property.LinkSpeed,
-                target.Label, property.RegistryKeyword, property.CurrentDisplayValue,
-                targetDisplay, property.CurrentRegistryValue, targetRegistry,
+                target.Label, property.RegistryKeyword, property.DisplayValue,
+                targetDisplay, property.RegistryValue, targetRegistry,
                 atTarget, hasBackup, conflict));
         }
 
@@ -137,7 +137,7 @@ public static class NetworkAdapterPerformanceTweakService
             string.Equals(x.RegistryKeyword, candidate.RegistryKeyword, StringComparison.OrdinalIgnoreCase));
         if (current is null ||
             !string.Equals(current.DisplayValue, candidate.CurrentDisplayValue, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(current.CurrentRegistryValue, candidate.CurrentRegistryValue, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(current.RegistryValue, candidate.CurrentRegistryValue, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("A propriedade mudou desde a análise. Atualize a página antes de aplicar.");
 
         var path = GetBackupPath(candidate.AdapterName, candidate.RegistryKeyword);
