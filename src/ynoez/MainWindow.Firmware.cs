@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using ynoez.Services;
 
 namespace ynoez;
@@ -11,34 +10,21 @@ public partial class MainWindow
     {
         var root = PageContainer();
         root.Children.Add(Heading("BIOS / PLACA-MÃE", 18));
-
         var hardwareLine = Body(_hardware.BoardManufacturer + " " + _hardware.BoardProduct +
             "  •  " + _hardware.Cpu);
         hardwareLine.Margin = new Thickness(0, 5, 0, 12);
         root.Children.Add(hardwareLine);
 
-        var faceit = new CheckBox
-        {
-            Content = "FACEIT Anti-Cheat",
-            IsChecked = false,
-            Margin = new Thickness(0, 4, 0, 4)
-        };
-        var riot = new CheckBox
-        {
-            Content = "Riot Vanguard",
-            IsChecked = false,
-            Margin = new Thickness(0, 4, 0, 4)
-        };
-        var vanguardPreCheck = new CheckBox
-        {
-            Content = "Vanguard Pre-Check (Windows 11 25H2+)",
-            IsChecked = false,
-            Margin = new Thickness(0, 4, 0, 4)
-        };
-
+        var faceit = CreateProfileCheck("FACEIT / CS2");
+        var riot = CreateProfileCheck("Riot Vanguard / VALORANT");
+        var easyAntiCheat = CreateProfileCheck("Easy Anti-Cheat");
+        var battleye = CreateProfileCheck("BattlEye");
+        var vanguardPreCheck = CreateProfileCheck("Vanguard Pre-Check (Windows 11 25H2+)");
         var choices = new StackPanel { Margin = new Thickness(0, 4, 0, 10) };
         choices.Children.Add(faceit);
         choices.Children.Add(riot);
+        choices.Children.Add(easyAntiCheat);
+        choices.Children.Add(battleye);
         choices.Children.Add(vanguardPreCheck);
         root.Children.Add(choices);
 
@@ -49,20 +35,20 @@ public partial class MainWindow
         var actionRow = new WrapPanel { Orientation = Orientation.Horizontal };
         var analyze = new Button
         {
-            Content = "Analisar BIOS",
+            Content = "ANALISAR",
             Style = (Style)FindResource("QuietButton"),
             Margin = new Thickness(0, 0, 7, 0)
         };
         var apply = new Button
         {
-            Content = "Aplicar perfil compatível",
+            Content = "APLICAR BIOS",
             Style = (Style)FindResource("AccentButton"),
             IsEnabled = false,
             Margin = new Thickness(0, 0, 7, 0)
         };
         var openUefi = new Button
         {
-            Content = "Entrar na BIOS",
+            Content = "ENTRAR NA BIOS",
             Style = (Style)FindResource("QuietButton")
         };
         actionRow.Children.Add(analyze);
@@ -79,14 +65,19 @@ public partial class MainWindow
             busy = true;
             analyze.IsEnabled = false;
             apply.IsEnabled = false;
-            status.Text = "Lendo placa, CPU, TPM, Secure Boot e requisitos dos anti-cheats…";
+            status.Text = "Detectando placa, CPU, TPM, Secure Boot e anti-cheats…";
             try
             {
                 snapshot = await FirmwareCompatibilityService.InspectAsync(_hardware);
                 var detected = snapshot.DetectedAntiCheats.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 faceit.IsChecked = detected.Contains("faceit");
                 riot.IsChecked = detected.Contains("riot-vanguard");
-                vanguardPreCheck.IsChecked = false;
+                easyAntiCheat.IsChecked = detected.Contains("easyanticheat");
+                battleye.IsChecked = detected.Contains("battleye");
+
+                var preCheckSupported = FirmwareCompatibilityService.IsVanguardPreCheckSupportedOS(_hardware);
+                vanguardPreCheck.IsEnabled = preCheckSupported;
+                vanguardPreCheck.IsChecked = preCheckSupported && detected.Contains("riot-vanguard");
 
                 var tpm = snapshot.TpmPresent
                     ? (snapshot.TpmReady ? "TPM " + snapshot.TpmVersion + " OK" : "TPM detectado, não pronto")
@@ -97,20 +88,20 @@ public partial class MainWindow
                 var hvci = snapshot.MemoryIntegrityEnabled ? "HVCI ON" : "HVCI OFF";
                 var iommu = snapshot.DmaProtectionAvailable ? "proteção DMA disponível" : "proteção DMA não confirmada";
                 var writer = snapshot.LenovoWmiAvailable
-                    ? (snapshot.CanWriteBios ? "BIOS com gravação Lenovo disponível" : "BIOS Lenovo detectada, gravação bloqueada por segurança")
-                    : "gravação automática não suportada por esta BIOS";
-                status.Text = snapshot.BiosMode + "  •  " + tpm + "  •  " + secure + "\n" +
-                    virtual + "  •  " + iommu + "  •  " + vbs + "  •  " + hvci + "\n" +
-                    writer;
-
-                apply.IsEnabled = snapshot.CanWriteBios;
+                    ? (snapshot.CanWriteBios ? "BIOS com gravação Lenovo disponível" : "gravação bloqueada por segurança")
+                    : "BIOS analisada; gravação automática não suportada neste modelo";
+                status.Text = snapshot.BiosMode + " • " + tpm + " • " + secure + "\n" +
+                    virtual + " • " + iommu + " • " + vbs + " • " + hvci + "\n" + writer;
+                if (!preCheckSupported)
+                    status.Text += "\nVanguard Pre-Check requer Windows 11 25H2 ou mais recente.";
                 if (!snapshot.LenovoWmiAvailable)
-                    status.Text += "\nO ynoez não grava offsets NVRAM genéricos. Use Entrar na BIOS para aplicar apenas o que foi detectado como necessário.";
+                    status.Text += "\nEsta BIOS não oferece interface de gravação documentada compatível. Nenhum offset UEFI genérico será escrito.";
+                apply.IsEnabled = snapshot.CanWriteBios;
             }
             catch (Exception ex)
             {
                 AppLog.Write("Análise de compatibilidade BIOS falhou: " + ex);
-                status.Text = "Não foi possível analisar o firmware: " + ex.Message;
+                status.Text = "Falha na análise do firmware: " + ex.Message;
             }
             finally
             {
@@ -126,10 +117,13 @@ public partial class MainWindow
             var selected = new List<string>();
             if (faceit.IsChecked == true) selected.Add("faceit");
             if (riot.IsChecked == true) selected.Add("riot-vanguard");
+            if (easyAntiCheat.IsChecked == true) selected.Add("easyanticheat");
+            if (battleye.IsChecked == true) selected.Add("battleye");
             if (vanguardPreCheck.IsChecked == true) selected.Add("vanguard-precheck");
             if (selected.Count == 0)
             {
-                MessageBox.Show("Marque o anti-cheat que você utiliza.", "ynoez", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Marque pelo menos um jogo ou anti-cheat que utiliza.", "ynoez",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             try
@@ -137,11 +131,19 @@ public partial class MainWindow
                 var result = FirmwareCompatibilityService.ApplySelectedProfiles(snapshot, selected);
                 status.Text = result.Message;
                 if (result.Applied)
+                {
                     apply.IsEnabled = false;
+                    MessageBox.Show(result.Message, "ynoez • BIOS", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show(result.Message, "ynoez • BIOS não alterada",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
             catch (Exception ex)
             {
-                AppLog.Write("Aplicação de perfil BIOS falhou: " + ex);
+                AppLog.Write("Aplicação do perfil BIOS falhou: " + ex);
                 status.Text = "A BIOS recusou o perfil: " + ex.Message;
             }
         };
@@ -150,4 +152,12 @@ public partial class MainWindow
         _ = InspectAsync();
         return root;
     }
+
+    private static CheckBox CreateProfileCheck(string label) => new()
+    {
+        Content = label,
+        IsChecked = false,
+        Margin = new Thickness(0, 4, 0, 4),
+        Foreground = System.Windows.Media.Brushes.White
+    };
 }
