@@ -149,7 +149,7 @@ public static class AppxDebloatService
             !string.Equals(candidate.DisplayName, definition.DisplayName, StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(candidate.PackageFullName) ||
             !candidate.PackageFullName.StartsWith(candidate.Name + "_", StringComparison.OrdinalIgnoreCase) ||
-            candidate.PackageFullName.Contains('''))
+            candidate.PackageFullName.Contains((char)39))
             throw new InvalidOperationException("Este pacote não pertence à lista fechada de aplicativos opcionais.");
     }
 
