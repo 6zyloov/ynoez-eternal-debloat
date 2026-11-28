@@ -18,6 +18,13 @@
             <SolidColorBrush x:Key="InputBackground" Color="#050505" />
             <SolidColorBrush x:Key="HoverBackground" Color="#171717" />
 
+            <!-- Hide every native WPF scrollbar; wheel/keyboard scrolling remains enabled. -->
+            <Style TargetType="{x:Type ScrollBar}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Setter Property="Width" Value="0" />
+                <Setter Property="Height" Value="0" />
+            </Style>
+
             <Style TargetType="{x:Type TextBlock}">
                 <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
@@ -414,7 +421,7 @@
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsSelected" Value="True">
                                     <Setter TargetName="TabBorder" Property="Background" Value="#202020" />
-                                    <Setter TargetName="TabBorder" Property="BorderBrush" Value="#FFFFFF" />
+                                    <Setter TargetName="TabBorder" Property="BorderBrush" Value="#333333" />
                                     <Setter Property="Foreground" Value="#FFFFFF" />
                                 </Trigger>
                                 <Trigger Property="IsMouseOver" Value="True">
