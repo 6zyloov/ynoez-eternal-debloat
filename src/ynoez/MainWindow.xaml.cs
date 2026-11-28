@@ -922,6 +922,15 @@ public partial class MainWindow : Window
             BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 4, 0, 8)
         };
+        var protectionWarning = AutoProfileService.GetProtectionConfigurationWarning();
+        var autoStatus = new TextBlock
+        {
+            Text = protectionWarning ?? "Automação desligada.",
+            Foreground = protectionWarning is null ? SecondaryBrush : BrushFrom("#FFC078"),
+            FontSize = 11,
+            Margin = new Thickness(0, 10, 0, 10),
+            TextWrapping = TextWrapping.Wrap
+        };
         var processPicker = new ComboBox
         {
             MinWidth = 320,
@@ -1008,15 +1017,6 @@ public partial class MainWindow : Window
         processPickerPanel.Children.Add(processPicker);
         processPickerPanel.Children.Add(refreshProcesses);
         processPickerPanel.Children.Add(addSelectedProcess);
-        var protectionWarning = AutoProfileService.GetProtectionConfigurationWarning();
-        var autoStatus = new TextBlock
-        {
-            Text = protectionWarning ?? "Automação desligada.",
-            Foreground = protectionWarning is null ? SecondaryBrush : BrushFrom("#FFC078"),
-            FontSize = 11,
-            Margin = new Thickness(0, 10, 0, 10),
-            TextWrapping = TextWrapping.Wrap
-        };
         var saveProtected = new Button
         {
             Content = "Salvar processos protegidos",
