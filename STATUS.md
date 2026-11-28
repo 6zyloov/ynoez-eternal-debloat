@@ -1,4 +1,17 @@
-# Desenvolvimento — ynoez 0.3.0
+# Desenvolvimento — ynoez 0.3.1 (candidato integrado)
+
+> **Estado desta branch:** integração em validação. O painel completo da linha principal foi preservado; a abertura vetorial com sigilo e os atalhos de Otimização, Debloat, Foco de Jogo e BIOS/Anti-cheat foram acrescentados. A compilação Windows e os testes desta integração ainda precisam passar na CI antes de disponibilizar o instalador.
+
+## Integração Stix + Oneclick + ynoez
+- Mantém a navegação e os módulos de Home, Monitor, Backup, Tweaks, Network, Debloat, Motherboard, Toolbox, Restore e Logs já existentes no ynoez; acrescenta atalhos rápidos sem remover páginas.
+- Abre com uma animação vetorial do sigilo enviada pelo usuário: ponto central, expansão de partículas e contorno final nítido; clique permite pular. A tela de entrada é demonstrativa e não realiza autenticação real.
+- Perfil de otimização para jogos com allowlist de ajustes de interface/captura e MMCSS Games, backup e rotina explícita de desfazer. Não aplica overclock, tensão, temporizadores de kernel ou desativação de proteções.
+- Debloat automático com lista fechada de pacotes AppX opcionais, seis serviços avaliados, tarefas agendadas de feedback/mapas e limpeza de caches selecionados. Serviços/tarefas guardam backup e têm restauração; remoção AppX não é automaticamente reversível.
+- Foco de jogo integrado: detecção/seleção de executáveis, prioridades de CPU/RAM, perfil de segundo plano e tentativa de recuperação de prioridades em sessões interrompidas. Nunca usa prioridade Realtime.
+- Compatibilidade de firmware identifica fabricante, modelo, modo UEFI, TPM, Secure Boot, virtualização e proteções. Alteração automática permanece limitada às interfaces verificadas de Lenovo WMI e ASUS ACT compatível; nos demais fabricantes mostra instruções manuais. Estado desconhecido de BitLocker bloqueia gravação.
+- Core Performance Boost / Turbo Boost é independente dos requisitos de anti-cheat e nunca é ativado por marcar FACEIT/Vanguard/EAC/BattlEye.
+- CI agora aceita pull requests para executar testes Windows, publicação self-contained x64 e criação do instalador 0.3.1.
+
 
 - Base de build atualizada para .NET 10 LTS (`net10.0-windows`), usando `System.Management 10.0.15`.
 
