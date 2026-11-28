@@ -44,6 +44,30 @@ public partial class App : Application
         AppLog.Write("Aplicativo iniciado. Versão: " + UpdateService.GetCurrentVersion());
         try
         {
+            var priorityRecovery = ProcessPriorityProfileService.RecoverInterruptedSession();
+            if (priorityRecovery.Warnings.Count > 0)
+            {
+                var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
+                ProcessPriorityProfileService.SaveProfile(savedPriorityProfile with { Enabled = false });
+                AppLog.Write("Perfil de foco desativado automaticamente porque uma restauração anterior ficou incompleta.");
+            }
+            else
+            {
+                var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
+                if (savedPriorityProfile.Enabled)
+                {
+                    var priorityStart = ProcessPriorityProfileService.StartSession(savedPriorityProfile);
+                    AppLog.Write("Perfil de foco retomado na inicialização. " + priorityStart.ToDisplayText());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Não foi possível recuperar ou retomar o perfil de prioridades: " + ex);
+        }
+
+        try
+        {
             PowerProfileService.RecoverInterruptedAutomaticSession();
         }
         catch (Exception ex)
@@ -89,7 +113,9 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        try { PowerProfileService.RecoverInterruptedAutomaticSession(); }
+        try { ProcessPriorityProfileService.RecoverInterruptedSession(); }
+        catch (Exception ex) { AppLog.Write("Falha ao restaurar prioridades de processos durante o encerramento: " + ex); }
+        try { PowerProfileService.RecoverInterruptedAutomaticSession();
         catch (Exception ex) { AppLog.Write("A sessão automática permaneceu pendente durante o encerramento: " + ex); }
         PowerProfileService.ClearExecutionRequirement();
         AppLog.Write("Aplicativo encerrado.");
