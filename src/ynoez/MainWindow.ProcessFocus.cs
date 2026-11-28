@@ -248,9 +248,19 @@ public partial class MainWindow
         try
         {
             var summary = ProcessPriorityProfileService.StartSession(settings);
-            StartProcessFocusMonitor();
-            if (_processFocusStatus is not null)
-                _processFocusStatus.Text = "Perfil ativado." + Environment.NewLine + summary.ToDisplayText();
+            var isActive = ProcessPriorityProfileService.LoadProfile().Enabled;
+            if (isActive)
+            {
+                StartProcessFocusMonitor();
+                if (_processFocusStatus is not null)
+                    _processFocusStatus.Text = "Perfil ativado. O ynoez continuará na bandeja enquanto esta configuração estiver ligada." + Environment.NewLine + summary.ToDisplayText();
+            }
+            else
+            {
+                _processFocusTimer?.Stop();
+                if (_processFocusStatus is not null)
+                    _processFocusStatus.Text = "Perfil não ativado: há alterações de uma sessão anterior que ainda precisam ser restauradas. Resolva os avisos antes de tentar novamente." + Environment.NewLine + summary.ToDisplayText();
+            }
         }
         catch (Exception ex)
         {

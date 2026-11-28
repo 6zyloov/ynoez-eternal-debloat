@@ -187,7 +187,8 @@ public static class ProcessPriorityProfileService
             var restore = RestoreJournalCore();
             if (restore.Warnings.Count > 0)
             {
-                AppLog.Write("O novo perfil de prioridades não foi iniciado porque a sessão anterior ainda tem itens que não puderam ser restaurados.");
+                SaveProfileCore(normalized with { Enabled = false });
+                AppLog.Write("O novo perfil de prioridades não foi iniciado porque a sessão anterior ainda tem itens que não puderam ser restaurados. O perfil ficou desativado até a restauração ser resolvida.");
                 return restore;
             }
 
