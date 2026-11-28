@@ -64,6 +64,12 @@ public partial class App : Application
         catch (Exception ex)
         {
             AppLog.Write("Não foi possível recuperar ou retomar o perfil de prioridades: " + ex);
+            try
+            {
+                var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
+                ProcessPriorityProfileService.SaveProfile(savedPriorityProfile with { Enabled = false });
+            }
+            catch { }
         }
 
         try
