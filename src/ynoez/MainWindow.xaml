@@ -31,6 +31,7 @@
                         <TextBlock Text="MENU" FontSize="9" Foreground="#686868" Margin="13,0,0,9" FontWeight="SemiBold" />
                         <Button x:Name="NavHome" Tag="⌂" Content="Home" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavMonitor" Tag="▣" Content="Monitor" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Button x:Name="NavProcessFocus" Tag="⚡" Content="Foco de Jogo" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavBackup" Tag="◫" Content="Backup" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavTweaks" Tag="✣" Content="Tweaks" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavNetwork" Tag="⌁" Content="Network" Style="{StaticResource NavButton}" Click="Nav_Click" />
