@@ -26,8 +26,8 @@ Permitir que um jogo principal tenha prioridade de CPU e preferência de GPU de 
 - O ynoez não usa `REALTIME_PRIORITY_CLASS`, não muda afinidade de CPU, prioridades individuais de threads ou limites de working set.
 - Processos essenciais do Windows e o próprio ynoez são ignorados.
 - As prioridades originais são registradas por PID e horário de criação, evitando aplicar restauração a um processo diferente caso o Windows reutilize um PID.
-- O perfil é reavaliado a cada dois segundos para alcançar novas instâncias do executável.
-- O diário é salvo antes das mudanças nativas e de Registro. Ao desativar, fechar o ynoez ou iniciar uma nova sessão após falha, o aplicativo tenta restaurar os valores originais.
+- O perfil é reavaliado a cada dois segundos para alcançar novas instâncias do executável. As escolhas ficam salvas, mas exigem que você clique em Ativar perfil de foco em cada execução do ynoez; não são reaplicadas silenciosamente na abertura.
+- O diário é salvo antes das mudanças nativas e de Registro. Ao desativar ou sair normalmente do ynoez, o aplicativo tenta restaurar os valores originais e desativa o perfil. Após um encerramento inesperado, a restauração é tentada na próxima abertura; a configuração é mantida, mas exige ativação manual.
 - Enquanto o perfil estiver ativo, fechar a janela a oculta na bandeja para manter o monitoramento. Para encerrar completamente, use **Encerrar ynoez** no menu da bandeja; isso tenta restaurar as prioridades antes de sair.
 - Se o Windows negar acesso ao processo, o ynoez mostra uma advertência. Executar como administrador pode ser necessário para processos elevados ou protegidos, mas não remove as restrições impostas por processos protegidos.
 

@@ -45,25 +45,18 @@ public partial class App : Application
         try
         {
             var priorityRecovery = ProcessPriorityProfileService.RecoverInterruptedSession();
-            if (priorityRecovery.Warnings.Count > 0)
-            {
-                var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
+            var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
+            if (savedPriorityProfile.Enabled)
                 ProcessPriorityProfileService.SaveProfile(savedPriorityProfile with { Enabled = false });
-                AppLog.Write("Perfil de foco desativado automaticamente porque uma restauração anterior ficou incompleta.");
-            }
+
+            if (priorityRecovery.Warnings.Count > 0)
+                AppLog.Write("O perfil de foco não será retomado automaticamente: a restauração anterior tem itens pendentes. " + priorityRecovery.ToDisplayText());
             else
-            {
-                var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
-                if (savedPriorityProfile.Enabled)
-                {
-                    var priorityStart = ProcessPriorityProfileService.StartSession(savedPriorityProfile);
-                    AppLog.Write("Perfil de foco retomado na inicialização. " + priorityStart.ToDisplayText());
-                }
-            }
+                AppLog.Write("Sessão anterior de foco restaurada. O perfil salvo exige ativação manual nesta execução.");
         }
         catch (Exception ex)
         {
-            AppLog.Write("Não foi possível recuperar ou retomar o perfil de prioridades: " + ex);
+            AppLog.Write("Não foi possível recuperar prioridades de uma sessão anterior: " + ex);
             try
             {
                 var savedPriorityProfile = ProcessPriorityProfileService.LoadProfile();
@@ -119,7 +112,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        try { ProcessPriorityProfileService.RecoverInterruptedSession(); }
+        try { ProcessPriorityProfileService.StopSession(); }
         catch (Exception ex) { AppLog.Write("Falha ao restaurar prioridades de processos durante o encerramento: " + ex); }
         try { PowerProfileService.RecoverInterruptedAutomaticSession(); }
         catch (Exception ex) { AppLog.Write("A sessão automática permaneceu pendente durante o encerramento: " + ex); }
