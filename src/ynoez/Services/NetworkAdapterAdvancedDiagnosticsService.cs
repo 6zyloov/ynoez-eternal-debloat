@@ -293,11 +293,11 @@ public static class NetworkAdapterAdvancedDiagnosticsService
         return @"
 $ErrorActionPreference = 'Stop'
 $items = New-Object System.Collections.Generic.List[object]
-$warnings = New-Object System.Collections.Generic.List[string]
+$errors = New-Object System.Collections.Generic.List[string]
 try {
     $adapters = @(Get-NetAdapter -Physical -ErrorAction Stop)
     if ($adapters.Count -eq 0) {
-        $warnings.Add('Nenhum adaptador físico foi encontrado.')
+        $errors.Add('Nenhum adaptador físico foi encontrado.')
     }
     foreach ($adapter in $adapters) {
         try {
@@ -324,7 +324,7 @@ try {
 $result = [pscustomobject]@{
     CapturedAt = [DateTimeOffset]::UtcNow.ToString('o')
     Properties = @($items.ToArray())
-    Errors = @($warnings.ToArray())
+    Errors = @($errors.ToArray())
 }
 ConvertTo-Json -InputObject $result -Depth 6 -Compress |
     Set-Content -LiteralPath '" + path + @"' -Encoding UTF8 -ErrorAction Stop
