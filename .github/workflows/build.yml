@@ -85,12 +85,18 @@ jobs:
         run: ./scripts/publish.ps1
       - name: Sign application before packaging when a certificate is configured
         shell: pwsh
+        env:
+          YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
+          YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
         run: ./scripts/sign-artifacts.ps1 -Target Application
       - name: Build candidate installer
         shell: pwsh
         run: ./scripts/build-installer.ps1
       - name: Sign installer or record unsigned status
         shell: pwsh
+        env:
+          YNOEZ_SIGNING_CERTIFICATE_BASE64: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_BASE64 }}
+          YNOEZ_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.YNOEZ_SIGNING_CERTIFICATE_PASSWORD }}
         run: ./scripts/sign-artifacts.ps1 -Target Installer
       - name: Generate and validate SPDX SBOM
         shell: pwsh
