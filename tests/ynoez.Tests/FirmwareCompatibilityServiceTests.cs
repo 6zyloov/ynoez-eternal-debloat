@@ -65,7 +65,7 @@ public sealed class FirmwareCompatibilityServiceTests
 
     [Fact]
     public void BoostAloneDoesNotInventAntiCheatRequirements() =>
-        Assert.Equal(["cpu-boost"], FirmwareCompatibilityService.GetTargetSettingIds([], includeCpuBoost: true));
+        Assert.Equal(new[] { "cpu-boost" }, FirmwareCompatibilityService.GetTargetSettingIds([], includeCpuBoost: true));
 
     [Fact]
     public void ManualGuidanceMentionsCpuBoostOnlyWhenItWasRequested()
