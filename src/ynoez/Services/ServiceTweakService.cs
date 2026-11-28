@@ -340,8 +340,16 @@ public sealed class ServiceTweakService
                 CreateNoWindow = true
             }
         };
-        process.Start();
-        process.WaitForExit();
+        try { process.Start(); }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            throw new OperationCanceledException("A elevação UAC foi cancelada; nenhum serviço foi alterado.", ex);
+        }
+        if (!process.WaitForExit(45000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            throw new TimeoutException("A alteração de serviços excedeu 45 segundos.");
+        }
         if (process.ExitCode != 0)
             throw new InvalidOperationException("O Windows recusou a alteração do serviço (código " + process.ExitCode + "). O backup foi preservado.");
     }
