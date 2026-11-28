@@ -1,6 +1,6 @@
 # Status do projeto — ynoez 0.3.0
 
-**Situação:** candidato integrado na PR draft #12. O commit anterior (5182d562dce54b5c14456535a448035933c59545) passou pela CI Windows Server 2025; esta rodada acrescentou SBOM SPDX, controles opcionais de Authenticode e teste de upgrade/rollback entre main e candidato. A validação automatizada da nova rodada ainda está pendente da execução do GitHub Actions. Não há release estável publicada.
+**Situação:** candidato integrado na PR draft #12. A revisão atual, commit `3c07809e50fc56fb74767bafeeb1cabfac990d99`, passou pela CI em Windows Server 2025 ([run 46092514834](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46092514834)). Auditoria NuGet, testes xUnit, publicação, instalador, SBOM, assinatura opcional/status, instalação limpa, reinstalação, desinstalação, upgrade do baseline main, rollback, re-upgrade e hashes concluíram com sucesso. Não há release estável publicada.
 
 ## Funcionalidades integradas
 
