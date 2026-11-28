@@ -60,7 +60,15 @@ try {
     Invoke-SilentInstaller -Path $paths.CandidateInstaller
     Assert-InstalledPayload -ExpectedHash $candidateHash -Stage 'Upgrade para o candidato'
 
-    Write-Host 'Fase 3/5: fazer rollback reinstalando o pacote legado.'
+    Write-Host 'Fase 3/5: desinstalar o candidato mantendo os dados e reinstalar o baseline legado.'
+    $candidateUninstaller = Join-Path $target 'unins000.exe'
+    if (-not (Test-Path -LiteralPath $candidateUninstaller -PathType Leaf)) { throw 'O candidato não registrou o desinstalador para rollback.' }
+    $rollbackRemoval = Start-Process -FilePath $candidateUninstaller -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -PassThru
+    if ($rollbackRemoval.ExitCode -ne 0) { throw "A remoção do candidato para rollback terminou com código $($rollbackRemoval.ExitCode)." }
+    if (Test-Path -LiteralPath (Join-Path $target 'ynoez.exe')) { throw 'A desinstalação do candidato deixou o executável instalado antes do rollback.' }
+    foreach ($folder in $folders) {
+        if (-not (Test-Path -LiteralPath $markers[$folder] -PathType Leaf)) { throw "A desinstalação do candidato removeu dados de $folder antes do rollback." }
+    }
     Invoke-SilentInstaller -Path $paths.LegacyInstaller
     Assert-InstalledPayload -ExpectedHash $legacyHash -Stage 'Rollback para o build legado'
 
