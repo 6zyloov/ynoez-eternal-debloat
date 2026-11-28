@@ -60,6 +60,8 @@ public static class NetworkAdapterPerformanceTweakService
         new("*InterruptModeration", "Disabled", "Interrupt Moderation",
             "Reduz a agregação de interrupções para testar latência menor. Pode aumentar uso de CPU; compare ping e frametime A/B."),
         new("*EEE", "Disabled", "Energy Efficient Ethernet",
+            "Desativa economia de energia Ethernet quando o driver oferece a opção. Pode aumentar consumo; use apenas para testar pausas/renegociação do link."),
+        new("*EnergyEfficientEthernet", "Disabled", "Energy Efficient Ethernet",
             "Desativa economia de energia Ethernet quando o driver oferece a opção. Pode aumentar consumo; use apenas para testar pausas/renegociação do link.")
     ];
 
@@ -134,7 +136,7 @@ public static class NetworkAdapterPerformanceTweakService
             string.Equals(x.AdapterName, candidate.AdapterName, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(x.RegistryKeyword, candidate.RegistryKeyword, StringComparison.OrdinalIgnoreCase));
         if (current is null ||
-            !string.Equals(current.CurrentDisplayValue(), candidate.CurrentDisplayValue, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(current.DisplayValue, candidate.CurrentDisplayValue, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(current.CurrentRegistryValue, candidate.CurrentRegistryValue, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("A propriedade mudou desde a análise. Atualize a página antes de aplicar.");
 

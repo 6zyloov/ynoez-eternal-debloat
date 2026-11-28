@@ -1017,7 +1017,7 @@ public partial class MainWindow : Window
 
         var adapterCard = MakeCard();
         var panel = new StackPanel { Margin = new Thickness(16, 14, 16, 14) };
-        panel.Children.Add(Heading("Economia de energia dos adaptadores", 14));
+        panel.Children.Add(Heading("Energia dos adaptadores", 14));
         var status = Body("Consultando adaptadores…");
         panel.Children.Add(status);
         var adapters = new UniformGrid { Columns = 2, Margin = new Thickness(0, 8, 0, 0) };
@@ -1025,6 +1025,17 @@ public partial class MainWindow : Window
         adapterCard.Child = panel;
         root.Children.Add(adapterCard);
         _ = LoadNetworkAdaptersAsync(adapters, status);
+
+        var latencyCard = MakeCard();
+        var latencyPanel = new StackPanel { Margin = new Thickness(16, 14, 16, 14) };
+        latencyPanel.Children.Add(Heading("Latência e RSS do driver", 14));
+        var latencyStatus = Body("Lendo apenas as propriedades suportadas pelo driver…");
+        latencyPanel.Children.Add(latencyStatus);
+        var latencyGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 8, 0, 0) };
+        latencyPanel.Children.Add(latencyGrid);
+        latencyCard.Child = latencyPanel;
+        root.Children.Add(latencyCard);
+        _ = LoadNetworkPerformanceTweaksAsync(latencyGrid, latencyStatus);
         return root;
     }
 
@@ -1061,6 +1072,54 @@ public partial class MainWindow : Window
         {
             AppLog.Write("Consulta de energia dos adaptadores falhou: " + ex);
             status.Text = "Falha ao consultar adaptadores: " + ex.Message;
+        }
+    }
+
+    private async Task LoadNetworkPerformanceTweaksAsync(UniformGrid host, TextBlock status)
+    {
+        try
+        {
+            var candidates = await NetworkAdapterPerformanceTweakService.GetCandidatesAsync();
+            host.Children.Clear();
+            foreach (var item in candidates)
+            {
+                var description = item.DisplayName switch
+                {
+                    "Receive Side Scaling (RSS)" => "RSS distribui o trabalho de recepção entre núcleos.",
+                    "Interrupt Moderation" => "Teste desligado para latência menor; pode aumentar CPU.",
+                    "Energy Efficient Ethernet" => "Teste desligado se houver pausas/renegociação do link.",
+                    _ => item.DisplayName
+                };
+                var state = item.HasConflict ? "ALTERADO FORA DO YNOEZ"
+                    : item.HasBackup ? "BACKUP SALVO"
+                    : item.IsAtTarget ? "JÁ OTIMIZADO"
+                    : "PADRÃO DO DRIVER";
+                var checkedState = item.HasBackup || item.IsAtTarget;
+                var canChange = !item.HasConflict && (item.HasBackup || !item.IsAtTarget);
+                host.Children.Add(BuildToggleCard(
+                    item.AdapterName + " • " + item.DisplayName,
+                    description + " • Atual: " + item.CurrentDisplayValue,
+                    checkedState,
+                    async enabled =>
+                    {
+                        if (enabled)
+                            await NetworkAdapterPerformanceTweakService.ApplyAsync(item);
+                        else
+                            await NetworkAdapterPerformanceTweakService.RestoreAsync(item);
+                        await LoadNetworkPerformanceTweaksAsync(host, status);
+                    },
+                    canChange,
+                    state));
+            }
+
+            status.Text = candidates.Count == 0
+                ? "Este driver não expõe RSS, Interrupt Moderation ou EEE em formato que o ynoez possa alterar com segurança."
+                : candidates.Count + " opção(ões) disponíveis no(s) driver(s) instalado(s).";
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Consulta de otimizações avançadas de NIC falhou: " + ex);
+            status.Text = "Falha ao consultar propriedades de rede: " + ex.Message;
         }
     }
 

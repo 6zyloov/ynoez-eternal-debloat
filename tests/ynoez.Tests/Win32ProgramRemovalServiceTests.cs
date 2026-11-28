@@ -41,9 +41,20 @@ public sealed class Win32ProgramRemovalServiceTests
     [Fact]
     public void NonMsiCommand_RequiresARealExecutablePath()
     {
-        var result = Win32ProgramRemovalService.BuildInvocation(
-            "SomeApp", false, @"""C:\Windows\System32\notepad.exe"" /remove");
-        Assert.NotNull(result);
+        var executable = Path.Combine(Path.GetTempPath(), "ynoez-test-uninstaller-" + Guid.NewGuid().ToString("N") + ".exe");
+        try
+        {
+            File.WriteAllText(executable, "test");
+            var command = "\"" + executable + "\" /uninstall";
+            var result = Win32ProgramRemovalService.BuildInvocation("SomeApp", false, command);
+            Assert.NotNull(result);
+            Assert.Equal(executable, result.Value.ExecutablePath);
+            Assert.Equal("/uninstall", result.Value.Arguments);
+        }
+        finally
+        {
+            try { if (File.Exists(executable)) File.Delete(executable); } catch { }
+        }
     }
 
     [Fact]

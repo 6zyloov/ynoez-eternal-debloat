@@ -81,7 +81,6 @@ public static class Win32ProgramRemovalService
                             var publisher = ReadString(item, "Publisher");
                             var version = ReadString(item, "DisplayVersion");
                             var command = ReadString(item, "UninstallString");
-                            var quietCommand = ReadString(item, "QuietUninstallString");
                             var windowsInstaller = ReadDword(item, "WindowsInstaller") == 1;
                             var systemComponent = ReadDword(item, "SystemComponent") == 1;
                             var releaseType = ReadString(item, "ReleaseType");
@@ -138,7 +137,7 @@ public static class Win32ProgramRemovalService
             StartInfo = new ProcessStartInfo(executable, arguments)
             {
                 UseShellExecute = true,
-                Verb = IsAdministrator() ? "" : "runas",
+                Verb = candidate.HiveName == "Computador" && !IsAdministrator() ? "runas" : "",
                 WorkingDirectory = Path.GetDirectoryName(executable) ?? Environment.CurrentDirectory
             }
         };
