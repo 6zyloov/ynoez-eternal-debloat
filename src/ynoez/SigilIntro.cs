@@ -9,7 +9,7 @@ namespace ynoez;
 /// Animação vetorial do sigilo: ponto central, expansão de partículas e desenho final nítido.
 /// Não depende de arquivo externo e pode ser pulada com um clique.
 /// </summary>
-internal sealed class SigilIntro : FrameworkElement
+public sealed class SigilIntro : FrameworkElement
 {
     public const double FormRevealSeconds = 3.6;
     private const int ParticleCount = 1050;
