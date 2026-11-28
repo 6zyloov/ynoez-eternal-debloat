@@ -32,23 +32,30 @@ public partial class MainWindow
             Margin = new Thickness(0, 10, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Left
         };
+        var undo = new Button
+        {
+            Content = "DESFAZER OTIMIZAÇÃO",
+            Style = (Style)FindResource("QuietButton"),
+            Height = 40,
+            MinWidth = 150,
+            Margin = new Thickness(0, 10, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
         root.Children.Add(apply);
         root.Children.Add(focus);
+        root.Children.Add(undo);
 
         var busy = false;
         apply.Click += async (_, _) =>
         {
             if (busy) return;
-            if (_autoProfileCts is not null)
-            {
-                MessageBox.Show("Desative os perfis automáticos antes de aplicar o perfil manual.", "ynoez",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (MessageBox.Show(
-                "Aplicar ajustes de jogo do Windows, perfil MMCSS Games e plano Alto desempenho?",
-                "ynoez • perfil competitivo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (!ThemedDialog.Confirm(this, "Aplicar otimização para jogos?",
+                "• A captura em segundo plano do Xbox / Game DVR será desativada.\n" +
+                "• Alguns efeitos visuais (animações e transparência) serão reduzidos.\n" +
+                "• O perfil MMCSS \"Games\" será ajustado e o plano de energia passará para Alto desempenho.\n\n" +
+                "NVIDIA Instant Replay (Alt+Z), OBS, drivers, Defender, Windows Update e anti-cheats não serão alterados. " +
+                "Cada ajuste é verificado depois de aplicado e guarda um backup do valor original.",
+                "OTIMIZAR"))
                 return;
 
             busy = true;
@@ -58,12 +65,9 @@ public partial class MainWindow
             {
                 var result = await PerformancePresetService.ApplyAsync();
                 status.Text = result.Summary;
-                if (!result.Succeeded)
-                    MessageBox.Show(result.Summary, "ynoez • ajustes parciais",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
-                else
-                    MessageBox.Show(result.Summary, "ynoez • otimização concluída",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                ThemedDialog.Info(this,
+                    result.Succeeded ? "Otimização concluída" : "Otimização parcial",
+                    result.Summary);
             }
             catch (Exception ex)
             {
@@ -74,6 +78,37 @@ public partial class MainWindow
             {
                 busy = false;
                 apply.IsEnabled = true;
+            }
+        };
+        undo.Click += async (_, _) =>
+        {
+            if (busy) return;
+            if (!ThemedDialog.Confirm(this, "Desfazer a otimização?",
+                "Os ajustes de jogo, o perfil MMCSS \"Games\" e o plano de energia voltam aos valores originais guardados pelo ynoez. " +
+                "Só é restaurado o que tiver backup; o resto é mantido como está.",
+                "DESFAZER"))
+                return;
+
+            busy = true;
+            apply.IsEnabled = false;
+            undo.IsEnabled = false;
+            status.Text = "Restaurando os valores originais…";
+            try
+            {
+                var summary = await PerformancePresetService.RestoreAsync();
+                status.Text = summary;
+                ThemedDialog.Info(this, "Desfazer otimização", summary);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Desfazer otimização falhou: " + ex);
+                status.Text = "Não foi possível desfazer: " + ex.Message;
+            }
+            finally
+            {
+                busy = false;
+                apply.IsEnabled = true;
+                undo.IsEnabled = true;
             }
         };
         focus.Click += (_, _) => ShowPage("Foco de Jogo");

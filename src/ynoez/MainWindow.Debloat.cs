@@ -28,29 +28,33 @@ public partial class MainWindow
         run.Click += async (_, _) =>
         {
             if (busy) return;
-            if (MessageBox.Show(
-                "O ynoez vai remover somente aplicativos opcionais de uma lista permitida, desativar serviços/tarefas não essenciais e limpar caches. " +
-                "Xbox, Store, drivers, runtimes, anti-cheats, Defender, Firewall, Windows Update, rede, áudio, impressão e pesquisa serão mantidos. Continuar?",
-                "ynoez • Debloat", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (!ThemedDialog.Confirm(this, "Executar o Debloat?",
+                "• Remove somente aplicativos opcionais de uma lista permitida (Notícias, Clima, Solitaire, Dicas etc.).\n" +
+                "• Desativa serviços e tarefas de telemetria que não são essenciais.\n" +
+                "• Limpa temporários e caches do Windows, Brave e Discord.\n\n" +
+                "Atenção: a remoção de aplicativos NÃO tem restauração automática; para recuperar, reinstale pela Microsoft Store. " +
+                "Serviços e tarefas desativados guardam backup e podem ser restaurados.\n\n" +
+                "Ficam preservados: Microsoft Store, Xbox, Calculadora, Bloco de Notas, Pesquisa, drivers, runtimes, anti-cheats, " +
+                "Defender, Firewall, Windows Update, rede, áudio e impressão.",
+                "EXECUTAR DEBLOAT"))
                 return;
 
             busy = true;
             run.IsEnabled = false;
             try
             {
-                var progress = new Progress<string>(message => status.Text = message);
                 var result = await DebloatProfileService.RunAsync(message =>
                 {
                     if (!Dispatcher.HasShutdownStarted)
                         Dispatcher.Invoke(() => status.Text = message);
                 });
                 status.Text = result.Summary;
-                if (result.Failures.Count > 0)
-                    MessageBox.Show(result.Summary + "\n\nAlgumas operações não puderam ser concluídas. Consulte o log local.",
-                        "ynoez • Debloat parcial", MessageBoxButton.OK, MessageBoxImage.Warning);
-                else
-                    MessageBox.Show(result.Summary, "ynoez • Debloat concluído",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                ThemedDialog.Info(this,
+                    result.Failures.Count > 0 ? "Debloat parcial" : "Debloat concluído",
+                    result.Failures.Count > 0
+                        ? result.Summary + "\n\nAlgumas operações não puderam ser concluídas. Consulte o log local."
+                        : result.Summary,
+                    result.ReportText);
             }
             catch (Exception ex)
             {

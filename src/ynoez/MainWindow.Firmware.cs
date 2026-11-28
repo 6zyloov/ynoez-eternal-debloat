@@ -20,12 +20,16 @@ public partial class MainWindow
         var easyAntiCheat = CreateProfileCheck("Easy Anti-Cheat");
         var battleye = CreateProfileCheck("BattlEye");
         var vanguardPreCheck = CreateProfileCheck("Vanguard Pre-Check (Windows 11 25H2+)");
+        // Desempenho, não requisito de anti-cheat: fica separado e desmarcado por padrão.
+        var cpuBoost = CreateProfileCheck("Core Performance Boost / Turbo Boost (desempenho — não é exigência de anti-cheat)");
+        cpuBoost.Margin = new Thickness(0, 12, 0, 4);
         var choices = new StackPanel { Margin = new Thickness(0, 4, 0, 10) };
         choices.Children.Add(faceit);
         choices.Children.Add(riot);
         choices.Children.Add(easyAntiCheat);
         choices.Children.Add(battleye);
         choices.Children.Add(vanguardPreCheck);
+        choices.Children.Add(cpuBoost);
         root.Children.Add(choices);
 
         var status = Body("Analisando firmware…");
@@ -122,26 +126,31 @@ public partial class MainWindow
             if (easyAntiCheat.IsChecked == true) selected.Add("easyanticheat");
             if (battleye.IsChecked == true) selected.Add("battleye");
             if (vanguardPreCheck.IsChecked == true) selected.Add("vanguard-precheck");
-            if (selected.Count == 0)
+            var wantsCpuBoost = cpuBoost.IsChecked == true;
+            if (selected.Count == 0 && !wantsCpuBoost)
             {
-                MessageBox.Show("Marque pelo menos um jogo ou anti-cheat que utiliza.", "ynoez",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                ThemedDialog.Info(this, "Nada selecionado",
+                    "Marque pelo menos um jogo ou anti-cheat que você utiliza, ou a opção de boost da CPU.");
                 return;
             }
+            if (snapshot.CanWriteBios)
+            {
+                var plannedSettings = FirmwareCompatibilityService.GetTargetSettingIds(selected, wantsCpuBoost);
+                if (plannedSettings.Count > 0 && !ThemedDialog.Confirm(this, "Gravar na BIOS?",
+                    "O ynoez vai gravar na BIOS, pela interface oficial do fabricante, somente os recursos que ainda estiverem desligados: " +
+                    FirmwareCompatibilityService.DescribeSettings(plannedSettings) + ".\n\n" +
+                    "O valor original de cada opção fica registrado em um diário local. A mudança só passa a valer depois de reiniciar; " +
+                    "o ynoez não reinicia o computador sozinho e não altera tensão, clock ou limites de potência.",
+                    "GRAVAR NA BIOS"))
+                    return;
+            }
+
             try
             {
-                var result = FirmwareCompatibilityService.ApplySelectedProfiles(snapshot, selected);
+                var result = FirmwareCompatibilityService.ApplySelectedProfiles(snapshot, selected, wantsCpuBoost);
                 status.Text = result.Message;
-                if (result.Applied)
-                {
-                    apply.IsEnabled = false;
-                    MessageBox.Show(result.Message, "ynoez • BIOS", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    MessageBox.Show(result.Message, "ynoez • BIOS não alterada",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
+                if (result.Applied) apply.IsEnabled = false;
+                ThemedDialog.Info(this, result.Applied ? "BIOS preparada" : "BIOS não alterada", result.Message);
             }
             catch (Exception ex)
             {

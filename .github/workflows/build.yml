@@ -106,7 +106,11 @@ jobs:
         run: ./scripts/test-installer.ps1
       - name: Test upgrade, rollback, re-upgrade and user-data retention
         shell: pwsh
-        run: ./scripts/test-installer-upgrade.ps1 -LegacyInstallerPath "migration-baseline/artifacts/ynoez-setup-0.3.0.exe" -CandidateInstallerPath "artifacts/ynoez-setup-0.3.0.exe" -LegacyExecutablePath "migration-baseline/dist/ynoez.exe" -CandidateExecutablePath "dist/ynoez.exe"
+        run: |
+          [xml]$candidateProject = Get-Content src/ynoez/ynoez.csproj
+          $candidateVersion = [string]$candidateProject.Project.PropertyGroup.Version
+          if ([string]::IsNullOrWhiteSpace($candidateVersion)) { throw "Versão candidata não encontrada no csproj." }
+          ./scripts/test-installer-upgrade.ps1 -LegacyInstallerPath "migration-baseline/artifacts/ynoez-setup-0.3.0.exe" -CandidateInstallerPath "artifacts/ynoez-setup-$candidateVersion.exe" -LegacyExecutablePath "migration-baseline/dist/ynoez.exe" -CandidateExecutablePath "dist/ynoez.exe"
       - name: Validate release packaging and checksums
         shell: pwsh
         run: ./scripts/release.ps1 -DryRun

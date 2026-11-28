@@ -93,12 +93,11 @@ public static class FirmwareCompatibilityService
         var deviceGuard = ReadDeviceGuard();
         var virtualization = ReadCpuVirtualization();
         var antiCheats = DetectAntiCheats();
-        var manufacturer = Normalize(hardware.BoardManufacturer);
         var lenovoAvailable = false;
         IReadOnlyList<FirmwareDetectedSetting> lenovoSettings = Array.Empty<FirmwareDetectedSetting>();
         var passwordStateKnown = false;
         var passwordSet = false;
-        if (manufacturer.Contains("LENOVO", StringComparison.Ordinal))
+        if (ManufacturerMatches(hardware.BoardManufacturer, "lenovo"))
         {
             lenovoSettings = TryReadLenovoSettings(out lenovoAvailable);
             passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState(out passwordStateKnown);
@@ -106,7 +105,7 @@ public static class FirmwareCompatibilityService
         var passwordStateConfirmed = lenovoAvailable && passwordStateKnown;
 
         AsusFirmwareInspection? asus = null;
-        if (manufacturer.Contains("ASUS", StringComparison.Ordinal))
+        if (ManufacturerMatches(hardware.BoardManufacturer, "asus"))
             AsusConfigurationToolAdapter.TryInspect(out asus);
         var firmwareSettings = asus?.Settings ?? lenovoSettings;
 
@@ -151,9 +150,8 @@ public static class FirmwareCompatibilityService
             _ => id
         }).ToArray();
 
-        var board = Normalize(snapshot.BoardManufacturer + " " + snapshot.BoardProduct);
         var lines = new List<string>();
-        if (board.Contains("GIGABYTEA520MKV2", StringComparison.Ordinal))
+        if (IsGigabyteA520MKV2(snapshot.BoardManufacturer, snapshot.BoardProduct))
         {
             lines.Add("GIGABYTE A520M K V2 — entre em Advanced Mode:");
             if (required.Contains("tpm", StringComparer.Ordinal))
@@ -168,7 +166,8 @@ public static class FirmwareCompatibilityService
                     ? "Boot > CSM Support: Disabled; depois Secure Boot > Custom > Restore Factory Keys; confirme Secure Boot Active."
                     : "Secure Boot bloqueado: o Windows iniciou em Legacy. Não desative CSM; converta o disco do sistema para GPT e valide UEFI antes.");
             }
-            lines.Add("CPU: Core Performance Boost em Auto/Enabled. PBO, tensão, clocks e limites térmicos ficam no padrão.");
+            if (required.Contains("cpu-boost", StringComparer.Ordinal))
+                lines.Add("CPU: Core Performance Boost em Auto/Enabled. PBO, tensão, clocks e limites térmicos ficam no padrão.");
         }
         else
         {
@@ -182,10 +181,10 @@ public static class FirmwareCompatibilityService
     public static IReadOnlyList<string> GetRequiredSettingIds(IEnumerable<string> selectedProfiles)
     {
         ArgumentNullException.ThrowIfNull(selectedProfiles);
-        var required = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "cpu-boost"
-        };
+        // Somente requisitos de anti-cheat. Core Performance Boost / Turbo Boost é uma opção de
+        // desempenho independente (ver GetTargetSettingIds) e nunca é exigência de FACEIT, Vanguard,
+        // EAC ou BattlEye.
+        var required = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var profile in selectedProfiles)
         {
@@ -195,6 +194,35 @@ public static class FirmwareCompatibilityService
         }
 
         return required.OrderBy(x => x, StringComparer.Ordinal).ToArray();
+    }
+
+    /// <summary>Nomes legíveis dos recursos de firmware, para confirmações e relatórios.</summary>
+    public static string DescribeSettings(IEnumerable<string> settingIds)
+    {
+        ArgumentNullException.ThrowIfNull(settingIds);
+        return string.Join(", ", settingIds.Select(id => id switch
+        {
+            "secureboot" => "Secure Boot",
+            "tpm" => "TPM 2.0 / AMD fTPM",
+            "iommu" => "IOMMU / DMA Remapping",
+            "virtualization" => "SVM / Intel VT-x",
+            "cpu-boost" => "Core Performance Boost / Turbo Boost",
+            _ => id
+        }));
+    }
+
+    /// <summary>
+    /// Requisitos de anti-cheat mais, apenas quando o usuário pedir explicitamente, a opção de
+    /// desempenho de boost da CPU. As duas categorias nunca são misturadas por padrão.
+    /// </summary>
+    public static IReadOnlyList<string> GetTargetSettingIds(
+        IEnumerable<string> selectedProfiles, bool includeCpuBoost)
+    {
+        ArgumentNullException.ThrowIfNull(selectedProfiles);
+        var targets = GetRequiredSettingIds(selectedProfiles).ToList();
+        if (includeCpuBoost && !targets.Contains("cpu-boost", StringComparer.Ordinal))
+            targets.Add("cpu-boost");
+        return targets.OrderBy(x => x, StringComparer.Ordinal).ToArray();
     }
 
     public static string? FindSettingName(IEnumerable<string> firmwareSettingNames, string requirementId)
@@ -227,15 +255,17 @@ public static class FirmwareCompatibilityService
 
     public static FirmwareApplyResult ApplySelectedProfiles(
         FirmwareCompatibilitySnapshot snapshot,
-        IEnumerable<string> selectedProfiles)
+        IEnumerable<string> selectedProfiles,
+        bool includeCpuBoost = false)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(selectedProfiles);
 
         var selected = selectedProfiles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var targets = GetRequiredSettingIds(selected);
+        var targets = GetTargetSettingIds(selected, includeCpuBoost);
         if (targets.Count == 0)
-            return new FirmwareApplyResult(false, false, 0, [], "Nenhum ajuste de firmware foi solicitado.");
+            return new FirmwareApplyResult(false, false, 0, [],
+                "Os anti-cheats selecionados não têm requisito de firmware documentado pelo ynoez. Nenhuma BIOS foi alterada.");
 
         if (!snapshot.LenovoWmiAvailable && !snapshot.AsusActAvailable)
             return new FirmwareApplyResult(false, false, 0, [],
@@ -690,6 +720,18 @@ public static class FirmwareCompatibilityService
 
     private static string Normalize(string value) =>
         new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    /// <summary>
+    /// Compara fabricante/produto reportados pelo SMBIOS. Normalize() devolve minúsculas, então os
+    /// tokens aqui também são minúsculos. Fabricante e produto são avaliados separadamente: o
+    /// fabricante real costuma vir como "Gigabyte Technology Co., Ltd." e "ASUSTeK COMPUTER INC.".
+    /// </summary>
+    internal static bool ManufacturerMatches(string? manufacturer, string vendorToken) =>
+        Normalize(manufacturer ?? string.Empty).Contains(Normalize(vendorToken), StringComparison.Ordinal);
+
+    internal static bool IsGigabyteA520MKV2(string? manufacturer, string? product) =>
+        ManufacturerMatches(manufacturer, "gigabyte") &&
+        Normalize(product ?? string.Empty).Contains("a520mkv2", StringComparison.Ordinal);
 
     private static void WriteAtomic(string path, string content)
     {

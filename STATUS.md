@@ -1,49 +1,18 @@
-# Status — ynoez 0.3.0
+# Status — ynoez 0.3.1
 
-**Situação:** candidato integrado na PR draft #12. A revisão 94a4549e67a5131f6f377e1e74cf1b0519e5fdae passou nas 24 etapas da CI Windows: auditoria NuGet, 259 testes, compilação, instalador, SBOM, instalação/reinstalação/desinstalação, upgrade, rollback, re-upgrade, retenção de dados, checksums e publicação de artefatos. Ainda não é release estável.
+**Situação:** candidato. As alterações desta versão foram feitas sem compilador disponível; compile e rode os testes
+(`dotnet test`) e a CI antes de qualquer uso. Não é release estável.
 
-CI aprovada: https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46108559354
-
-## Interface
-
-- Tema preto absoluto/branco, sem separadores superiores claros e sem scrollbar visível; rolagem por mouse/teclado continua.
-- Login local de demonstração aceita qualquer texto; não valida, não armazena e não transmite credenciais.
-- Home compacta com CPU/GPU/RAM e atalhos.
-- Menu lateral: Home, Otimizações, Debloat, Rede, Foco de Jogo, Placa-mãe, Toolbox e Backup. Monitor, Restore e Logs não aparecem na navegação.
-
-## Otimizações
-
-- Main: Game Mode, Game DVR, efeitos visuais, animações, transparência e atraso de menus/hover.
-- Power: Alto desempenho/Equilibrado, perfis automáticos e restauração do plano original.
-- Kernel: MMCSS Games, NetworkThrottlingIndex, PowerThrottlingOff, Win32PrioritySeparation Programs 0x26 e timer 1 ms apenas no processo ynoez.
-- GPU: HAGS reversível, preferência por aplicativo no Foco de Jogo e atalhos AMD/Windows.
-- Rede: RSS, Interrupt Moderation e EEE somente quando o driver informa opções compatíveis; economia de energia por adaptador com backup.
-- Foco de Jogo: detecção de CS2 e Roblox; uma regra cobre todas as instâncias RobloxPlayerBeta.exe; CPU/memória e preferência de adaptador gráfico com journal de restauração.
-
-## Debloat
-
-- Limpeza Temp/Brave/Discord.
-- AppX opcional com allowlist fechada, remoção somente da conta atual e sem rollback automático.
-- Win32 com desinstalador direto: MSI via ProductCode ou executável registrado. Bloqueia command hosts e componentes conhecidos de Windows/driver/runtime/anti-cheat.
-- Inicialização do usuário com backup/reversão.
-- Serviços e tarefas opcionais com whitelist, confirmação, UAC, backup e verificação.
-- Leituras de inicialização, serviços e tarefas em segundo plano.
-
-## Placa-mãe
-
-- Perfil GIGABYTE A520M K V2 com recomendações XMP/DOCP, Core Performance Boost, PBO, Smart Fan 5 e SAM/Re-Size BAR.
-- UEFI por reinicialização explícita; links BIOS dependem da revisão física confirmada no PCB.
-- Não grava variáveis de BIOS/UEFI, não faz flash nem altera tensão.
+## O que o app tem hoje
+- Início com abertura animada do sigilo e login local de demonstração (aceita qualquer texto; não valida, não guarda e não transmite credenciais).
+- Menu: Home, Otimizações, Debloat, Foco de Jogo, Placa-mãe.
+- **Otimizações:** um botão aplica ajustes de jogo (Game DVR/captura, efeitos visuais, atrasos de menu), MMCSS Games e plano Alto desempenho, com backup e botão de desfazer.
+- **Debloat:** AppX opcional por allowlist fechada (sem restauração automática), serviços/tarefas opcionais com backup, limpeza Temp/Brave/Discord, com relatório final.
+- **Foco de Jogo:** CS2 e Roblox (todas as instâncias) com prioridade conservadora, XT protegido e restauração ao encerrar.
+- **BIOS / Placa-mãe:** detecção de UEFI, Secure Boot, TPM, virtualização, DMA, VBS/HVCI e anti-cheats; escolha de jogos/anti-cheats; gravação apenas via Lenovo WMI ou ASUS ACT em modelos compatíveis; demais placas recebem guia manual.
 
 ## Limites
-
-- Win32PrioritySeparation 0x26 é política de quantum/foreground, não multiplicador de CPU.
-- NetworkThrottlingIndex é legado; HAGS/MMCSS/RSS/EEE/Interrupt Moderation são dependentes de Windows/driver e precisam de A/B.
-- PowerThrottlingOff pode aumentar consumo/temperatura.
-- AppX não tem rollback automático; Win32 usa o desinstalador oficial do fabricante.
-- Nenhum ganho de FPS/ping é prometido sem validação no PC real.
-- Authenticode NOT SIGNED sem certificado Code Signing.
-
-## Artefatos
-
-Artefatos publicados na execução CI acima: ynoez-portable-win-x64 e ynoez-setup-win-x64. SHA256SUMS.txt acompanha os arquivos.
+- Nenhum ganho de FPS/ping é prometido sem medição no PC real.
+- GIGABYTE A520M K V2: guia manual; o app não grava a BIOS dessa placa nem altera tensão, clock ou limites de potência.
+- Sem assinatura Authenticode (sem certificado configurado).
+- Detalhes e níveis de validação: `docs/AUDIT-0.3.1.md`.
