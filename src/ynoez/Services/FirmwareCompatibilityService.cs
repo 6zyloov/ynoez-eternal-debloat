@@ -92,7 +92,8 @@ public static class FirmwareCompatibilityService
         var virtualization = ReadCpuVirtualization();
         var antiCheats = DetectAntiCheats();
         var lenovoSettings = TryReadLenovoSettings(out var lenovoAvailable);
-        var passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState(out var passwordStateKnown);
+        var passwordStateKnown = false;
+        var passwordSet = lenovoAvailable && ReadLenovoSupervisorPasswordState(out passwordStateKnown);
         var passwordStateConfirmed = lenovoAvailable && passwordStateKnown;
 
         return new FirmwareCompatibilitySnapshot(
