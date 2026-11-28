@@ -18,7 +18,7 @@ Este artefato é uma build candidata para avaliação, não uma release estável
 
 ## Integridade e validação
 
-A CI do commit `3c07809e50fc56fb74767bafeeb1cabfac990d99` terminou com sucesso no Windows Server 2025 ([run 46092514834](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46092514834)). Foram aprovados auditoria NuGet, testes xUnit, publicação e instalador, geração/validação de SBOM, instalação limpa, reinstalação, desinstalação preservando dados, upgrade do baseline atual de main, rollback, re-upgrade e dry-run de SHA-256. O manifesto inclui instalador, pacote portátil, SBOM e status de assinatura.
+A revisão de código `8c5664d420b90f6813f6263f443059c970829be9`, incluindo Foco de Jogo, passou pela CI no Windows Server 2025 ([run 46095777614](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46095777614)). Foram aprovados auditoria NuGet, testes xUnit, publicação self-contained, instalador, SBOM, instalação limpa, reinstalação, desinstalação preservando dados, upgrade do baseline atual de main, rollback, re-upgrade, hashes e upload dos artefatos. O manifesto inclui instalador, pacote portátil, SBOM e status de assinatura.
 
 Na SBOM atual, seis componentes e dez arquivos foram identificados, mas os campos de licença dos pacotes permanecem NOASSERTION; a revisão formal de licenças ainda é necessária. A distribuição atual declara Authenticode NOT SIGNED porque nenhum certificado de assinatura foi configurado.
 

@@ -38,7 +38,7 @@ A versão do app e do instalador vem de um único campo Version em src/ynoez/yno
 
 O pipeline gera e valida uma SBOM SPDX 2.2, publica o manifesto e inclui seu SHA-256 junto ao instalador e pacote portátil. Na SBOM desta build, os pacotes foram identificados, mas os campos de licença estão como NOASSERTION; a revisão formal de licenças continua pendente. O ciclo de assinatura aceita certificado PFX em secrets do GitHub Actions: o executável é assinado antes de ser empacotado e o instalador é assinado depois. Sem certificado, a distribuição declara explicitamente Authenticode NOT SIGNED; não simula uma assinatura. Consulte docs/SBOM-AND-SIGNING.md.
 
-A CI do commit `3c07809e50fc56fb74767bafeeb1cabfac990d99` passou no GitHub Actions em Windows Server 2025 ([run 46092514834](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46092514834)). Foram aprovados instalação limpa, reinstalação, desinstalação preservando Data/Backups/Logs/Downloads, upgrade do baseline atual de main para o candidato, rollback, re-upgrade, validação da SBOM e dos hashes. Esse teste de baseline não substitui a migração de uma futura versão estável já publicada.
+A revisão de código `8c5664d420b90f6813f6263f443059c970829be9`, incluindo o Foco de Jogo, passou na CI do GitHub Actions em Windows Server 2025 ([run 46095777614](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46095777614)). Foram aprovados auditoria NuGet, xUnit, build self-contained, instalador, SBOM, assinatura/status, instalação limpa, reinstalação, desinstalação preservando Data/Backups/Logs/Downloads, upgrade do baseline atual de main, rollback, re-upgrade, hashes e upload dos artefatos. O teste de baseline não substitui a migração de uma futura versão estável já publicada.
 
 ## Segurança e limites
 
@@ -52,7 +52,7 @@ O projeto não automatiza flash de BIOS, overclock, tensão, PBO, BCD/HPET/timer
 
 ## Build e testes
 
-O GitHub Actions compila em Windows x64, audita dependências NuGet diretas e transitivas, executa os testes xUnit, publica o executável autocontido, constrói o instalador e gera a SBOM. A pipeline também faz o smoke test de instalação/reinstalação/desinstalação, testa upgrade e rollback entre o baseline de main e o candidato, valida integridade, e publica os artefatos de build e metadata. A CI desta revisão deve terminar antes de considerar essa rodada validada.
+O GitHub Actions compila em Windows x64, audita dependências NuGet diretas e transitivas, executa os testes xUnit, publica o executável autocontido, constrói o instalador e gera a SBOM. A pipeline também faz o smoke test de instalação/reinstalação/desinstalação, testa upgrade e rollback entre o baseline de main e o candidato, valida integridade, e publica os artefatos de build e metadata. A CI da revisão de código `8c5664d420b90f6813f6263f443059c970829be9` terminou com sucesso ([run 46095777614](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46095777614)). Isso valida o build e os testes automatizados, mas não substitui os testes prolongados no PC de destino.
 
 Directory.Build.props habilita a auditoria de vulnerabilidades NuGet e transforma alertas moderados ou superiores em erro de restore. Detalhes em docs/DEPENDENCY-AUDIT.md e docs/SBOM-AND-SIGNING.md.
 

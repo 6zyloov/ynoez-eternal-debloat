@@ -1,6 +1,6 @@
 # Status do projeto — ynoez 0.3.0
 
-**Situação:** candidato integrado na PR draft #12. A revisão atual, commit `3c07809e50fc56fb74767bafeeb1cabfac990d99`, passou pela CI em Windows Server 2025 ([run 46092514834](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46092514834)). Auditoria NuGet, testes xUnit, publicação, instalador, SBOM, assinatura opcional/status, instalação limpa, reinstalação, desinstalação, upgrade do baseline main, rollback, re-upgrade e hashes concluíram com sucesso. Não há release estável publicada.
+**Situação:** candidato integrado na PR draft #12. A revisão de código `8c5664d420b90f6813f6263f443059c970829be9`, incluindo Foco de Jogo, passou pela CI em Windows Server 2025 ([run 46095777614](https://github.com/6zyloov/ynoez-eternal-debloat/actions/runs/46095777614)). Auditoria NuGet, testes xUnit, publicação, instalador, SBOM, assinatura opcional/status, instalação limpa, reinstalação, desinstalação, upgrade do baseline main, rollback, re-upgrade e hashes concluíram com sucesso. Não há release estável publicada.
 
 ## Funcionalidades integradas
 
@@ -22,7 +22,7 @@ Permanecem protegidos Microsoft Store/licenciamento, impressão, Calculadora, Cl
 
 ## Limites que ainda impedem chamar de release estável
 
-1. A nova CI precisa terminar com sucesso para validar a rodada de SBOM, assinatura e migração/rollback.
+1. A CI automatizada desta revisão está verde; ainda falta validação em Windows cliente e hardware físico, porque runner Windows Server 2025 não reproduz o ambiente real de jogo.
 2. Testar em Windows cliente: abertura, navegação, WMI, sessões longas, PresentMon em jogos reais, rede e recuperação após falhas.
 3. Validar Roblox + automações XT por várias horas, observando que processos e scripts permanecem ativos; cadastrar o nome exato de processos XT independentes dos runtimes protegidos.
 4. Testar Vanguard/FACEIT em ambiente autorizado e hardware AMD/Intel/NVIDIA reais. A CI não confirma compatibilidade de anti-cheat.
