@@ -390,7 +390,7 @@ public static class NetworkAdapterPerformanceTweakService
 
     private static void ValidateText(string value, string parameter)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value.Any(char.IsControl) || value.Contains('''))
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value.Any(char.IsControl) || value.Contains((char)39))
             throw new ArgumentException("Valor inválido para comando de NIC.", parameter);
     }
 
