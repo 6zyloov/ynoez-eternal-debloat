@@ -323,10 +323,21 @@ public sealed class ScheduledTaskTweakService
                 RedirectStandardError = !elevated
             }
         };
-        process.Start();
+        try
+        {
+            process.Start();
+        }
+        catch (Win32Exception ex) when (elevated && ex.NativeErrorCode == 1223)
+        {
+            throw new OperationCanceledException("A elevação UAC foi cancelada; nenhuma tarefa foi alterada.", ex);
+        }
         if (elevated)
         {
-            process.WaitForExit();
+            if (!process.WaitForExit(45000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                throw new TimeoutException("A alteração de tarefas excedeu 45 segundos.");
+            }
             return (process.ExitCode, "", "");
         }
 
