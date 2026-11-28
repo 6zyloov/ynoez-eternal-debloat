@@ -212,10 +212,12 @@ public static class FirmwareCompatibilityService
         return null;
     }
 
-    public static string? SelectEnabledValue(IEnumerable<string> allowedValues)
+    public static string? SelectEnabledValue(IEnumerable<string> allowedValues, string requirementId = "")
     {
         ArgumentNullException.ThrowIfNull(allowedValues);
-        string[] preferred = ["Enabled", "Enable", "On", "Active", "1"];
+        string[] preferred = string.Equals(requirementId, "cpu-boost", StringComparison.OrdinalIgnoreCase)
+            ? ["Enabled", "Enable", "Auto", "On", "Active", "1"]
+            : ["Enabled", "Enable", "On", "Active", "1"];
         var values = allowedValues.ToArray();
         return preferred.FirstOrDefault(target =>
             values.Any(value => string.Equals(value.Trim(), target, StringComparison.OrdinalIgnoreCase))) is { } match
@@ -341,7 +343,7 @@ public static class FirmwareCompatibilityService
                 string.Equals(setting.Value, "Active", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(setting.Value, "1", StringComparison.OrdinalIgnoreCase) ||
                 (requirement == "cpu-boost" && string.Equals(setting.Value, "Auto", StringComparison.OrdinalIgnoreCase));
-            if (!alreadyEnabled && SelectEnabledValue(setting.AllowedValues) is null)
+            if (!alreadyEnabled && SelectEnabledValue(setting.AllowedValues, requirement) is null)
                 missing.Add(requirement);
         }
         return missing;
@@ -396,7 +398,7 @@ public static class FirmwareCompatibilityService
             var name = FindSettingName(settings.Select(x => x.Name), requirement);
             if (name is null) continue;
             var current = settings.First(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
-            var enabled = SelectEnabledValue(current.AllowedValues);
+            var enabled = SelectEnabledValue(current.AllowedValues, requirement);
             var alreadyEnabled = string.Equals(current.Value, "Enabled", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(current.Value, "Enable", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(current.Value, "On", StringComparison.OrdinalIgnoreCase) ||
